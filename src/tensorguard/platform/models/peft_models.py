@@ -29,7 +29,7 @@ class IntegrationConfig(SQLModel, table=True):
     name: str = Field(index=True)
     connector_id: str = Field(index=True) # e.g. "mlflow", "s3"
     category: ConnectorCategory
-    config_json: str = Field(default="{}", sa_column=Column(JSON))
+    config_json: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -41,7 +41,7 @@ class PeftWizardDraft(SQLModel, table=True):
     tenant_id: str = Field(index=True)
     user_id: str = Field(index=True)
     step: int = Field(default=1)
-    draft_json: str = Field(default="{}", sa_column=Column(JSON))
+    draft_json: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 class PeftRun(SQLModel, table=True):
@@ -56,15 +56,15 @@ class PeftRun(SQLModel, table=True):
     progress: float = Field(default=0.0) # 0.0 to 100.0
     
     # Configuration
-    config_json: str = Field(default="{}", sa_column=Column(JSON))
+    config_json: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     
     # Metrics and Logs
-    metrics_json: str = Field(default="{}", sa_column=Column(JSON))
+    metrics_json: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     log_path: Optional[str] = None
     
     # Policy & Governance
     policy_verdict: Optional[str] = None # PASS/FAIL
-    policy_details_json: Optional[str] = Field(default="{}", sa_column=Column(JSON))
+    policy_details_json: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     
     # Artifacts
     adapter_path: Optional[str] = None
