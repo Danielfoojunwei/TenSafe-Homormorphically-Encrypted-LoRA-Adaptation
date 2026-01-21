@@ -3,6 +3,13 @@ import pytest
 
 from tensorguard.utils.production_gates import ProductionGateError, is_production
 
+# Check if tenseal is available (required for serving.backend imports)
+try:
+    import tenseal
+    TENSEAL_AVAILABLE = True
+except ImportError:
+    TENSEAL_AVAILABLE = False
+
 
 def test_tpm_simulator_blocked_in_production(monkeypatch):
     monkeypatch.setenv("TG_ENVIRONMENT", "production")
@@ -39,6 +46,7 @@ def test_key_provider_factory_blocks_unsupported_in_production(monkeypatch):
         KeyProviderFactory.create("pkcs11")
 
 
+@pytest.mark.skipif(not TENSEAL_AVAILABLE, reason="tenseal not installed")
 def test_native_backend_blocked_in_production(monkeypatch):
     monkeypatch.setenv("TG_ENVIRONMENT", "production")
     is_production.cache_clear()

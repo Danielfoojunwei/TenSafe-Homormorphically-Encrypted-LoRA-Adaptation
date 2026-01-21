@@ -3,8 +3,20 @@ import pytest
 import os
 import shutil
 import json
-from tensorguard.tgsp.cli import main
 from unittest.mock import patch, MagicMock
+
+# Check if liboqs is available (required for PQC signing)
+try:
+    from tensorguard.crypto.pqc.dilithium import Dilithium3
+    Dilithium3()  # Try to instantiate
+    LIBOQS_AVAILABLE = True
+except (ImportError, Exception):
+    LIBOQS_AVAILABLE = False
+
+# Import main only if dependencies are available
+if LIBOQS_AVAILABLE:
+    from tensorguard.tgsp.cli import main
+
 
 @pytest.fixture
 def tgsp_test_env(tmp_path):
@@ -22,6 +34,7 @@ def tgsp_test_env(tmp_path):
     
     return input_dir, out_dir, keys_dir
 
+@pytest.mark.skipif(not LIBOQS_AVAILABLE, reason="liboqs (PQC) not installed")
 def test_full_flow_v02(tgsp_test_env):
     input_dir, out_dir, keys_dir = tgsp_test_env
     
@@ -78,6 +91,7 @@ def test_full_flow_v02(tgsp_test_env):
     # It writes to artifacts/evidence by default.
     # We can check global store or file existence if path known.
     
+@pytest.mark.skipif(not LIBOQS_AVAILABLE, reason="liboqs (PQC) not installed")
 def test_full_flow_v03_hpke(tgsp_test_env):
     input_dir, out_dir, keys_dir = tgsp_test_env
     

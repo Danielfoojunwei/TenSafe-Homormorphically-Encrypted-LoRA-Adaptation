@@ -1,0 +1,27 @@
+{
+  "tgsp_version": "0.2",
+  "package_id": "399ea594bc43a913",
+  "model_name": "unknown",
+  "model_version": "1.0.0",
+  "author_id": "anonymous",
+  "producer_pubkey_ed25519": null,
+  "created_at": 1768957782.307008,
+  "payload_hash": "pending",
+  "content_index": [],
+  "policy_constraints": {},
+  "build_info": {
+    "workflow_version": "2.0",
+    "simulation_mode": "True"
+  },
+  "compat_base_model_id": [],
+  "privacy": {
+    "mode": "off",
+    "provider": null,
+    "profile": null,
+    "sidecar_image_digest": null,
+    "encrypted_feature_schema_hash": null,
+    "router_model_hash": null,
+    "provider_version": null,
+    "scheme_params_hash": null
+  }
+}

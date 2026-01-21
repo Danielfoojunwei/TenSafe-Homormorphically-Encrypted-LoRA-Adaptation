@@ -7,6 +7,10 @@ import os
 import sys
 import numpy as np
 from pathlib import Path
+import pytest
+
+# Skip entire module if tenseal is not available
+tenseal = pytest.importorskip("tenseal", reason="tenseal (FHE library) not installed")
 
 # Add src to path
 sys.path.append(os.path.join(os.getcwd(), "src"))
@@ -16,9 +20,10 @@ from tensorguard.core.crypto import N2HEContext
 from tensorguard.moai.keys import MoaiKeyManager, MoaiConfig
 from tensorguard.agent.identity.csr_generator import CSRGenerator
 
+
 def verify_unified_fabric():
     print("=== Unified Key Fabric Verification ===")
-    
+
     # 1. Verify N2HE (Aggregation)
     print("\n[Scope: AGGREGATION] Testing N2HE Key")
     ctx = N2HEContext()
@@ -53,8 +58,14 @@ def verify_unified_fabric():
     assert len([k for k in all_keys if k['scope'] == 'aggregation']) >= 1
     assert len([k for k in all_keys if k['scope'] == 'inference']) >= 1
     assert len([k for k in all_keys if k['scope'] == 'identity']) >= 1
-    
+
     print("\nUnified Fabric Status: OPERATIONAL")
+
+
+def test_unified_fabric():
+    """Pytest entry point for the unified fabric verification."""
+    verify_unified_fabric()
+
 
 if __name__ == "__main__":
     try:

@@ -125,7 +125,7 @@ class PeftWorkflow:
         runs_dir.mkdir(parents=True, exist_ok=True)
         return runs_dir
     
-    async def _stage_data_resolve(self) -> bool:
+    async def _stage_data_resolve(self):
         """Stage 1: Resolve and validate dataset."""
         self._update_run("DATA_RESOLVE", 5.0)
         yield self.log("Resolving dataset...")
@@ -139,10 +139,8 @@ class PeftWorkflow:
         
         if SIMULATION_MODE:
             await asyncio.sleep(0.3)
-        
-        return True
-    
-    async def _stage_train(self) -> bool:
+
+    async def _stage_train(self):
         """Stage 2: Execute PEFT training."""
         self._update_run("TRAINING", 10.0)
         yield self.log("Starting training backend...")
@@ -188,17 +186,15 @@ class PeftWorkflow:
                     if "OOM" in str(result.get("error", "")):
                         self.diagnosis.add_remediation("Reduce batch_size or max_seq_length")
                         self.diagnosis.add_remediation("Enable gradient checkpointing")
-                    return False
-                
+                    return
+
                 self.metrics = result.get("metrics", {})
                 self.artifacts["adapter_path"] = result.get("adapter_path", "")
             except Exception as e:
                 self.diagnosis = DiagnosisReport("TRAINING", str(e))
-                return False
-        
-        return True
-    
-    async def _stage_eval(self) -> bool:
+                return
+
+    async def _stage_eval(self):
         """Stage 3: Evaluate adapter quality and forgetting."""
         self._update_run("EVAL", 60.0)
         yield self.log("Running evaluation suite...")
@@ -217,10 +213,8 @@ class PeftWorkflow:
             "mode": self.privacy_mode,
             "profile": self.privacy_profile,
         }
-        
-        return True
-    
-    async def _stage_pack_tgsp(self) -> bool:
+
+    async def _stage_pack_tgsp(self):
         """Stage 4: Package adapter into TGSP bundle."""
         self._update_run("PACK_TGSP", 70.0)
         yield self.log("Packaging adapters into TGSP...")
@@ -265,10 +259,8 @@ class PeftWorkflow:
         
         if SIMULATION_MODE:
             await asyncio.sleep(0.2)
-        
-        return True
-    
-    async def _stage_emit_evidence(self) -> bool:
+
+    async def _stage_emit_evidence(self):
         """Stage 5: Emit evidence chain events."""
         self._update_run("EMIT_EVIDENCE", 85.0)
         yield self.log("Emitting evidence chain events...")
@@ -299,13 +291,11 @@ class PeftWorkflow:
         
         if self.run:
             self.run.evidence_path = str(evidence_path)
-        
+
         if SIMULATION_MODE:
             await asyncio.sleep(0.2)
-        
-        return True
-    
-    async def _stage_register(self) -> bool:
+
+    async def _stage_register(self):
         """Stage 6: Register adapter in registry."""
         self._update_run("REGISTER", 95.0)
         yield self.log("Registering adapter in registry...")
@@ -316,12 +306,10 @@ class PeftWorkflow:
         
         if self.run:
             self.run.registry_ref = registry_ref
-        
+
         if SIMULATION_MODE:
             await asyncio.sleep(0.1)
-        
-        return True
-    
+
     async def execute(self):
         """
         Execute the complete PEFT workflow.

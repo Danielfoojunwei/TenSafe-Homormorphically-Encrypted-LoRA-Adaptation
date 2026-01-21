@@ -1,7 +1,7 @@
 # Makefile for TensorGuardFlow
 # Automation for build, test, and security verification
 
-.PHONY: install test agent bench clean reports lint setup ci typecheck
+.PHONY: install test agent bench bench-full bench-quick bench-report bench-regression bench-ci clean reports lint setup ci typecheck
 
 # Default target
 all: test
@@ -36,7 +36,7 @@ agent:
 	@echo "--- Starting TensorGuard Unified Agent ---"
 	export PYTHONPATH=src && python -m tensorguard.agent.daemon
 
-# Benchmarking Subsystem
+# Benchmarking Subsystem (Legacy Microbenchmarks)
 bench:
 	@echo "--- Running TensorGuard Microbenchmarks ---"
 	export PYTHONPATH=src && python -m tensorguard.bench.cli micro
@@ -44,6 +44,41 @@ bench:
 	export PYTHONPATH=src && python -m tensorguard.bench.cli privacy
 	@echo "--- Generating Benchmarking Report ---"
 	export PYTHONPATH=src && python -m tensorguard.bench.cli report
+
+# Performance Benchmarking Suite (HTTP, Telemetry, Resources)
+bench-full:
+	@echo "=== TensorGuardFlow Full Performance Benchmark Suite ==="
+	@echo "This requires a running TensorGuardFlow server at http://localhost:8000"
+	@mkdir -p artifacts/benchmarks
+	python -m benchmarks.runner --load moderate --duration 60 --output artifacts/benchmarks
+	@echo "=== Generating Analysis Report ==="
+	python -c "from benchmarks.analyzer import analyze_results; analyze_results('artifacts/benchmarks/benchmark_results_latest.json', 'docs')"
+
+# Quick benchmark for development (light load, short duration)
+bench-quick:
+	@echo "=== Quick Performance Benchmark ==="
+	@mkdir -p artifacts/benchmarks
+	python -m benchmarks.runner --load light --duration 30 --output artifacts/benchmarks
+
+# Generate analysis report from existing results
+bench-report:
+	@echo "=== Generating Benchmark Analysis Report ==="
+	@test -f artifacts/benchmarks/benchmark_results_latest.json || (echo "Error: No benchmark results found. Run 'make bench-full' first." && exit 1)
+	python -c "from benchmarks.analyzer import analyze_results; analyze_results('artifacts/benchmarks/benchmark_results_latest.json', 'docs')"
+	@echo "Report generated at: docs/performance_benchmark_report.md"
+
+# Run regression tests against thresholds
+bench-regression:
+	@echo "=== Performance Regression Test ==="
+	@test -f artifacts/benchmarks/benchmark_results_latest.json || (echo "Error: No benchmark results found. Run 'make bench-full' first." && exit 1)
+	python -m benchmarks.regression_test artifacts/benchmarks/benchmark_results_latest.json
+
+# CI-friendly benchmark: quick test with regression check
+bench-ci:
+	@echo "=== CI Performance Benchmark ==="
+	@mkdir -p artifacts/benchmarks
+	python -m benchmarks.runner --load light --duration 30 --output artifacts/benchmarks
+	python -m benchmarks.regression_test artifacts/benchmarks/benchmark_results_latest.json --junit artifacts/benchmarks/regression_junit.xml
 
 # Linting
 lint:

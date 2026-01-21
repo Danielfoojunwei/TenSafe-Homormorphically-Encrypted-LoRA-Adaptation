@@ -387,6 +387,43 @@ def warn_incomplete_feature(
         logger.info(f"[DEV MODE] {msg}")
 
 
+def require_production_gate(
+    gate_name: str,
+    message: str,
+    remediation: Optional[str] = None,
+    allow_env_var: Optional[str] = None,
+) -> None:
+    """
+    Require a production gate to pass, or raise ProductionGateError.
+
+    This is a general-purpose gate that blocks an operation in production
+    unless explicitly allowed via environment variable.
+
+    Args:
+        gate_name: Name of the gate for error messages
+        message: Description of why this is blocked
+        remediation: How to fix (defaults to generic message)
+        allow_env_var: If set, check this env var to allow the operation
+
+    Raises:
+        ProductionGateError: If in production and not allowed
+    """
+    if not is_production():
+        logger.warning(f"[DEV MODE] Gate {gate_name}: {message}")
+        return
+
+    # Check if explicitly allowed via env var
+    if allow_env_var and os.getenv(allow_env_var, "").lower() == "true":
+        logger.warning(f"[PRODUCTION] Gate {gate_name} bypassed via {allow_env_var}")
+        return
+
+    raise ProductionGateError(
+        gate_name=gate_name,
+        message=message,
+        remediation=remediation or f"This operation is not allowed in production."
+    )
+
+
 def assert_feature_available(
     feature_name: str,
     required_modules: List[str],

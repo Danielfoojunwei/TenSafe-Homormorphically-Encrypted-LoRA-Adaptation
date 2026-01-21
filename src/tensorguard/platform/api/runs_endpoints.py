@@ -10,7 +10,16 @@ import shutil
 import uuid
 
 router = APIRouter()
-policy_engine = PolicyEngine() # Initialize engine (loads packs)
+
+# Lazy-loaded policy engine to avoid database access at import time
+_policy_engine = None
+
+def get_policy_engine() -> PolicyEngine:
+    """Lazy-load the policy engine on first use."""
+    global _policy_engine
+    if _policy_engine is None:
+        _policy_engine = PolicyEngine()
+    return _policy_engine
 
 @router.post("/runs", response_model=Run)
 def create_run(run_data: Dict[str, Any], session: Session = Depends(get_session)):
@@ -101,7 +110,7 @@ def evaluate_run(
         report_data = {"metrics": json.loads(run.metrics_json)}
         
     try:
-        result = policy_engine.evaluate(run_id, report_data, pack_id)
+        result = get_policy_engine().evaluate(run_id, report_data, pack_id)
         session.add(result)
         run.status = "evaluated"
         session.add(run)

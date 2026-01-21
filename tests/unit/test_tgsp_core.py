@@ -5,6 +5,21 @@ import shutil
 import json
 from cryptography.hazmat.primitives.asymmetric import ed25519, x25519
 from cryptography.hazmat.primitives import serialization
+
+# Check if liboqs is available (required for PQC signing)
+try:
+    from tensorguard.crypto.pqc.dilithium import Dilithium3
+    Dilithium3()
+    LIBOQS_AVAILABLE = True
+except (ImportError, Exception):
+    LIBOQS_AVAILABLE = False
+
+# Skip entire module if liboqs is not available
+pytestmark = pytest.mark.skipif(
+    not LIBOQS_AVAILABLE,
+    reason="liboqs (PQC) not installed - required for hybrid TGSP crypto"
+)
+
 from tensorguard.tgsp.service import TGSPService
 from tensorguard.tgsp import crypto
 

@@ -1,0 +1,26 @@
+{
+  "event_id": "d600d3ab-f675-4dab-b42f-ef0010dbef0b",
+  "event_type": "TGSP_BUILT",
+  "timestamp": 1768957782.5094707,
+  "tenant_id": "default",
+  "fleet_id": null,
+  "agent_id": null,
+  "subject": {},
+  "manifest_hash": "d68e1cf30b301d622a22c3101566996a117d65ebd3b01965b61e31a99120a096",
+  "recipients_hash": null,
+  "payload_hash": null,
+  "policy_hash": null,
+  "claims_hash": null,
+  "attestation_id": null,
+  "result": {
+    "status": "success",
+    "privacy_mode": "off"
+  },
+  "metrics": {
+    "primary_metric": 0.92,
+    "forgetting_score": 0.05,
+    "loss": 0.15
+  },
+  "artifacts": [],
+  "signature": null
+}
