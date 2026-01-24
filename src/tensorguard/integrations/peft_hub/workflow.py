@@ -27,7 +27,9 @@ from ...privacy.safe_logger import get_safe_logger
 logger = get_safe_logger(__name__)
 
 # Check for simulation mode
+# Check for simulation and demo modes
 SIMULATION_MODE = os.getenv("TG_SIMULATION", "false").lower() == "true"
+DEMO_MODE = os.getenv("TG_DEMO_MODE", "false").lower() == "true"
 
 
 class DiagnosisReport:
@@ -139,24 +141,12 @@ class PeftWorkflow:
         
         if SIMULATION_MODE:
             await asyncio.sleep(0.3)
+        return
 
-    async def _stage_train(self):
+    async def _stage_train(self) -> bool:
         """Stage 2: Execute PEFT training."""
         self._update_run("TRAINING", 10.0)
         yield self.log("Starting training backend...")
-        
-        training_connector = ConnectorCatalog.get_connector("training_hf")
-        training_config = self.config if isinstance(self.config, dict) else self.config.training_config
-        if hasattr(training_config, 'model_dump'):
-            training_config = training_config.model_dump()
-        
-        trainer = training_connector.to_runtime(training_config)
-        
-        def training_callback(message: str) -> None:
-            self.logs.append(f"[TRAIN] {message}")
-        
-        # Execute training
-        yield self.log("Executing PEFT training...")
         
         if SIMULATION_MODE:
             # Simulated training
@@ -177,24 +167,61 @@ class PeftWorkflow:
                 },
             }
             self.artifacts["adapter_path"] = str(self._create_runs_dir() / "adapter")
-        else:
-            # Real training
-            try:
-                result = trainer.run(log_callback=training_callback)
-                if result.get("status") != "ok":
-                    self.diagnosis = DiagnosisReport("TRAINING", result.get("error", "Training failed"))
-                    if "OOM" in str(result.get("error", "")):
-                        self.diagnosis.add_remediation("Reduce batch_size or max_seq_length")
-                        self.diagnosis.add_remediation("Enable gradient checkpointing")
-                    return
+            return
 
-                self.metrics = result.get("metrics", {})
-                self.artifacts["adapter_path"] = result.get("adapter_path", "")
-            except Exception as e:
-                self.diagnosis = DiagnosisReport("TRAINING", str(e))
+        training_connector = ConnectorCatalog.get_connector("training_hf")
+        training_config = self.config if isinstance(self.config, dict) else self.config.training_config
+        
+        # Override for Demo Mode
+        if DEMO_MODE:
+            yield self.log("DEMO MODE ACTIVE: Forcing tiny training configuration")
+            if hasattr(training_config, 'dict'): # Pydantic v1
+                training_config = training_config.dict()
+            elif hasattr(training_config, 'model_dump'): # Pydantic v2
+                training_config = training_config.model_dump()
+            elif not isinstance(training_config, dict):
+                training_config = {}
+                
+            training_config.update({
+                "num_train_epochs": 1,
+                "max_steps": 2, # Force very short run
+                "per_device_train_batch_size": 1,
+                "per_device_eval_batch_size": 1,
+                "gradient_accumulation_steps": 1,
+                "logging_steps": 1,
+                "eval_steps": 1,
+                "save_steps": 1,
+            })
+            
+        if hasattr(training_config, 'model_dump') and not isinstance(training_config, dict):
+            training_config = training_config.model_dump()
+        
+        trainer = training_connector.to_runtime(training_config)
+        
+        def training_callback(message: str) -> None:
+            self.logs.append(f"[TRAIN] {message}")
+        
+        # Execute training
+        yield self.log("Executing PEFT training...")
+        # Real training
+        try:
+            result = trainer.run(log_callback=training_callback)
+            if result.get("status") != "ok":
+                self.diagnosis = DiagnosisReport("TRAINING", result.get("error", "Training failed"))
+                if "OOM" in str(result.get("error", "")):
+                    self.diagnosis.add_remediation("Reduce batch_size or max_seq_length")
+                    self.diagnosis.add_remediation("Enable gradient checkpointing")
                 return
-
-    async def _stage_eval(self):
+            
+            self.metrics = result.get("metrics", {})
+            self.artifacts["adapter_path"] = result.get("adapter_path", "")
+        except Exception as e:
+            self.diagnosis = DiagnosisReport("TRAINING", str(e))
+            return
+        
+        return
+    
+    async def _stage_eval(self) -> bool:
         """Stage 3: Evaluate adapter quality and forgetting."""
         self._update_run("EVAL", 60.0)
         yield self.log("Running evaluation suite...")
@@ -213,8 +240,9 @@ class PeftWorkflow:
             "mode": self.privacy_mode,
             "profile": self.privacy_profile,
         }
-
-    async def _stage_pack_tgsp(self):
+        return
+    
+    async def _stage_pack_tgsp(self) -> bool:
         """Stage 4: Package adapter into TGSP bundle."""
         self._update_run("PACK_TGSP", 70.0)
         yield self.log("Packaging adapters into TGSP...")
@@ -259,8 +287,9 @@ class PeftWorkflow:
         
         if SIMULATION_MODE:
             await asyncio.sleep(0.2)
-
-    async def _stage_emit_evidence(self):
+        return
+    
+    async def _stage_emit_evidence(self) -> bool:
         """Stage 5: Emit evidence chain events."""
         self._update_run("EMIT_EVIDENCE", 85.0)
         yield self.log("Emitting evidence chain events...")
@@ -294,8 +323,9 @@ class PeftWorkflow:
 
         if SIMULATION_MODE:
             await asyncio.sleep(0.2)
-
-    async def _stage_register(self):
+        return
+    
+    async def _stage_register(self) -> bool:
         """Stage 6: Register adapter in registry."""
         self._update_run("REGISTER", 95.0)
         yield self.log("Registering adapter in registry...")
@@ -309,7 +339,7 @@ class PeftWorkflow:
 
         if SIMULATION_MODE:
             await asyncio.sleep(0.1)
-
+        return
     async def execute(self):
         """
         Execute the complete PEFT workflow.

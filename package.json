@@ -1,0 +1,7 @@
+{
+    "name": "tensorguard-qa",
+    "private": true,
+    "devDependencies": {
+        "@playwright/test": "^1.42.1"
+    }
+}

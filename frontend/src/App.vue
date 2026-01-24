@@ -1,108 +1,39 @@
-<script setup>
-import { ref } from 'vue'
-import Sidebar from './components/Sidebar.vue'
-import Header from './components/Header.vue'
-
-// Consolidated Views
-import CommandCenter from './components/CommandCenter.vue'
-import ModelsWorkbench from './components/ModelsWorkbench.vue'
-import OperationsCenter from './components/OperationsCenter.vue'
-import SecurityCenter from './components/SecurityCenter.vue'
-import GlobalSettings from './components/GlobalSettings.vue'
-
-// Main navigation state
-const activeTab = ref('dashboard')
-
-// Sub-tab states for deep linking
-const modelTab = ref('registry')
-const operationsTab = ref('fleets')
-const securityTab = ref('overview')
-
-// Handle navigation events from child components
-const handleNavigate = (target) => {
-  if (typeof target === 'object') {
-    activeTab.value = target.page
-    if (target.tab) {
-      switch (target.page) {
-        case 'models':
-          modelTab.value = target.tab
-          break
-        case 'operations':
-          operationsTab.value = target.tab
-          break
-        case 'security':
-          securityTab.value = target.tab
-          break
-      }
-    }
-  } else {
-    activeTab.value = target
-  }
-}
-</script>
-
 <template>
-  <div class="flex h-screen bg-background text-secondary overflow-hidden">
-    <!-- Sidebar -->
-    <Sidebar :activeTab="activeTab" @update:activeTab="handleNavigate" />
+  <div class="h-screen bg-[#0a0a0a] text-gray-100 flex overflow-hidden">
+    <!-- Sidebar (Core Only) -->
+    <aside class="w-64 bg-[#111] border-r border-[#222] flex flex-col">
+       <div class="p-6 border-b border-[#222]">
+         <h1 class="font-bold text-lg flex items-center gap-2">
+            <div class="w-6 h-6 bg-orange-600 rounded"></div>
+            TensorGuardFlow
+         </h1>
+         <div class="text-xs text-gray-500 mt-1">Continuous Control Plane</div>
+       </div>
+
+       <nav class="flex-1 p-4 space-y-1">
+          <router-link to="/" class="nav-item">
+              <span class="material-icons text-sm">dashboard</span> Dashboard
+          </router-link>
+          <!-- Add other Core links if needed, usually Dashboard links to details -->
+       </nav>
+
+       <div class="p-4 border-t border-[#222] text-xs text-center text-gray-600">
+          v2.3.0 Core
+       </div>
+    </aside>
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col ml-64 transition-all duration-300">
-      <Header />
-
-      <main class="flex-1 overflow-hidden relative">
-        <!-- Content Switcher -->
-        <transition name="fade" mode="out-in">
-          <!-- Command Center (Dashboard) -->
-          <div v-if="activeTab === 'dashboard'" class="h-full overflow-y-auto">
-            <CommandCenter @navigate="handleNavigate" />
-          </div>
-
-          <!-- Models Workbench -->
-          <div v-else-if="activeTab === 'models'" class="h-full overflow-hidden">
-            <ModelsWorkbench :initialTab="modelTab" @navigate="handleNavigate" />
-          </div>
-
-          <!-- Operations Center -->
-          <div v-else-if="activeTab === 'operations'" class="h-full overflow-hidden">
-            <OperationsCenter :initialTab="operationsTab" @navigate="handleNavigate" />
-          </div>
-
-          <!-- Security Center -->
-          <div v-else-if="activeTab === 'security'" class="h-full overflow-hidden">
-            <SecurityCenter :initialTab="securityTab" @navigate="handleNavigate" />
-          </div>
-
-          <!-- Settings -->
-          <div v-else-if="activeTab === 'settings'" class="h-full overflow-y-auto p-6">
-            <GlobalSettings />
-          </div>
-
-          <!-- Fallback -->
-          <div v-else class="h-full overflow-y-auto p-6 flex items-center justify-center">
-            <div class="text-gray-500 text-center">
-              <div class="text-4xl mb-4">404</div>
-              <div>View not found: {{ activeTab }}</div>
-            </div>
-          </div>
-        </transition>
-      </main>
-    </div>
+    <main class="flex-1 overflow-auto">
+       <router-view></router-view>
+    </main>
   </div>
 </template>
 
-<style>
-.bg-app { background-color: #000000; }
-.bg-card { background-color: #0d1117; }
-.border-border { border-color: #30363d; }
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
+<style scoped>
+.nav-item {
+    @apply flex items-center gap-3 px-3 py-2 rounded text-gray-400 hover:bg-[#222] hover:text-white transition-colors;
 }
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.router-link-active {
+    @apply bg-[#222] text-white font-medium;
 }
 </style>

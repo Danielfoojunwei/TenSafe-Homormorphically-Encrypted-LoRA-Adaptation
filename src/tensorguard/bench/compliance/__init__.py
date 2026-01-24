@@ -1,3 +1,0 @@
-"""
-Compliance Evidence Generation
-"""

@@ -82,4 +82,20 @@ logs/
 # Node
 frontend/node_modules/
 frontend/dist/
+
+# ============================================
+# Large Data & Runs
+# ============================================
+runs/
+outputs/
+tmp/
+cache/
+tmp_keys/
+*.safetensors
+*.pt
+*.bin
+*.mp4
+*.mov
 *.zip
+*.tar
+

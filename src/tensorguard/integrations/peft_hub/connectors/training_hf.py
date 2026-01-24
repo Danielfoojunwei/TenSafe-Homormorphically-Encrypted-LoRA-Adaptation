@@ -183,9 +183,15 @@ class RealTrainer:
             dataset_name = self.config.get("dataset_name")
 
             if dataset_path and os.path.exists(dataset_path):
-                from datasets import load_from_disk
-
-                dataset = load_from_disk(dataset_path)
+                if os.path.isdir(dataset_path):
+                    from datasets import load_from_disk
+                    dataset = load_from_disk(dataset_path)
+                else:
+                    # Support single file datasets (json, jsonl, csv)
+                    from datasets import load_dataset
+                    ext = dataset_path.rsplit(".", 1)[-1]
+                    if ext == "jsonl": ext = "json"
+                    dataset = load_dataset(ext, data_files=dataset_path, split="train")
             elif dataset_name:
                 from datasets import load_dataset
 
@@ -270,7 +276,7 @@ class RealTrainer:
                 "samples_trained": len(tokenized_dataset),
             }
 
-            return {"status": "success", "metrics": metrics}
+            return {"status": "ok", "metrics": metrics}
 
         except Exception as e:
             logger.error(f"Training failed: {e}")
@@ -352,7 +358,7 @@ class DemoTrainer:
             f.write("DEMO_ADAPTER_PLACEHOLDER_NOT_FOR_PRODUCTION")
 
         return {
-            "status": "demo_success",
+            "status": "ok",
             "warning": "This was a demo run - not real training",
             "metrics": {
                 "mode": "demo",

@@ -1,3 +1,0 @@
-"""
-TensorGuard Benchmark Suite
-"""

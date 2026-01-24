@@ -10,7 +10,6 @@ import shutil
 import uuid
 
 router = APIRouter()
-
 # Lazy-loaded policy engine to avoid database access at import time
 _policy_engine = None
 
@@ -87,7 +86,8 @@ async def upload_artifact(
 def evaluate_run(
     run_id: str, 
     pack_id: str = "soc2-evidence-pack",
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    policy_engine: PolicyEngine = Depends(get_policy_engine)
 ):
     """Evaluate a run against a policy pack."""
     run = session.get(Run, run_id)

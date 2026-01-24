@@ -1,0 +1,5 @@
+{
+    "feed_type": "local",
+    "feed_uri": "tests/fixtures/demo_dataset.jsonl",
+    "privacy_mode": "off"
+}
