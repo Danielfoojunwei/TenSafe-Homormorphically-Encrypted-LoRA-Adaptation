@@ -72,6 +72,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         return response
 
+from ..integrations.peft_hub.catalog import discover_connectors
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_startup_config(
@@ -82,6 +84,14 @@ async def lifespan(app: FastAPI):
         required_dependencies=[("cryptography", "Install cryptography: pip install cryptography>=41.0")],
     )
     # Startup logic (e.g., connector discovery)
+    discover_connectors()
+    
+    # Auto-initialize database for Demo Mode
+    if os.getenv("TG_DEMO_MODE") == "true":
+        from .database import engine, SQLModel
+        logger.info("DEMO_MODE: Initializing database tables...")
+        SQLModel.metadata.create_all(engine)
+        
     logger.info("Starting TensorGuard Management Platform...")
     yield
     # Shutdown logic
@@ -225,68 +235,73 @@ from .api import config_endpoints
 app.include_router(config_endpoints.router, prefix="/api/v1/config", tags=["config"])
 
 # Enablement routes (Trust Console)
-from .api import enablement_endpoints
-app.include_router(enablement_endpoints.router, prefix="/api/v1/enablement", tags=["enablement"])
+# from .api import enablement_endpoints
+# app.include_router(enablement_endpoints.router, prefix="/api/v1/enablement", tags=["enablement"])
 
 # Runs & Evidence
 from .api import runs_endpoints
 app.include_router(runs_endpoints.router, prefix="/api/v1", tags=["runs"])
 
 # Community TGSP
-from .api import community_tgsp
-app.include_router(community_tgsp.router, prefix="/api/community/tgsp", tags=["community-tgsp"])
+# from .api import community_tgsp
+# app.include_router(community_tgsp.router, prefix="/api/community/tgsp", tags=["community-tgsp"])
 
 # PEFT Studio
-from .api import peft_endpoints
-app.include_router(peft_endpoints.router, prefix="/api/v1/peft", tags=["peft"])
+# from .api import peft_endpoints
+# app.include_router(peft_endpoints.router, prefix="/api/v1/peft", tags=["peft"])
+
+# Continuous Learning (TGFlow Core)
+from .api import continuous_endpoints, metrics_endpoints
+app.include_router(continuous_endpoints.router, prefix="/api/v1", tags=["continuous-learning"])
+app.include_router(metrics_endpoints.router, prefix="/api/v1")
 
 # FedMoE Experts & Skills Library
-from .api import fedmoe_endpoints
-app.include_router(fedmoe_endpoints.router, prefix="/api/v1/fedmoe", tags=["fedmoe"])
+# from .api import fedmoe_endpoints
+# app.include_router(fedmoe_endpoints.router, prefix="/api/v1/fedmoe", tags=["fedmoe"])
 
 # System Settings
 from .api import settings_endpoints
 app.include_router(settings_endpoints.router, prefix="/api/v1", tags=["settings"])
 
 # Pipeline Configuration
-from .api import pipeline_config_endpoints
-app.include_router(pipeline_config_endpoints.router, prefix="/api/v1", tags=["pipeline-config"])
+# from .api import pipeline_config_endpoints
+# app.include_router(pipeline_config_endpoints.router, prefix="/api/v1", tags=["pipeline-config"])
 
 # KMS (Key Management Service)
-from .api import kms_endpoints
-app.include_router(kms_endpoints.router, prefix="/api/v1", tags=["kms"])
+# from .api import kms_endpoints
+# app.include_router(kms_endpoints.router, prefix="/api/v1", tags=["kms"])
 
 # Advanced 3-Tier Gating & Forensics
-from .api import edge_gating_endpoints
-app.include_router(edge_gating_endpoints.router, prefix="/api/v1", tags=["edge-gating"])
+# from .api import edge_gating_endpoints
+# app.include_router(edge_gating_endpoints.router, prefix="/api/v1", tags=["edge-gating"])
 
-from .api import skills_library_endpoints
-app.include_router(skills_library_endpoints.router, prefix="/api/v1", tags=["skills-library"])
+# from .api import skills_library_endpoints
+# app.include_router(skills_library_endpoints.router, prefix="/api/v1", tags=["skills-library"])
 
-from .api import bayesian_policy_endpoints
-app.include_router(bayesian_policy_endpoints.router, prefix="/api/v1", tags=["bayesian-policy"])
+# from .api import bayesian_policy_endpoints
+# app.include_router(bayesian_policy_endpoints.router, prefix="/api/v1", tags=["bayesian-policy"])
 
-from .api import forensics_endpoints
-app.include_router(forensics_endpoints.router, prefix="/api/v1", tags=["forensics"])
+# from .api import forensics_endpoints
+# app.include_router(forensics_endpoints.router, prefix="/api/v1", tags=["forensics"])
 
-from .api import integrations_endpoints
-app.include_router(integrations_endpoints.router, prefix="/api/v1", tags=["integrations"])
+# from .api import integrations_endpoints
+# app.include_router(integrations_endpoints.router, prefix="/api/v1", tags=["integrations"])
 
 # Model Lineage (Version Control)
-from .api import lineage_endpoints
-app.include_router(lineage_endpoints.router, prefix="/api/v1", tags=["lineage"])
+# from .api import lineage_endpoints
+# app.include_router(lineage_endpoints.router, prefix="/api/v1", tags=["lineage"])
 
 # VLA (Vision-Language-Action) for Robotics
-from .api import vla_endpoints
-app.include_router(vla_endpoints.router, prefix="/api/v1", tags=["vla"])
+# from .api import vla_endpoints
+# app.include_router(vla_endpoints.router, prefix="/api/v1", tags=["vla"])
 
 # Production Telemetry Ingestion & Query
-from .api import telemetry_endpoints
-app.include_router(telemetry_endpoints.router, prefix="/api/v1", tags=["telemetry"])
+# from .api import telemetry_endpoints
+# app.include_router(telemetry_endpoints.router, prefix="/api/v1", tags=["telemetry"])
 
 # Deployment Management (Canary, A/B, Shadow, Rollback)
-from .api import deployment_endpoints
-app.include_router(deployment_endpoints.router, prefix="/api/v1", tags=["deployments"])
+# from .api import deployment_endpoints
+# app.include_router(deployment_endpoints.router, prefix="/api/v1", tags=["deployments"])
 
 # Enterprise Stubs (Proprietary Boundary)
 try:

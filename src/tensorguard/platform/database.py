@@ -7,7 +7,7 @@ health checks, and environment-based configuration.
 
 from sqlmodel import SQLModel, create_engine, Session
 from sqlalchemy.pool import QueuePool, NullPool
-from sqlalchemy import event
+from sqlalchemy import event, text
 from ..utils.config import settings
 import os
 import logging
@@ -30,6 +30,9 @@ from .models.settings_models import SystemSetting, KMSKey, KMSRotationLog  # noq
 from .models.vla_models import (  # noqa: F401
     VLAModel, VLASafetyCheck, VLADeploymentLog, VLABenchmarkResult
 )
+from .models.continuous_models import Route, Feed, Policy, CandidateEvent, AdapterLifecycleState  # noqa: F401
+from .models.tgflow_core_models import *  # noqa: F401
+from .models.metrics_models import RouteMetricSeries, AdapterMetricSnapshot, RunStepMetrics  # noqa: F401
 
 
 # Environment configuration
@@ -124,7 +127,7 @@ def check_db_health() -> dict:
     """
     try:
         with Session(engine) as session:
-            session.execute("SELECT 1")
+            session.execute(text("SELECT 1"))
 
         pool = engine.pool
         return {
