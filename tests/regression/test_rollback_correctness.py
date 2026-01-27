@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 from unittest.mock import patch, MagicMock
+from conftest import async_iter_mock
 
 
 class TestRollbackCorrectness:
@@ -44,10 +45,10 @@ class TestRollbackCorrectness:
             mock_instance.artifacts = {"adapter_path": "/mock/adapter", "tgsp_path": "/mock/tgsp"}
             mock_instance.metrics = {"eval": {"accuracy": 0.95, "forgetting": 0.01, "regression": 0.01}}
             mock_instance.diagnosis = None
-            mock_instance._stage_train.return_value = iter([])
-            mock_instance._stage_eval.return_value = iter([])
-            mock_instance._stage_pack_tgsp.return_value = iter([])
-            mock_instance._stage_emit_evidence.return_value = iter([])
+            mock_instance._stage_train.return_value = async_iter_mock([])
+            mock_instance._stage_eval.return_value = async_iter_mock([])
+            mock_instance._stage_pack_tgsp.return_value = async_iter_mock([])
+            mock_instance._stage_emit_evidence.return_value = async_iter_mock([])
             MockWorkflow.return_value = mock_instance
 
             # First run - creates first adapter
@@ -121,10 +122,10 @@ class TestRollbackCorrectness:
             mock_instance.artifacts = {"adapter_path": "/mock/adapter", "tgsp_path": "/mock/tgsp"}
             mock_instance.metrics = {"eval": {"accuracy": 0.95, "forgetting": 0.01, "regression": 0.01}}
             mock_instance.diagnosis = None
-            mock_instance._stage_train.return_value = iter([])
-            mock_instance._stage_eval.return_value = iter([])
-            mock_instance._stage_pack_tgsp.return_value = iter([])
-            mock_instance._stage_emit_evidence.return_value = iter([])
+            mock_instance._stage_train.return_value = async_iter_mock([])
+            mock_instance._stage_eval.return_value = async_iter_mock([])
+            mock_instance._stage_pack_tgsp.return_value = async_iter_mock([])
+            mock_instance._stage_emit_evidence.return_value = async_iter_mock([])
             MockWorkflow.return_value = mock_instance
 
             client.post(f"/api/v1/tgflow/routes/{route_key}/run_once", headers=tenant_header)
@@ -173,10 +174,10 @@ class TestRollbackTimeline:
             mock_instance.artifacts = {"adapter_path": "/mock/adapter", "tgsp_path": "/mock/tgsp"}
             mock_instance.metrics = {"eval": {"accuracy": 0.95, "forgetting": 0.01, "regression": 0.01}}
             mock_instance.diagnosis = None
-            mock_instance._stage_train.return_value = iter([])
-            mock_instance._stage_eval.return_value = iter([])
-            mock_instance._stage_pack_tgsp.return_value = iter([])
-            mock_instance._stage_emit_evidence.return_value = iter([])
+            mock_instance._stage_train.return_value = async_iter_mock([])
+            mock_instance._stage_eval.return_value = async_iter_mock([])
+            mock_instance._stage_pack_tgsp.return_value = async_iter_mock([])
+            mock_instance._stage_emit_evidence.return_value = async_iter_mock([])
             MockWorkflow.return_value = mock_instance
 
             # Two runs to have a fallback
@@ -215,10 +216,10 @@ class TestRollbackDiff:
             mock_instance.artifacts = {"adapter_path": "/mock/adapter", "tgsp_path": "/mock/tgsp"}
             mock_instance.metrics = {"eval": {"accuracy": 0.95, "forgetting": 0.01, "regression": 0.01}}
             mock_instance.diagnosis = None
-            mock_instance._stage_train.return_value = iter([])
-            mock_instance._stage_eval.return_value = iter([])
-            mock_instance._stage_pack_tgsp.return_value = iter([])
-            mock_instance._stage_emit_evidence.return_value = iter([])
+            mock_instance._stage_train.return_value = async_iter_mock([])
+            mock_instance._stage_eval.return_value = async_iter_mock([])
+            mock_instance._stage_pack_tgsp.return_value = async_iter_mock([])
+            mock_instance._stage_emit_evidence.return_value = async_iter_mock([])
             MockWorkflow.return_value = mock_instance
 
             client.post(f"/api/v1/tgflow/routes/{route_key}/run_once", headers=tenant_header)

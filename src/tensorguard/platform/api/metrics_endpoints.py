@@ -10,7 +10,7 @@ from ...metrics.schemas import MetricName, MetricUnit
 from ...metrics.route_health import compute_route_health_score
 from ...integrations.framework.manager import IntegrationManager
 
-router = APIRouter(prefix="/api/v1/metrics", tags=["Metrics"])
+router = APIRouter(prefix="/metrics", tags=["Metrics"])
 
 @router.get("/routes/summary")
 async def get_routes_summary(tenant_id: str, session: Session = Depends(get_session)):
@@ -100,7 +100,7 @@ async def get_dashboard_bundle(
     events = session.exec(
         select(CandidateEvent)
         .where(CandidateEvent.route_key == route_key)
-        .order_by(CandidateEvent.ts.desc())
+        .order_by(CandidateEvent.created_at.desc())
         .limit(20)
     ).all()
     
