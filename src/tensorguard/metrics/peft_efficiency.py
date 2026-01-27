@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import os
 
 def compute_peft_efficiency(peft_config: Dict[str, Any], adapter_file_path: Optional[str] = None):

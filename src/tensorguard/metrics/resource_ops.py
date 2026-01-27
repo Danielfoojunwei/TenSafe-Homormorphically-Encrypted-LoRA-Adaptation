@@ -1,7 +1,7 @@
 import logging
 import time
 import psutil
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class StepTimer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.duration_sec = time.perf_counter() - self.start_time
         self.peak_cpu_mb = get_peak_cpu_mem()
-        self.peak_gpu_mb = get_peak_gpu_mem()
+        self.peak_gpu_mb = get_gpu_memory_mb()
         
     def to_dict(self) -> Dict[str, Any]:
         return {

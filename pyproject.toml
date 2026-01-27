@@ -111,6 +111,9 @@ markers = [
     "crypto: marks tests requiring cryptographic operations",
     "privacy: marks tests for privacy features",
     "compliance: marks tests for compliance features",
+    "regression: marks tests as regression tests for critical invariants",
+    "n2he: marks tests for N2HE privacy features",
+    "perf: marks tests for performance validation",
 ]
 
 [tool.ruff]
