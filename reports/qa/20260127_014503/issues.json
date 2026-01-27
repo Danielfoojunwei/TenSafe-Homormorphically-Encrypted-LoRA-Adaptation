@@ -1,0 +1,175 @@
+{
+  "generated_at": "2026-01-27T01:59:00Z",
+  "run_id": "20260127_014503",
+  "total_issues": 8,
+  "by_severity": {
+    "P0": 4,
+    "P1": 4,
+    "P2": 2
+  },
+  "issues": [
+    {
+      "id": "TGQA-0001",
+      "title": "Missing identity/keys module",
+      "severity": "P0",
+      "status": "FIXED",
+      "component": "identity",
+      "reproduction_steps": [
+        "import tensorguard.identity",
+        "ModuleNotFoundError: No module named 'tensorguard.identity.keys'"
+      ],
+      "expected": "Module imports successfully",
+      "actual": "ModuleNotFoundError",
+      "logs_path": null,
+      "proposed_fix": "Create src/tensorguard/identity/keys/provider.py with KeyProvider class",
+      "regression_test": "test_identity_import"
+    },
+    {
+      "id": "TGQA-0002",
+      "title": "Missing List import in resource_ops.py",
+      "severity": "P0",
+      "status": "FIXED",
+      "component": "metrics",
+      "reproduction_steps": [
+        "from tensorguard.metrics.resource_ops import step_timer",
+        "NameError: name 'List' is not defined"
+      ],
+      "expected": "Module imports successfully",
+      "actual": "NameError",
+      "logs_path": null,
+      "proposed_fix": "Add 'List' to typing imports",
+      "regression_test": "test_resource_ops_import"
+    },
+    {
+      "id": "TGQA-0003",
+      "title": "Function name mismatch get_peak_gpu_mem",
+      "severity": "P0",
+      "status": "FIXED",
+      "component": "metrics",
+      "reproduction_steps": [
+        "Use StepTimer context manager",
+        "NameError: name 'get_peak_gpu_mem' is not defined"
+      ],
+      "expected": "StepTimer exits correctly",
+      "actual": "NameError",
+      "logs_path": null,
+      "proposed_fix": "Change call to get_gpu_memory_mb()",
+      "regression_test": "test_step_timer"
+    },
+    {
+      "id": "TGQA-0004",
+      "title": "Missing Optional import in peft_efficiency.py",
+      "severity": "P0",
+      "status": "FIXED",
+      "component": "metrics",
+      "reproduction_steps": [
+        "from tensorguard.metrics.peft_efficiency import compute_peft_efficiency",
+        "NameError: name 'Optional' is not defined"
+      ],
+      "expected": "Module imports successfully",
+      "actual": "NameError",
+      "logs_path": null,
+      "proposed_fix": "Add 'Optional' to typing imports",
+      "regression_test": "test_peft_efficiency_import"
+    },
+    {
+      "id": "TGQA-0005",
+      "title": "Missing data directory causes 500 error in run_once",
+      "severity": "P1",
+      "status": "OPEN",
+      "component": "orchestrator",
+      "reproduction_steps": [
+        "Create route with feed pointing to nonexistent path",
+        "POST /api/v1/tgflow/routes/{key}/run_once",
+        "Response: 500 Internal Server Error"
+      ],
+      "expected": "Response with verdict='failed' and descriptive reason",
+      "actual": "HTTP 500 with detail: 'Data snapshot not found at data/raw/'",
+      "logs_path": "logs/regression_tests.log",
+      "proposed_fix": "Add existence check in novelty detector with proper error handling",
+      "regression_test": "test_run_once_missing_data_graceful"
+    },
+    {
+      "id": "TGQA-0006",
+      "title": "Dashboard routes summary returns None instead of list",
+      "severity": "P1",
+      "status": "OPEN",
+      "component": "dashboard",
+      "reproduction_steps": [
+        "GET /api/v1/metrics/routes/summary?tenant_id=test",
+        "Response: null"
+      ],
+      "expected": "Empty list [] when no routes exist",
+      "actual": "null/None",
+      "logs_path": "logs/regression_tests.log",
+      "proposed_fix": "Return empty list default in routes summary endpoint",
+      "regression_test": "test_routes_summary_empty_tenant"
+    },
+    {
+      "id": "TGQA-0007",
+      "title": "IntegrationManager exception propagates to 500 error",
+      "severity": "P1",
+      "status": "OPEN",
+      "component": "integrations",
+      "reproduction_steps": [
+        "Mock IntegrationManager to throw exception",
+        "Call endpoint that uses IntegrationManager",
+        "HTTP 500 error"
+      ],
+      "expected": "Graceful error handling with structured response",
+      "actual": "Unhandled exception causing 500",
+      "logs_path": "logs/regression_tests.log",
+      "proposed_fix": "Wrap integration calls in try/except with fallback",
+      "regression_test": "test_integration_manager_failure_handled"
+    },
+    {
+      "id": "TGQA-0008",
+      "title": "Missing frontend/dist directory crashes startup",
+      "severity": "P1",
+      "status": "OPEN",
+      "component": "platform",
+      "reproduction_steps": [
+        "Remove frontend/dist directory",
+        "Start application",
+        "RuntimeError: Directory '/path/frontend/dist' does not exist"
+      ],
+      "expected": "Application starts with warning, skips static file mounting",
+      "actual": "Application crashes",
+      "logs_path": null,
+      "proposed_fix": "Check directory exists before mounting StaticFiles",
+      "regression_test": "test_startup_without_frontend_dist"
+    },
+    {
+      "id": "TGQA-0009",
+      "title": "Pytest regression marker not registered",
+      "severity": "P2",
+      "status": "OPEN",
+      "component": "testing",
+      "reproduction_steps": [
+        "Run pytest with @pytest.mark.regression decorated tests",
+        "Warning: Unknown pytest.mark.regression"
+      ],
+      "expected": "No warning",
+      "actual": "PytestUnknownMarkWarning",
+      "logs_path": null,
+      "proposed_fix": "Add 'regression' and 'n2he' to pytest.ini markers",
+      "regression_test": null
+    },
+    {
+      "id": "TGQA-0010",
+      "title": "passlib crypt deprecation warning",
+      "severity": "P2",
+      "status": "OPEN",
+      "component": "dependencies",
+      "reproduction_steps": [
+        "Run tests",
+        "DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13"
+      ],
+      "expected": "No deprecation warnings",
+      "actual": "DeprecationWarning from passlib",
+      "logs_path": null,
+      "proposed_fix": "Monitor passlib for updates, consider alternative",
+      "regression_test": null
+    }
+  ]
+}

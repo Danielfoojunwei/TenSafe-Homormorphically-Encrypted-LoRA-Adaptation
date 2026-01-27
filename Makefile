@@ -1,7 +1,7 @@
 # Makefile for TensorGuardFlow
 # Automation for build, test, and security verification
 
-.PHONY: install test agent bench bench-full bench-quick bench-report bench-regression bench-ci clean reports lint setup ci typecheck
+.PHONY: install test agent bench bench-full bench-quick bench-report bench-regression bench-ci clean reports lint setup ci typecheck qa perf regression security-scan fmt
 
 # Default target
 all: test
@@ -93,6 +93,50 @@ typecheck:
 # CI target: install, lint, (optional type check), tests
 ci: install lint typecheck test
 	@echo "--- CI checks completed ---"
+
+# === QA Engineering Suite ===
+
+# Full QA run (static analysis + all tests + perf baseline)
+qa:
+	@echo "=== TensorGuardFlow Full QA Suite ==="
+	./scripts/qa/run_full_qa.sh
+
+# Performance baseline only
+perf:
+	@echo "=== Performance Baseline ==="
+	./scripts/qa/run_perf_baseline.sh
+
+# Regression tests only
+regression:
+	@echo "=== Regression Tests ==="
+	export TG_SIMULATION=true && export TG_DEMO_MODE=true && \
+	python -m pytest tests/regression/ -v -m "regression"
+
+# Security scan (bandit + pip-audit)
+security-scan:
+	@echo "=== Security Scan ==="
+	@command -v bandit >/dev/null 2>&1 && bandit -r src/ -ll || echo "Install bandit: pip install bandit"
+	@command -v pip-audit >/dev/null 2>&1 && pip-audit || echo "Install pip-audit: pip install pip-audit"
+
+# Format code
+fmt:
+	@echo "=== Formatting Code ==="
+	@command -v ruff >/dev/null 2>&1 && ruff check src/ --fix || echo "Install ruff: pip install ruff"
+	@command -v black >/dev/null 2>&1 && black src/ || echo "Install black: pip install black"
+
+# Collect issues from QA run
+collect-issues:
+	@echo "=== Collecting Issues ==="
+	@if [ -z "$(RUN_ID)" ]; then \
+		RUN_ID=$$(ls -t reports/qa/ 2>/dev/null | head -1); \
+		if [ -n "$$RUN_ID" ]; then \
+			python scripts/qa/collect_issues.py "reports/qa/$$RUN_ID"; \
+		else \
+			echo "No QA runs found. Run 'make qa' first."; \
+		fi \
+	else \
+		python scripts/qa/collect_issues.py "reports/qa/$(RUN_ID)"; \
+	fi
 
 # Cleanup
 clean:
