@@ -105,7 +105,14 @@ def bench(subcommand_args):
     bench_main()
 
 
-    click.echo(f"Compliance bundle exported: {result}")
+# === TG-TINKER (Privacy-First Training API) ===
+@cli.command(context_settings=dict(ignore_unknown_options=True))
+@click.argument("subcommand_args", nargs=-1, type=click.UNPROCESSED)
+def tinker(subcommand_args):
+    """TG-Tinker Privacy-First Training API commands."""
+    from .platform.tg_tinker_api.cli import main as tinker_main
+    sys.argv = ["tinker"] + list(subcommand_args)
+    tinker_main()
 
 
 # === PEFT STUDIO ===
