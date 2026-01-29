@@ -211,4 +211,77 @@ export const statusApi = {
     getHealth: () => request('/health')
 }
 
+// TG-Tinker Training API
+export const tinkerApi = {
+    // Training Clients
+    createTrainingClient: (config) =>
+        request('/v1/training_clients', { method: 'POST', body: JSON.stringify(config) }),
+    getTrainingClient: (clientId) => request(`/v1/training_clients/${clientId}`),
+    listTrainingClients: (params = {}) => {
+        const query = new URLSearchParams(params).toString()
+        return request(`/v1/training_clients${query ? '?' + query : ''}`)
+    },
+
+    // Async Operations
+    getFuture: (futureId) => request(`/v1/futures/${futureId}`),
+    cancelFuture: (futureId) => request(`/v1/futures/${futureId}/cancel`, { method: 'POST' }),
+
+    // Training Operations
+    forwardBackward: (clientId, batch) =>
+        request(`/v1/training_clients/${clientId}/forward_backward`, {
+            method: 'POST',
+            body: JSON.stringify(batch)
+        }),
+    optimStep: (clientId, options = {}) =>
+        request(`/v1/training_clients/${clientId}/optim_step`, {
+            method: 'POST',
+            body: JSON.stringify(options)
+        }),
+    sample: (clientId, prompts, options = {}) =>
+        request(`/v1/training_clients/${clientId}/sample`, {
+            method: 'POST',
+            body: JSON.stringify({ prompts, ...options })
+        }),
+
+    // State Management
+    saveState: (clientId, options = {}) =>
+        request(`/v1/training_clients/${clientId}/save_state`, {
+            method: 'POST',
+            body: JSON.stringify(options)
+        }),
+    loadState: (clientId, artifactId) =>
+        request(`/v1/training_clients/${clientId}/load_state`, {
+            method: 'POST',
+            body: JSON.stringify({ artifact_id: artifactId })
+        }),
+
+    // Artifacts
+    getArtifact: (artifactId) => request(`/v1/artifacts/${artifactId}`),
+    listArtifacts: (clientId = null, params = {}) => {
+        if (clientId) params.training_client_id = clientId
+        const query = new URLSearchParams(params).toString()
+        return request(`/v1/artifacts${query ? '?' + query : ''}`)
+    },
+
+    // Audit Logs
+    getAuditLogs: (params = {}) => {
+        const query = new URLSearchParams(params).toString()
+        return request(`/v1/audit_logs${query ? '?' + query : ''}`)
+    },
+    verifyAuditChain: (tenantId = null) => {
+        const query = tenantId ? `?tenant_id=${tenantId}` : ''
+        return request(`/v1/audit_logs/verify${query}`)
+    },
+
+    // Privacy Metrics
+    getPrivacySpent: (clientId) => request(`/v1/training_clients/${clientId}/privacy_spent`),
+
+    // TGSP Export
+    exportToTGSP: (clientId, artifactId, options = {}) =>
+        request(`/v1/training_clients/${clientId}/export_tgsp`, {
+            method: 'POST',
+            body: JSON.stringify({ artifact_id: artifactId, ...options })
+        })
+}
+
 export { ApiError, request }
