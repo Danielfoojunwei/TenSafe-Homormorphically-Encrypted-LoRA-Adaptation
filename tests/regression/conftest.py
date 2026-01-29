@@ -9,11 +9,53 @@ import pytest
 import os
 import sys
 import logging
-from typing import Generator
+from typing import Generator, AsyncIterator
 from fastapi.testclient import TestClient
 from fastapi import Header
 from sqlmodel import SQLModel, Session, create_engine
 from sqlalchemy.pool import StaticPool
+from unittest.mock import MagicMock
+
+
+# --- Async Mock Helpers ---
+
+class AsyncIteratorMock:
+    """Helper class to create async iterators for mocking async generators."""
+
+    def __init__(self, items=None):
+        self.items = items or []
+        self.index = 0
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self.index >= len(self.items):
+            raise StopAsyncIteration
+        item = self.items[self.index]
+        self.index += 1
+        return item
+
+
+def async_iter_mock(items=None):
+    """Create a mock that returns an async iterator."""
+    return AsyncIteratorMock(items or [])
+
+
+def create_mock_workflow():
+    """Create a properly configured mock PeftWorkflow for tests."""
+    mock = MagicMock()
+    mock.artifacts = {"adapter_path": "/mock/adapter", "tgsp_path": "/mock/tgsp"}
+    mock.metrics = {"eval": {"accuracy": 0.95, "forgetting": 0.01, "regression": 0.01}}
+    mock.diagnosis = None
+
+    # Use async iterators for stage methods
+    mock._stage_train.return_value = async_iter_mock([])
+    mock._stage_eval.return_value = async_iter_mock([])
+    mock._stage_pack_tgsp.return_value = async_iter_mock([])
+    mock._stage_emit_evidence.return_value = async_iter_mock([])
+
+    return mock
 
 # Configure logging for regression tests
 logging.basicConfig(level=logging.INFO)

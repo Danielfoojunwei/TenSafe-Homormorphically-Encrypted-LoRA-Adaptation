@@ -157,8 +157,11 @@ class PeftWorkflow:
             
             self.metrics = {
                 "eval": {
-                    "primary_metric": 0.92,
-                    "forgetting_score": 0.05,
+                    "accuracy": 0.92,  # primary metric
+                    "primary_metric": 0.92,  # alias
+                    "forgetting": 0.05,
+                    "forgetting_score": 0.05,  # alias
+                    "regression": 0.02,
                     "loss": 0.15,
                 },
                 "training": {

@@ -7,6 +7,7 @@ Tests that TGSP + evidence are generated every run and tamper detection works.
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
+from conftest import async_iter_mock
 
 
 class TestEvidenceChainIntegrity:
@@ -48,10 +49,10 @@ class TestEvidenceChainIntegrity:
                 "eval": {"accuracy": 0.95, "forgetting": 0.01, "regression": 0.01}
             }
             mock_instance.diagnosis = None
-            mock_instance._stage_train.return_value = iter([])
-            mock_instance._stage_eval.return_value = iter([])
-            mock_instance._stage_pack_tgsp.return_value = iter([])
-            mock_instance._stage_emit_evidence.return_value = iter([])
+            mock_instance._stage_train.return_value = async_iter_mock([])
+            mock_instance._stage_eval.return_value = async_iter_mock([])
+            mock_instance._stage_pack_tgsp.return_value = async_iter_mock([])
+            mock_instance._stage_emit_evidence.return_value = async_iter_mock([])
             MockWorkflow.return_value = mock_instance
 
             # Run once
@@ -149,10 +150,10 @@ class TestTGSPGeneration:
             }
             mock_instance.metrics = {"eval": {"accuracy": 0.95, "forgetting": 0.01, "regression": 0.01}}
             mock_instance.diagnosis = None
-            mock_instance._stage_train.return_value = iter([])
-            mock_instance._stage_eval.return_value = iter([])
-            mock_instance._stage_pack_tgsp.return_value = iter([])
-            mock_instance._stage_emit_evidence.return_value = iter([])
+            mock_instance._stage_train.return_value = async_iter_mock([])
+            mock_instance._stage_eval.return_value = async_iter_mock([])
+            mock_instance._stage_pack_tgsp.return_value = async_iter_mock([])
+            mock_instance._stage_emit_evidence.return_value = async_iter_mock([])
             MockWorkflow.return_value = mock_instance
 
             resp = client.post(f"/api/v1/tgflow/routes/{route_key}/run_once", headers=tenant_header)
@@ -244,10 +245,10 @@ class TestEvidenceIntegrity:
             mock_instance.artifacts = {"adapter_path": "/mock/adapter"}
             mock_instance.metrics = {"eval": {"accuracy": 0.95, "forgetting": 0.01, "regression": 0.01}}
             mock_instance.diagnosis = None
-            mock_instance._stage_train.return_value = iter([])
-            mock_instance._stage_eval.return_value = iter([])
-            mock_instance._stage_pack_tgsp.return_value = iter([])
-            mock_instance._stage_emit_evidence.return_value = iter([])
+            mock_instance._stage_train.return_value = async_iter_mock([])
+            mock_instance._stage_eval.return_value = async_iter_mock([])
+            mock_instance._stage_pack_tgsp.return_value = async_iter_mock([])
+            mock_instance._stage_emit_evidence.return_value = async_iter_mock([])
             MockWorkflow.return_value = mock_instance
 
             client.post(f"/api/v1/tgflow/routes/{route_key}/run_once", headers=tenant_header)
