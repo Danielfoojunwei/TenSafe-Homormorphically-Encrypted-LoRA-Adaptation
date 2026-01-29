@@ -1,0 +1,20 @@
+{"id": "short_chat_1", "category": "short_chat", "prompt": "Hello, how are you?", "max_tokens": 32}
+{"id": "short_chat_2", "category": "short_chat", "prompt": "What is the capital of France?", "max_tokens": 16}
+{"id": "short_chat_3", "category": "short_chat", "prompt": "Tell me a joke.", "max_tokens": 64}
+{"id": "summarization_1", "category": "summarization", "prompt": "Summarize the following: Machine learning is a subset of artificial intelligence that enables systems to learn and improve from experience without being explicitly programmed.", "max_tokens": 64}
+{"id": "summarization_2", "category": "summarization", "prompt": "Summarize: TensorGuard provides post-quantum secure model packaging with privacy-preserving training capabilities using differential privacy.", "max_tokens": 64}
+{"id": "code_explain_1", "category": "code_explanation", "prompt": "Explain this code: def fib(n): return n if n < 2 else fib(n-1) + fib(n-2)", "max_tokens": 128}
+{"id": "code_explain_2", "category": "code_explanation", "prompt": "What does this do: for i in range(10): print(i**2)", "max_tokens": 64}
+{"id": "math_1", "category": "math", "prompt": "If a train travels 60 miles per hour for 2.5 hours, how far does it travel?", "max_tokens": 32}
+{"id": "math_2", "category": "math", "prompt": "What is 15% of 200?", "max_tokens": 16}
+{"id": "math_3", "category": "math", "prompt": "Solve: 2x + 5 = 13", "max_tokens": 32}
+{"id": "reasoning_1", "category": "reasoning", "prompt": "If all cats are mammals, and all mammals are warm-blooded, are all cats warm-blooded?", "max_tokens": 64}
+{"id": "reasoning_2", "category": "reasoning", "prompt": "A farmer has 17 sheep. All but 9 run away. How many are left?", "max_tokens": 32}
+{"id": "tool_use_1", "category": "tool_use", "prompt": "Use the calculator to compute 123 * 456", "max_tokens": 32}
+{"id": "tool_use_2", "category": "tool_use", "prompt": "Search for information about machine learning", "max_tokens": 64}
+{"id": "privacy_1", "category": "privacy", "prompt": "What is differential privacy?", "max_tokens": 128}
+{"id": "privacy_2", "category": "privacy", "prompt": "Explain epsilon in DP-SGD", "max_tokens": 128}
+{"id": "security_1", "category": "security", "prompt": "What is AES-256-GCM encryption?", "max_tokens": 128}
+{"id": "security_2", "category": "security", "prompt": "Explain post-quantum cryptography", "max_tokens": 128}
+{"id": "long_context_1", "category": "long_context", "prompt": "Given the context that TensorGuardFlow is a privacy-first ML platform with TG-Tinker training API, TGSP secure packaging, and differential privacy support, explain how a user would train a model with privacy guarantees.", "max_tokens": 256}
+{"id": "long_context_2", "category": "long_context", "prompt": "The TG-Tinker API provides forward_backward, optim_step, sample, save_state, and load_state primitives. Each operation is async via FutureHandle. Artifacts are encrypted with AES-256-GCM. Audit logs are hash-chained. How does this ensure data integrity?", "max_tokens": 256}

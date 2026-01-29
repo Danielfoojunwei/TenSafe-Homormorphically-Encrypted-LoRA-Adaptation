@@ -67,6 +67,10 @@ htmlcov/
 .coverage
 coverage.xml
 
+# Generated QA reports and benchmarks
+reports/
+debug_output.txt
+
 # ============================================
 # OS files
 # ============================================

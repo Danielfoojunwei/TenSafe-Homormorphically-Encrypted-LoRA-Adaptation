@@ -2,6 +2,11 @@
 TG-Tinker audit logging with hash chaining.
 
 Provides tamper-evident append-only audit log.
+
+Integration Points:
+- Hash chaining for tamper detection
+- Optional PQC signatures (Ed25519 + Dilithium3) for non-repudiation
+- Compatible with tensorguard.identity.audit for enterprise audit trails
 """
 
 import hashlib
@@ -9,9 +14,12 @@ import json
 import logging
 import threading
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from .models import TinkerAuditLog, generate_audit_id
+
+if TYPE_CHECKING:
+    pass
 
 logger = logging.getLogger(__name__)
 

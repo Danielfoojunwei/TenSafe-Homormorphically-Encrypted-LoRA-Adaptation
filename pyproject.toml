@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tensorguard"
-version = "2.3.0"
-description = "Post-Quantum Secure MLOps Platform with Unified Evidence Fabric"
+version = "3.0.0"
+description = "Privacy-First ML Platform with TG-Tinker Training API, Post-Quantum Security, and Fleet Governance"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.9"
@@ -73,6 +73,12 @@ pqc = [
     "liboqs-python>=0.10.0",
 ]
 
+# TG-Tinker Training API dependencies
+tinker = [
+    "httpx>=0.25.0,<1.0.0",
+    "click>=8.1.0,<9.0.0",
+]
+
 # Development dependencies
 dev = [
     "pytest>=7.4.0,<8.0.0",
@@ -85,7 +91,7 @@ dev = [
 
 # All optional dependencies
 all = [
-    "tensorguard[bench,fl,acme,pqc,dev]",
+    "tensorguard[bench,fl,acme,pqc,tinker,dev]",
 ]
 
 [project.urls]
