@@ -11,6 +11,8 @@ TenSafe enables organizations to fine-tune large language models while maintaini
 - **Homomorphic Encryption** - N2HE integration for privacy-preserving computations
 - **Immutable Audit Logs** - Hash-chained audit trail for compliance
 - **LoRA Support** - Efficient fine-tuning with Low-Rank Adaptation
+- **Pluggable Loss Functions** - Bring-your-own loss with stable contract (NEW)
+- **RLVR Mode** - Reinforcement Learning with Verifiable Rewards (NEW)
 
 ## Key Features
 
@@ -103,6 +105,8 @@ print(f"Encrypted with: {checkpoint.encryption.algorithm}")
 - [Training](guides/training.md) - Training workflows and best practices
 - [Sampling](guides/sampling.md) - Text generation and inference
 - [Privacy](guides/privacy.md) - DP and homomorphic encryption
+- [Custom Loss Functions](custom_loss_quickstart.md) - Pluggable loss guide (NEW)
+- [RLVR Training](rlvr_quickstart.md) - Reinforcement Learning with Verifiable Rewards (NEW)
 
 ### API Reference
 - [ServiceClient](api-reference/service-client.md) - Main entry point
@@ -112,9 +116,10 @@ print(f"Encrypted with: {checkpoint.encryption.algorithm}")
 - [Exceptions](api-reference/exceptions.md) - Error handling
 
 ### Cookbook
-- [LoRA Fine-tuning](cookbook/lora-finetuning.md) - Complete LoRA tutorial
+- [LoRA Fine-tuning](cookbook/lora-finetuning.md) - Complete LoRA tutorial with custom loss
 - [Encrypted Inference](cookbook/encrypted-inference.md) - N2HE inference
 - [Privacy Budget Management](cookbook/privacy-budget.md) - DP budgeting
+- [RLVR Training](cookbook/rlvr-training.md) - Complete RLVR workflow (NEW)
 
 ## Support
 

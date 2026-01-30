@@ -30,7 +30,7 @@ Example usage:
 """
 
 from .rollout import MockRolloutSampler, RolloutSampler, Trajectory, TrajectoryBatch
-from .reward import RewardFn, resolve_reward, register_reward
+from .reward import RewardFn, resolve_reward, register_reward, get_registered_rewards
 from .buffers import TrajectoryBuffer
 from .trainer import RLVRTrainer
 from .config import RLVRConfig
@@ -46,6 +46,7 @@ __all__ = [
     "RewardFn",
     "resolve_reward",
     "register_reward",
+    "get_registered_rewards",
     # Buffers
     "TrajectoryBuffer",
     # Trainer
