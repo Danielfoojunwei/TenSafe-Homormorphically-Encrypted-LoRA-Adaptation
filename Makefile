@@ -2,7 +2,7 @@
 # Privacy-First ML Training API
 # ================================================================
 
-.PHONY: help install dev test lint typecheck serve clean qa bench evidence compliance compliance-smoke bench-llama3 bench-llama3-smoke
+.PHONY: help install dev test lint typecheck serve clean qa bench evidence compliance compliance-smoke bench-llama3 bench-llama3-smoke test-n2he bench-n2he bench-n2he-full n2he-smoke
 
 SHELL := /bin/bash
 PYTHON := python3
@@ -44,6 +44,12 @@ help:
 	@echo "Llama3 LoRA Benchmarks:"
 	@echo "  make bench-llama3-smoke  Run smoke benchmark with compliance"
 	@echo "  make bench-llama3        Run full benchmark with compliance"
+	@echo ""
+	@echo "N2HE Homomorphic Encryption:"
+	@echo "  make test-n2he           Run N2HE integration tests"
+	@echo "  make bench-n2he          Run N2HE quick benchmark"
+	@echo "  make bench-n2he-full     Run N2HE full benchmark"
+	@echo "  make n2he-smoke          Run N2HE smoke test (tests + benchmark)"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make clean         Remove build artifacts"
@@ -205,6 +211,34 @@ bench-llama3:
 	$(PYTHON) scripts/compliance/build_compliance_evidence.py
 	$(PYTHON) scripts/bench/build_llama3_report.py --mode full
 	@echo "Full Llama3 benchmark with compliance complete."
+
+# =============================================================================
+# N2HE Homomorphic Encryption
+# =============================================================================
+
+test-n2he:
+	@echo "Running N2HE integration tests..."
+	$(PYTHON) -m pytest tests/n2he/ -v --tb=short
+	@echo "N2HE tests complete."
+
+bench-n2he:
+	@echo "Running N2HE quick benchmark..."
+	@mkdir -p $(REPORTS_DIR)/n2he
+	$(PYTHON) -c "from tensorguard.n2he.benchmark import run_quick_benchmark, generate_benchmark_report; suite = run_quick_benchmark(); print(generate_benchmark_report(suite))"
+	@echo "N2HE quick benchmark complete."
+
+bench-n2he-full:
+	@echo "Running N2HE full benchmark..."
+	@mkdir -p $(REPORTS_DIR)/n2he
+	$(PYTHON) -c "from tensorguard.n2he.benchmark import run_full_benchmark, generate_benchmark_report; suite = run_full_benchmark(); print(generate_benchmark_report(suite))"
+	@echo "N2HE full benchmark complete."
+
+n2he-smoke:
+	@echo "Running N2HE smoke test (tests + quick benchmark)..."
+	@mkdir -p $(REPORTS_DIR)/n2he
+	$(PYTHON) -m pytest tests/n2he/ -v --tb=short -x
+	$(PYTHON) -c "from tensorguard.n2he.benchmark import run_quick_benchmark, generate_benchmark_report; suite = run_quick_benchmark(); print(generate_benchmark_report(suite))"
+	@echo "N2HE smoke test complete."
 
 # =============================================================================
 # Utilities
