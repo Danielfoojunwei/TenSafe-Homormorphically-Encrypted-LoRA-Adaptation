@@ -5,34 +5,34 @@ Production-ready database configuration with connection pooling,
 health checks, and environment-based configuration.
 """
 
-from sqlmodel import SQLModel, create_engine, Session
-from sqlalchemy.pool import QueuePool, NullPool
-from sqlalchemy import event, text
-import os
 import logging
+import os
+
+from sqlalchemy import event, text
+from sqlalchemy.pool import NullPool, QueuePool
+from sqlmodel import Session, create_engine
 
 logger = logging.getLogger(__name__)
 
 # Import all models to register them with SQLModel
-from .models.core import Tenant, User, Fleet, Job, AuditLog  # noqa: F401
-from .models.identity_models import (  # noqa: F401
-    IdentityEndpoint, IdentityCertificate, IdentityPolicy,
-    IdentityRenewalJob, IdentityAuditLog, IdentityAgent
-)
+from .models.continuous_models import AdapterLifecycleState, CandidateEvent, Feed, Policy, Route  # noqa: F401
+from .models.core import AuditLog, Fleet, Job, Tenant, User  # noqa: F401
 from .models.enablement_models import *  # noqa: F401
 from .models.evidence_models import *  # noqa: F401
-from .models.peft_models import (  # noqa: F401
-    IntegrationConfig, PeftWizardDraft, PeftRun
-)
 from .models.fedmoe_models import FedMoEExpert, SkillEvidence  # noqa: F401
-from .models.settings_models import SystemSetting, KMSKey, KMSRotationLog  # noqa: F401
-from .models.vla_models import (  # noqa: F401
-    VLAModel, VLASafetyCheck, VLADeploymentLog, VLABenchmarkResult
+from .models.identity_models import (  # noqa: F401
+    IdentityAgent,
+    IdentityAuditLog,
+    IdentityCertificate,
+    IdentityEndpoint,
+    IdentityPolicy,
+    IdentityRenewalJob,
 )
-from .models.continuous_models import Route, Feed, Policy, CandidateEvent, AdapterLifecycleState  # noqa: F401
+from .models.metrics_models import AdapterMetricSnapshot, RouteMetricSeries, RunStepMetrics  # noqa: F401
+from .models.peft_models import IntegrationConfig, PeftRun, PeftWizardDraft  # noqa: F401
+from .models.settings_models import KMSKey, KMSRotationLog, SystemSetting  # noqa: F401
 from .models.tgflow_core_models import *  # noqa: F401
-from .models.metrics_models import RouteMetricSeries, AdapterMetricSnapshot, RunStepMetrics  # noqa: F401
-
+from .models.vla_models import VLABenchmarkResult, VLADeploymentLog, VLAModel, VLASafetyCheck  # noqa: F401
 
 # Environment configuration
 DATABASE_URL = os.getenv("DATABASE_URL")

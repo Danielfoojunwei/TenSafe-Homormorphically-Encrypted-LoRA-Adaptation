@@ -17,9 +17,9 @@ __all__ = ["__version__"]
 
 try:
     from .crypto import (
+        generate_hybrid_keypair,
         sign_hybrid,
         verify_hybrid,
-        generate_hybrid_keypair,
     )
     __all__.extend(["sign_hybrid", "verify_hybrid", "generate_hybrid_keypair"])
 except ImportError:

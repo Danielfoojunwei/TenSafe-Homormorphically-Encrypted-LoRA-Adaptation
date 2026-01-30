@@ -17,7 +17,7 @@ import secrets
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -233,7 +233,7 @@ class EncryptedArtifactStore:
         training_client_id: str,
     ) -> bytes:
         """Build additional authenticated data for encryption."""
-        return f"{artifact_id}|{tenant_id}|{training_client_id}".encode("utf-8")
+        return f"{artifact_id}|{tenant_id}|{training_client_id}".encode()
 
 
 class KeyManager:

@@ -7,11 +7,10 @@ FastAPI routers for the TG-Tinker training API.
 import hashlib
 import json
 import logging
-import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from .audit import get_audit_logger
@@ -20,11 +19,10 @@ from .models import (
     TinkerArtifact,
     TinkerFuture,
     TinkerTrainingClient,
-    generate_artifact_id,
     generate_future_id,
     generate_tc_id,
 )
-from .queue import Job, JobStatus, get_job_queue
+from .queue import get_job_queue
 from .storage import EncryptedArtifactStore, KeyManager, LocalStorageBackend
 from .worker import get_worker, start_worker
 

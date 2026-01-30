@@ -2,8 +2,8 @@
 
 from .compliance_events import (
     ComplianceEvent,
-    ComplianceEventType,
     ComplianceEventEmitter,
+    ComplianceEventType,
     get_compliance_emitter,
 )
 

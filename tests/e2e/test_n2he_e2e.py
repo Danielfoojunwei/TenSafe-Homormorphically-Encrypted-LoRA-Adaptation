@@ -830,7 +830,7 @@ class TestN2HEE2E:
         # Verify key bundle integrates with TenSafe key management
         bundle = harness.key_manager.generate_key_bundle(
             tenant_id="tensafe-integration-test",
-            scheme_params=harness.lwe_params,
+            params=harness.lwe_params,
         )
 
         # Export keys (simulates distribution)
@@ -852,18 +852,20 @@ class TestN2HEE2E:
         """Run the built-in N2HE benchmark suite."""
         print("\n  Running N2HE benchmark suite...")
 
-        results = run_quick_benchmark()
+        suite = run_quick_benchmark()
 
-        assert "keygen" in results
-        assert "encryption" in results
-        assert "lora_delta" in results
+        # Check that benchmark suite has results
+        assert len(suite.results) > 0, "No benchmark results"
+
+        # Get operation names from results
+        op_names = [r.operation for r in suite.results]
+        assert "keygen" in op_names, f"Missing keygen benchmark, got: {op_names}"
+        assert "encryption" in op_names, f"Missing encryption benchmark, got: {op_names}"
+        assert "lora_delta" in op_names, f"Missing lora_delta benchmark, got: {op_names}"
 
         print("\n  Benchmark Results:")
-        for op, data in results.items():
-            if isinstance(data, dict) and "mean_ms" in data:
-                print(f"    {op}: {data['mean_ms']:.3f}ms")
-
-        return results
+        for result in suite.results:
+            print(f"    {result.operation}: {result.mean_time_ms:.3f}ms ({result.ops_per_second:.0f} ops/sec)")
 
 
 if __name__ == "__main__":

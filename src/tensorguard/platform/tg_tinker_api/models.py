@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlmodel import Field, Relationship, SQLModel, Column, JSON
+from sqlmodel import JSON, Column, Field, Relationship, SQLModel
 
 
 def generate_uuid() -> str:

@@ -5,9 +5,7 @@ Provides CLI interface for the TG-Tinker training API.
 """
 
 import json
-import os
 import sys
-from datetime import datetime
 from typing import Optional
 
 import click
@@ -103,7 +101,6 @@ def create_client(
         DPConfig,
         LoRAConfig,
         OptimizerConfig,
-        ServiceClient,
         TrainingConfig,
     )
 

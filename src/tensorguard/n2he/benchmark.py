@@ -144,7 +144,7 @@ class N2HEBenchmark:
     def _get_context(self) -> N2HEContext:
         """Get or create benchmark context."""
         if self._context is None:
-            self._context = create_context(profile="lora", use_simulation=True)
+            self._context = create_context(profile="lora", use_toy_mode=True)
             self._context.generate_keys()
         return self._context
 
@@ -206,7 +206,7 @@ class N2HEBenchmark:
         """Benchmark key generation."""
 
         def keygen_op():
-            ctx = create_context(profile="lora", use_simulation=True)
+            ctx = create_context(profile="lora", use_toy_mode=True)
             ctx.generate_keys()
 
         return self._benchmark_operation("keygen", keygen_op, iterations)

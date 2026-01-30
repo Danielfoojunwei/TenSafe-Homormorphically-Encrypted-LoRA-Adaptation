@@ -1,20 +1,21 @@
 
 import abc
-from typing import Tuple, Optional
+from typing import Tuple
+
 
 class PostQuantumKEM(abc.ABC):
     """Abstract Base Class for Post-Quantum Key Encapsulation."""
-    
+
     @property
     @abc.abstractmethod
     def name(self) -> str:
         pass
-        
+
     @property
     @abc.abstractmethod
     def public_key_size(self) -> int:
         pass
-        
+
     @property
     @abc.abstractmethod
     def ciphertext_size(self) -> int:
@@ -37,7 +38,7 @@ class PostQuantumKEM(abc.ABC):
 
 class PostQuantumSig(abc.ABC):
     """Abstract Base Class for Post-Quantum Signatures."""
-    
+
     @property
     @abc.abstractmethod
     def name(self) -> str:

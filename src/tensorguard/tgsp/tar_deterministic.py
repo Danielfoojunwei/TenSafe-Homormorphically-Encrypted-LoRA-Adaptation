@@ -8,9 +8,9 @@ SECURITY NOTE: This module creates reproducible tarballs by normalizing:
 - Permissions (644 for files, 755 for directories/executables)
 """
 
-import tarfile
-import os
 import io
+import os
+import tarfile
 
 
 def deterministic_filter(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo:

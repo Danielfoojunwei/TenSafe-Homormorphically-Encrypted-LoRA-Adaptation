@@ -141,7 +141,7 @@ class TestN2HEContext:
     @pytest.fixture
     def context(self):
         """Create a context with generated keys."""
-        ctx = create_context(profile="lora", use_simulation=True)
+        ctx = create_context(profile="lora", use_toy_mode=True)
         ctx.generate_keys()
         return ctx
 

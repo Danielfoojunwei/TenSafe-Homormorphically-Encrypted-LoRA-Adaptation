@@ -547,6 +547,42 @@ class EncryptedLoRARuntime:
 
         return record
 
+    def get_manifest_claims(self) -> Dict[str, Any]:
+        """
+        Get manifest claims for TenSafe integration.
+
+        Returns claims about the HE configuration that can be included
+        in TGSP manifests for auditing and verification.
+
+        Returns:
+            Dictionary of manifest claims
+        """
+        claims = {
+            "he_scheme": "n2he",
+            "he_scheme_config": {
+                "mode": self.config.mode.value,
+                "rank": self.config.rank,
+                "alpha": self.config.alpha,
+                "target_modules": self.config.target_modules,
+                "batch_size": self.config.batch_size,
+                "max_seq_len": self.config.max_seq_len,
+            },
+            "adapters_registered": len(self._adapters),
+            "adapter_ids": list(self._adapters.keys()),
+        }
+
+        if self.config.he_params:
+            claims["he_params"] = {
+                "scheme_type": self.config.he_params.scheme_type.value,
+                "security_level": self.config.he_params.security_level,
+                "lattice_dimension": self.config.he_params.n,
+            }
+
+        if self.config.key_bundle_id:
+            claims["key_bundle_id"] = self.config.key_bundle_id
+
+        return claims
+
 
 def create_encrypted_runtime(
     rank: int = 16,

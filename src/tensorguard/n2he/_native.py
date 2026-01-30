@@ -31,6 +31,7 @@ import struct
 from ctypes import (
     POINTER,
     Structure,
+    byref,
     c_char_p,
     c_double,
     c_int,
@@ -39,7 +40,6 @@ from ctypes import (
     c_size_t,
     c_uint64,
     c_void_p,
-    byref,
 )
 from pathlib import Path
 from typing import Optional, Tuple

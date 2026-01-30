@@ -15,7 +15,6 @@ from .schemas import (
     LoadStateResult,
     OperationType,
     OptimStepRequest,
-    SampleCompletion,
     SampleRequest,
     SampleResult,
     SaveStateRequest,

@@ -4,18 +4,16 @@ TG-Tinker job queue.
 Provides an in-memory queue (with pluggable backends) for async job execution.
 """
 
-import asyncio
 import hashlib
 import json
 import logging
 import threading
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from queue import Empty, PriorityQueue
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

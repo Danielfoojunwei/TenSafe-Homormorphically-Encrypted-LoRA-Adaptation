@@ -5,12 +5,9 @@ SECURITY NOTE: This module implements deterministic packaging to ensure
 byte-for-byte reproducible artifacts for audit and verification.
 """
 
-import zipfile
 import os
-import io
-from typing import List, Dict
-from datetime import datetime
-from .crypto import get_sha256
+import zipfile
+from typing import Dict, List
 
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB safety limit
 

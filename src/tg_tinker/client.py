@@ -5,14 +5,12 @@ This module provides the ServiceClient class, the primary entry point
 for interacting with the TG-Tinker API.
 """
 
-import hashlib
-import json
 import time
 from typing import Any, Dict, List, Optional
 
 import httpx
 
-from .config import TenSafeConfig, get_config, validate_api_key
+from .config import get_config, validate_api_key
 from .exceptions import (
     ArtifactNotFoundError,
     AuthenticationError,
@@ -33,7 +31,6 @@ from .schemas import (
     FutureResultResponse,
     LoadStateRequest,
     LoadStateResult,
-    LoRAConfig,
     OptimStepRequest,
     SampleRequest,
     SampleResult,

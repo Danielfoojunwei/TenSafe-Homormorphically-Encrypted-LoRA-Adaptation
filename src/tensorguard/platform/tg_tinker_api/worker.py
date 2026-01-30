@@ -11,7 +11,7 @@ import time
 from datetime import datetime
 from typing import Any, Callable, Dict, Optional
 
-from .queue import Job, JobQueue, JobStatus, get_job_queue
+from .queue import Job, JobQueue, get_job_queue
 
 logger = logging.getLogger(__name__)
 

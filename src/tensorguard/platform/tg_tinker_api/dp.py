@@ -9,7 +9,7 @@ import logging
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ class RDPAccountant(PrivacyAccountant):
         """
         self.target_delta = target_delta
         self.orders = orders or self.DEFAULT_ORDERS
-        self._rdp_epsilons: Dict[float, float] = {order: 0.0 for order in self.orders}
+        self._rdp_epsilons: Dict[float, float] = dict.fromkeys(self.orders, 0.0)
 
     def step(
         self,
@@ -164,7 +164,7 @@ class RDPAccountant(PrivacyAccountant):
 
     def reset(self) -> None:
         """Reset the accountant."""
-        self._rdp_epsilons = {order: 0.0 for order in self.orders}
+        self._rdp_epsilons = dict.fromkeys(self.orders, 0.0)
 
     def _compute_rdp(
         self,

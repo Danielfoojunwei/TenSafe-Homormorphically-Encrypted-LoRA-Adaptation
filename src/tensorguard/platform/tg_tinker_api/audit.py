@@ -14,7 +14,7 @@ import json
 import logging
 import threading
 from datetime import datetime
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from .models import TinkerAuditLog, generate_audit_id
 

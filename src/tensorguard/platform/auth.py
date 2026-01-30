@@ -15,11 +15,12 @@ import os
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session
 
 from .database import get_session
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 # JWT Configuration - MUST be set in production
-from ..utils.production_gates import is_production, ProductionGateError, require_env
+from ..utils.production_gates import is_production, require_env
 
 SECRET_KEY = os.getenv("TG_SECRET_KEY")
 if not SECRET_KEY:
@@ -232,7 +233,7 @@ async def get_current_user(
             )
             return demo_user
     # --- END DEMO MODE ---
-    
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

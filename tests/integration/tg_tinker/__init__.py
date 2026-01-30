@@ -1,1 +1,0 @@
-"""TG-Tinker integration tests."""

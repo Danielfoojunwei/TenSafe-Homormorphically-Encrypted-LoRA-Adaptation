@@ -7,12 +7,14 @@ for secure distribution to edge devices.
 
 import json
 import logging
-import os
-import shutil
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from .audit import AuditLogger
+    from .storage import EncryptedArtifactStore, TinkerArtifact
 
 logger = logging.getLogger(__name__)
 

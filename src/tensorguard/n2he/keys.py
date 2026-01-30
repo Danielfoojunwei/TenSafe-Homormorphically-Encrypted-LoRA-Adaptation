@@ -25,7 +25,7 @@ import secrets
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -204,6 +204,14 @@ class HEKeyBundle:
             "capabilities": self.evaluation_key.capabilities,
         }
 
+    def export_public_key(self) -> Dict[str, Any]:
+        """Export public key for client distribution."""
+        return self.public_key.to_dict()
+
+    def export_evaluation_key(self) -> Dict[str, Any]:
+        """Export evaluation key for server distribution."""
+        return self.evaluation_key.to_dict()
+
 
 class HEKeyManager:
     """
@@ -287,7 +295,7 @@ class HEKeyManager:
         key_id_base = f"n2he-{tenant_id}-{bundle_id}"
 
         # Create context and generate keys
-        ctx = create_context(profile="lora", use_simulation=True)
+        ctx = create_context(profile="lora", use_toy_mode=True)
         ctx.generate_keys()
 
         params_hash = params.get_hash()
@@ -376,7 +384,7 @@ class HEKeyManager:
         if bundle is None:
             return None
 
-        ctx = create_context(profile="lora", use_simulation=True)
+        ctx = create_context(profile="lora", use_toy_mode=True)
         ctx.load_keys(
             pk=bundle.public_key.key_bytes,
             ek=bundle.evaluation_key.key_bytes,

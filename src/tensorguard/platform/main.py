@@ -4,18 +4,19 @@ TG-Tinker Platform Server.
 Privacy-first ML training API server built on FastAPI.
 """
 
+import logging
+import os
+from contextlib import asynccontextmanager
+from datetime import datetime
+
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from sqlmodel import SQLModel
 from starlette.middleware.base import BaseHTTPMiddleware
-from contextlib import asynccontextmanager
-import os
-import logging
-from datetime import datetime
 
 from .database import check_db_health, engine
 from .tg_tinker_api import router as tinker_router
-from sqlmodel import SQLModel
 
 logger = logging.getLogger(__name__)
 

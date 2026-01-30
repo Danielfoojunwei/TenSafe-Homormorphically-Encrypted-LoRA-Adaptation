@@ -3,7 +3,20 @@ N2HE Core Module.
 
 Provides the foundational homomorphic encryption primitives for TenSafe.
 This module interfaces with the N2HE C++ library (when available) or
-provides a pure-Python simulation layer for development and testing.
+provides a pure-Python TOY simulation layer for development and testing.
+
+IMPORTANT: The default ToyN2HEScheme is NOT CRYPTOGRAPHICALLY SECURE.
+It is intended only for:
+- Development and testing
+- API compatibility verification
+- Performance benchmarking (overhead estimation)
+
+For production use, you must:
+1. Install the N2HE C++ library
+2. Use NativeN2HEScheme from tensorguard.n2he._native
+
+To explicitly enable toy mode for development, set:
+    TENSAFE_TOY_HE=1
 
 The N2HE scheme is based on LWE/RLWE encryption with optimized kernels
 for neural network linear algebra operations (weighted sums, convolutions).
@@ -17,6 +30,7 @@ References:
 import hashlib
 import json
 import logging
+import os
 import secrets
 import struct
 from abc import ABC, abstractmethod
@@ -27,6 +41,20 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# Environment variable to explicitly enable toy/simulation mode
+_TOY_HE_ENABLED = os.environ.get("TENSAFE_TOY_HE", "0").lower() in ("1", "true", "yes")
+
+
+class ToyModeNotEnabledError(Exception):
+    """Raised when toy HE mode is used without explicit opt-in."""
+
+    def __init__(self):
+        super().__init__(
+            "ToyN2HEScheme is not cryptographically secure and requires explicit opt-in. "
+            "To enable toy mode for development/testing, set TENSAFE_TOY_HE=1 environment variable. "
+            "For production, install the N2HE native library."
+        )
 
 
 class HESchemeType(Enum):
@@ -331,24 +359,41 @@ class N2HEScheme(ABC):
         pass
 
 
-class SimulatedN2HEScheme(N2HEScheme):
+class ToyN2HEScheme(N2HEScheme):
     """
-    Simulated N2HE scheme for development and testing.
+    TOY N2HE scheme for development and testing ONLY.
 
-    This provides a functionally correct but not cryptographically
-    secure implementation for integration testing without the
-    N2HE C++ library dependency.
+    WARNING: THIS IS NOT CRYPTOGRAPHICALLY SECURE!
 
-    WARNING: Do not use in production - this is for testing only!
+    This provides a functionally correct but insecure implementation
+    for integration testing without the N2HE C++ library dependency.
+    It simulates the API but does not provide real encryption.
+
+    DO NOT USE IN PRODUCTION - this is for development/testing only!
+
+    To use this scheme, you must explicitly opt-in by setting:
+        TENSAFE_TOY_HE=1
+
+    For production, install the N2HE native library and use NativeN2HEScheme.
     """
 
-    def __init__(self, params: Optional[HESchemeParams] = None):
-        """Initialize with scheme parameters."""
+    def __init__(self, params: Optional[HESchemeParams] = None, _force_enable: bool = False):
+        """
+        Initialize with scheme parameters.
+
+        Args:
+            params: HE scheme parameters
+            _force_enable: Internal flag to bypass env check (for tests only)
+        """
+        if not _force_enable and not _TOY_HE_ENABLED:
+            raise ToyModeNotEnabledError()
+
         self.params = params or HESchemeParams.default_lora_params()
         self._noise_growth_factor = 1.5  # Simulated noise growth
         logger.warning(
-            "Using SimulatedN2HEScheme - NOT for production use! "
-            "Install N2HE C++ library for real encryption."
+            "*** USING ToyN2HEScheme - NOT CRYPTOGRAPHICALLY SECURE! ***\n"
+            "This is a simulation for development/testing only.\n"
+            "For production, install N2HE C++ library."
         )
 
     def keygen(self) -> Tuple[bytes, bytes, bytes]:
@@ -475,7 +520,7 @@ class N2HEContext:
             scheme: HE scheme implementation (default: simulated)
         """
         self.params = params or HESchemeParams.default_lora_params()
-        self.scheme = scheme or SimulatedN2HEScheme(self.params)
+        self.scheme = scheme or ToyN2HEScheme(self.params)
 
         # Key material (set by load_keys or generate_keys)
         self._sk: Optional[bytes] = None
@@ -645,17 +690,21 @@ class N2HEContext:
 
 def create_context(
     profile: str = "lora",
-    use_simulation: bool = True,
+    use_toy_mode: bool = False,
 ) -> N2HEContext:
     """
     Factory function to create an N2HE context.
 
     Args:
         profile: Parameter profile ("lora", "high_precision", "default")
-        use_simulation: Use simulated scheme (True) or real N2HE (False)
+        use_toy_mode: Use toy/simulated scheme. Requires TENSAFE_TOY_HE=1 env var.
 
     Returns:
         Configured N2HEContext
+
+    Raises:
+        ToyModeNotEnabledError: If toy mode requested without env var
+        ImportError: If native N2HE not available and toy mode not enabled
     """
     if profile == "lora":
         params = HESchemeParams.default_lora_params()
@@ -664,8 +713,8 @@ def create_context(
     else:
         params = HESchemeParams()
 
-    if use_simulation:
-        scheme = SimulatedN2HEScheme(params)
+    if use_toy_mode or _TOY_HE_ENABLED:
+        scheme = ToyN2HEScheme(params)
     else:
         # Try to import real N2HE
         try:
@@ -673,9 +722,14 @@ def create_context(
             scheme = NativeN2HEScheme(params)
             logger.info("Using native N2HE scheme")
         except ImportError:
-            logger.warning(
-                "Native N2HE not available, falling back to simulation"
+            raise ImportError(
+                "Native N2HE library not available. Either:\n"
+                "1. Install the N2HE C++ library for production use, or\n"
+                "2. Set TENSAFE_TOY_HE=1 for development/testing"
             )
-            scheme = SimulatedN2HEScheme(params)
 
     return N2HEContext(params=params, scheme=scheme)
+
+
+# Backwards compatibility alias (deprecated)
+SimulatedN2HEScheme = ToyN2HEScheme

@@ -3,8 +3,9 @@ import os
 import shutil
 import tempfile
 from argparse import Namespace
+
 from .cli import run_build, run_open
-from .format import read_tgsp_header
+
 
 class TGSPService:
     @staticmethod
@@ -17,10 +18,10 @@ class TGSPService:
                     parts = p.split(":", 2)
                     if len(parts) == 3:
                         shutil.copy(parts[2], os.path.join(tmp_in, os.path.basename(parts[2])))
-            
+
             if policy_path:
                 shutil.copy(policy_path, os.path.join(tmp_in, "policy.yaml"))
-            
+
             # Extract paths from recipients (format: id:path)
             recipient_paths = []
             if recipients:
@@ -38,7 +39,7 @@ class TGSPService:
                 recipients=recipient_paths,
                 signing_key=signing_key_path
             )
-            
+
             run_build(new_args)
             return "legacy-pkg-id"
 
