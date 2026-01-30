@@ -38,7 +38,6 @@ try:
     # In production, keys should be loaded from secure storage
     _signing_key_path = os.getenv("TG_VLA_SIGNING_KEY_PATH")
     if _signing_key_path and os.path.exists(_signing_key_path):
-        import json
         with open(_signing_key_path, "r") as f:
             _pqc_keypair = json.load(f)
     else:

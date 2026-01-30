@@ -173,9 +173,6 @@ async def get_fleets_extended(session: Session = Depends(get_session), current_u
 
 @router.post("/fleets", response_model=Dict[str, Any])
 async def create_fleet(name: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    import secrets
-    import hashlib
-    
     # Generate a real secure API key
     raw_key = f"tg_{secrets.token_hex(16)}"
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
@@ -249,7 +246,6 @@ async def release_key(req: KeyReleaseRequest, fleet: Fleet = Depends(verify_flee
     Release a re-wrapped DEK for a device.
     In production, this verifies attestation state and unwraps the master key from KMS.
     """
-    import secrets
     return {
         "result": "allow",
         "rewrapped": {

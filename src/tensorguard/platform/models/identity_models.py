@@ -210,11 +210,6 @@ class IdentityCertificate(SQLModel, table=True):
     @property
     def is_expired(self) -> bool:
         return datetime.utcnow() > self.not_after
-    
-    @property
-    def has_eku_conflict(self) -> bool:
-        """Check for Chrome Jun 2026 EKU conflict (public + both EKUs)."""
-        return self.is_public_trust and self.eku_server_auth and self.eku_client_auth
 
 
 class IdentityPolicy(SQLModel, table=True):

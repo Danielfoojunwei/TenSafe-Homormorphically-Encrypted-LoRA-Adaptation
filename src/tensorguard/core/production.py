@@ -22,7 +22,6 @@ import logging
 import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timedelta
-from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 import numpy as np
