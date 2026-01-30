@@ -10,6 +10,17 @@ TenSafe is a complete privacy-preserving machine learning training platform that
 
 ---
 
+> **Feature Maturity Notice**: This project contains features at various maturity levels.
+> See [docs/MATURITY.md](docs/MATURITY.md) for details on what is production-ready vs experimental.
+>
+> **Package Names**: The installable packages are `tg_tinker` (SDK) and `tensorguard` (server).
+> The README uses "tensafe" as a product name only.
+>
+> **N2HE Warning**: Homomorphic encryption features use a **toy simulation** by default.
+> Set `TENSAFE_TOY_HE=1` for testing. Production requires the native N2HE library.
+
+---
+
 ## The Problem
 
 Training ML models on sensitive data creates significant security and compliance risks:
@@ -252,6 +263,11 @@ package = bridge.create_tssp_from_checkpoint(
 ```
 
 ### 6. N2HE Homomorphic Encryption
+
+> **Maturity Warning**: N2HE integration is in **alpha** status. The default `ToyN2HEScheme`
+> provides **NO cryptographic security**—it simulates HE operations for API testing only.
+> Production use requires building the native N2HE C++ library (see "Building the Native Library").
+> Set `TENSAFE_TOY_HE=1` to acknowledge toy mode usage.
 
 Compute on encrypted data without decryption using Neural Network Homomorphic Encryption:
 
