@@ -382,6 +382,60 @@ if __name__ == "__main__":
     main()
 ```
 
+## Using Custom Loss Functions
+
+### Built-in Losses
+
+```python
+from tensafe.training.losses import resolve_loss
+
+# Token cross-entropy with label smoothing
+loss_fn = resolve_loss("token_ce", ignore_index=-100, label_smoothing=0.1)
+```
+
+### Custom Focal Loss for Imbalanced Data
+
+```python
+from tensafe.training.losses import register_loss
+import torch.nn.functional as F
+
+@register_loss("focal_ce")
+def focal_cross_entropy(outputs, batch, gamma=2.0, alpha=0.25, **kwargs):
+    """Focal loss to handle class imbalance."""
+    logits = outputs.logits.view(-1, outputs.logits.size(-1))
+    labels = batch["labels"].view(-1)
+
+    # Filter out ignored tokens
+    mask = labels != -100
+    logits = logits[mask]
+    labels = labels[mask]
+
+    ce_loss = F.cross_entropy(logits, labels, reduction='none')
+    pt = torch.exp(-ce_loss)
+    focal = alpha * ((1 - pt) ** gamma) * ce_loss
+
+    return {
+        "loss": focal.mean(),
+        "metrics": {"focal_weight": ((1 - pt) ** gamma).mean().item()}
+    }
+
+# Configure training with custom loss
+config = TrainingConfig(
+    model_ref="meta-llama/Llama-3-8B",
+    lora_config=LoRAConfig(rank=16, alpha=32),
+    loss_config={"type": "focal_ce", "kwargs": {"gamma": 2.0}},
+)
+```
+
+### Contrastive Loss for Embeddings
+
+```python
+from tensafe.training.losses import resolve_loss
+
+# Useful for embedding fine-tuning
+loss_fn = resolve_loss("contrastive", temperature=0.07, reduction="mean")
+```
+
 ## Tips
 
 ### Memory Optimization

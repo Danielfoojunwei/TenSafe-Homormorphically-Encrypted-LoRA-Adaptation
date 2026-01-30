@@ -200,6 +200,160 @@ optimizer = OptimizerConfig(
 - `sgd` - Stochastic Gradient Descent
 - `adafactor` - Memory-efficient Adam alternative
 
+## Pluggable Loss Functions
+
+TenSafe supports custom loss functions for advanced training scenarios.
+
+### Built-in Losses
+
+```python
+from tensafe.training.losses import resolve_loss
+
+# Token cross-entropy (default for language modeling)
+loss_fn = resolve_loss("token_ce", ignore_index=-100)
+
+# Margin ranking loss
+loss_fn = resolve_loss("margin_ranking", margin=0.5)
+
+# Contrastive loss
+loss_fn = resolve_loss("contrastive", temperature=0.07)
+
+# Mean squared error
+loss_fn = resolve_loss("mse")
+```
+
+### Custom Loss Functions
+
+Register your own loss:
+
+```python
+from tensafe.training.losses import register_loss
+
+@register_loss("focal_loss")
+def focal_loss(outputs, batch, gamma=2.0, **kwargs):
+    """Focal loss for imbalanced data."""
+    logits = outputs.logits
+    labels = batch["labels"]
+
+    ce_loss = F.cross_entropy(logits, labels, reduction='none')
+    pt = torch.exp(-ce_loss)
+    focal = ((1 - pt) ** gamma) * ce_loss
+
+    return {
+        "loss": focal.mean(),
+        "metrics": {"gamma": gamma, "pt_mean": pt.mean().item()}
+    }
+
+# Use custom loss
+loss_fn = resolve_loss("focal_loss", gamma=2.5)
+```
+
+### Dotted Path Import
+
+Load loss from external module:
+
+```python
+# From my_package/losses.py
+loss_fn = resolve_loss("my_package.losses:weighted_ce")
+```
+
+### YAML Configuration
+
+```yaml
+# training_config.yaml
+training:
+  mode: sft
+
+loss:
+  type: token_ce
+  kwargs:
+    ignore_index: -100
+    label_smoothing: 0.1
+```
+
+See [Custom Loss Quickstart](../custom_loss_quickstart.md) for more examples.
+
+## RLVR Mode (Reinforcement Learning with Verifiable Rewards)
+
+Train models using RL with custom reward functions.
+
+### Training Modes
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| `sft` | Supervised Fine-Tuning | Standard loss-based training |
+| `rlvr` | RL with Verifiable Rewards | Policy gradient optimization |
+
+### Basic RLVR Setup
+
+```python
+from tensafe.rlvr import (
+    MockRolloutSampler,
+    REINFORCE,
+    REINFORCEConfig,
+    resolve_reward,
+)
+
+# Create reward function
+reward_fn = resolve_reward("keyword_contains", keywords=["solution", "answer"])
+
+# Create RL algorithm
+algo = REINFORCE(REINFORCEConfig(
+    use_baseline=True,
+    normalize_advantages=True,
+    entropy_coef=0.01,
+))
+
+# Training loop
+sampler = MockRolloutSampler(max_new_tokens=64)
+prompts = ["Solve the equation x + 2 = 5", "What is 3 * 4?"]
+
+for epoch in range(10):
+    batch = sampler.generate_trajectories(prompts)
+    for traj in batch:
+        traj.reward = reward_fn(traj.prompt, traj.response)
+
+    result = algo.update(batch, training_client)
+    print(f"Mean reward: {batch.mean_reward:.3f}")
+```
+
+### PPO Algorithm
+
+For more stable training:
+
+```python
+from tensafe.rlvr import PPO, PPOConfig
+
+algo = PPO(PPOConfig(
+    clip_range=0.2,
+    ppo_epochs=4,
+    target_kl=0.01,
+    entropy_coef=0.01,
+))
+```
+
+### Custom Reward Functions
+
+```python
+from tensafe.rlvr import register_reward
+
+@register_reward("code_quality")
+def code_quality_reward(prompt: str, response: str, meta=None) -> float:
+    """Reward based on code quality metrics."""
+    score = 0.0
+    if "def " in response:
+        score += 0.3
+    if "return" in response:
+        score += 0.3
+    if len(response) > 50:
+        score += 0.4
+    return score
+
+reward_fn = resolve_reward("code_quality")
+```
+
+See [RLVR Quickstart](../rlvr_quickstart.md) for comprehensive guide.
+
 ## Gradient Accumulation
 
 Simulate larger batch sizes:
