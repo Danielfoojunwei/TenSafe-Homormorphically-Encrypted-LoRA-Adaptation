@@ -1,4 +1,4 @@
-# TG-Tinker Makefile
+# TenSafe Makefile
 # Privacy-First ML Training API
 # ================================================================
 
@@ -17,8 +17,8 @@ REPORTS_DIR := reports
 
 # Default target
 help:
-	@echo "TG-Tinker - Privacy-First ML Training API"
-	@echo "=========================================="
+	@echo "TenSafe - Privacy-First ML Training API"
+	@echo "========================================"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make install       Install production dependencies"
@@ -76,8 +76,8 @@ test-integration:
 test-regression:
 	$(PYTHON) -m pytest tests/regression/ -v --tb=short -m regression
 
-test-tg-tinker:
-	$(PYTHON) -m pytest tests/ -v --tb=short -m tg_tinker
+test-tensafe:
+	$(PYTHON) -m pytest tests/ -v --tb=short -m tensafe
 
 test-cov:
 	$(PYTHON) -m pytest tests/ -v --cov=src --cov-report=html --cov-report=term
@@ -138,11 +138,11 @@ bench-full:
 
 bench-comparison:
 	@mkdir -p $(REPORTS_DIR)/bench
-	$(PYTHON) scripts/bench/comparison/tg_tinker_vs_baseline.py --mode smoke
+	$(PYTHON) scripts/bench/comparison/tensafe_vs_baseline.py --mode smoke
 
 bench-comparison-full:
 	@mkdir -p $(REPORTS_DIR)/bench
-	$(PYTHON) scripts/bench/comparison/tg_tinker_vs_baseline.py --mode full
+	$(PYTHON) scripts/bench/comparison/tensafe_vs_baseline.py --mode full
 
 # =============================================================================
 # Evidence & Test Matrix
@@ -175,7 +175,7 @@ clean:
 # =============================================================================
 
 docker-build:
-	docker build -t tg-tinker:latest .
+	docker build -t tensafe:latest .
 
 docker-run:
-	docker run -p 8000:8000 -e TG_ENVIRONMENT=development tg-tinker:latest
+	docker run -p 8000:8000 -e TS_ENVIRONMENT=development tensafe:latest

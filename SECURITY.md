@@ -2,7 +2,7 @@
 
 ## Reporting Security Vulnerabilities
 
-If you discover a security vulnerability in TensorGuard, please report it responsibly:
+If you discover a security vulnerability in TenSafe, please report it responsibly:
 
 1. **DO NOT** create a public GitHub issue
 2. Email security concerns to the maintainers directly
@@ -28,7 +28,7 @@ For development and testing, generate keys locally:
 ```bash
 # Generate identity keys for testing
 python -c "
-from tensorguard.identity.keys.provider import FileKeyProvider
+from tensafe.identity.keys.provider import FileKeyProvider
 provider = FileKeyProvider('./keys/identity')
 key_id = provider.generate_key()
 print(f'Generated test key: {key_id}')
@@ -36,7 +36,7 @@ print(f'Generated test key: {key_id}')
 
 # Generate N2HE keys for aggregation testing
 python -c "
-from tensorguard.core.crypto import N2HEContext
+from tensafe.core.crypto import N2HEContext
 ctx = N2HEContext()
 print('N2HE context initialized with fresh keys')
 "
@@ -60,7 +60,7 @@ For production deployments:
 
 ### Post-Quantum Cryptography (PQC)
 
-**IMPORTANT**: The PQC implementations in `src/tensorguard/crypto/pqc/` are
+**IMPORTANT**: The PQC implementations in `src/tensafe/crypto/pqc/` are
 **SIMULATORS ONLY** and provide **NO ACTUAL SECURITY**. They are included for:
 
 - API compatibility testing
@@ -75,7 +75,7 @@ For production PQC, integrate with:
 ### Custom Cryptography
 
 The N2HE (Noise-Tolerant Homomorphic Encryption) implementation in
-`src/tensorguard/core/crypto.py` is a research prototype. For production:
+`src/tensafe/core/crypto.py` is a research prototype. For production:
 
 1. Obtain third-party cryptographic audit
 2. Use constant-time implementations
@@ -86,7 +86,7 @@ The N2HE (Noise-Tolerant Homomorphic Encryption) implementation in
 
 ### Avoid Pickle
 
-Never use `pickle` for untrusted data. TensorGuard uses:
+Never use `pickle` for untrusted data. TenSafe uses:
 - `msgpack` for safe binary serialization
 - `json` for human-readable formats
 - Protocol Buffers for structured data (where applicable)
@@ -113,7 +113,7 @@ All production deployments should:
 
 ## Compliance
 
-TensorGuard's evidence fabric supports compliance documentation for:
+TenSafe's evidence fabric supports compliance documentation for:
 - SOC 2 Type II
 - ISO 27001
 - NIST CSF

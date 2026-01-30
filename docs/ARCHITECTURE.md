@@ -1,24 +1,24 @@
-# TensorGuardFlow Architecture
+# TenSafe Architecture
 
 **Version**: 3.0.0
 **Last Updated**: 2026-01-28
 
 ## Overview
 
-TensorGuardFlow is a unified privacy-first ML platform that integrates four core subsystems:
+TenSafe is a unified privacy-first ML platform that integrates four core subsystems:
 
-1. **TG-Tinker Training API** - Privacy-preserving model fine-tuning
-2. **TGSP Secure Packaging** - Cryptographically protected model distribution
+1. **TenSafe Training API** - Privacy-preserving model fine-tuning
+2. **TSSP Secure Packaging** - Cryptographically protected model distribution
 3. **Platform Control Plane** - Fleet management and policy enforcement
 4. **Edge Agent** - Secure deployment and attestation
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              TensorGuardFlow Platform                                │
+│                              TenSafe Platform                                        │
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                      │
 │   ┌────────────────────────────────────────────────────────────────────────────┐    │
-│   │                         Client Layer (tg_tinker SDK)                        │    │
+│   │                         Client Layer (tensafe SDK)                          │    │
 │   │  ┌─────────────┐  ┌──────────────────┐  ┌────────────────┐                 │    │
 │   │  │ServiceClient│──▶│ TrainingClient   │──▶│  FutureHandle  │                 │    │
 │   │  └─────────────┘  │ • forward_backward│  │  • status()    │                 │    │
@@ -31,11 +31,11 @@ TensorGuardFlow is a unified privacy-first ML platform that integrates four core
 │                                        │                                             │
 │                                        ▼ HTTPS/TLS 1.3                              │
 │   ┌────────────────────────────────────────────────────────────────────────────┐    │
-│   │                       Server Layer (tensorguard.platform)                   │    │
+│   │                       Server Layer (tensafe.platform)                       │    │
 │   │                                                                             │    │
 │   │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐  ┌─────────────┐ │    │
-│   │  │ TG-Tinker API │  │ Platform API  │  │  TGSP API     │  │ Telemetry   │ │    │
-│   │  │ /v1/training_ │  │ /api/v1/      │  │ /api/tgsp/    │  │ /api/v1/    │ │    │
+│   │  │ TenSafe API   │  │ Platform API  │  │  TSSP API     │  │ Telemetry   │ │    │
+│   │  │ /v1/training_ │  │ /api/v1/      │  │ /api/tssp/    │  │ /api/v1/    │ │    │
 │   │  │    clients    │  │ attestation   │  │ upload        │  │ telemetry   │ │    │
 │   │  └───────┬───────┘  └───────┬───────┘  └───────┬───────┘  └──────┬──────┘ │    │
 │   │          │                  │                  │                 │        │    │
@@ -53,18 +53,18 @@ TensorGuardFlow is a unified privacy-first ML platform that integrates four core
 │   │  ┌─────────────────────────────────────────────────────────────────────┐  │    │
 │   │  │                     Storage Layer                                    │  │    │
 │   │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │  │    │
-│   │  │  │Encrypted     │  │  Database    │  │ TGSP Package │              │  │    │
+│   │  │  │Encrypted     │  │  Database    │  │ TSSP Package │              │  │    │
 │   │  │  │Artifact Store│  │  (SQLite/    │  │   Registry   │              │  │    │
 │   │  │  │(AES-256-GCM) │  │   Postgres)  │  │              │              │  │    │
 │   │  │  └──────────────┘  └──────────────┘  └──────────────┘              │  │    │
 │   │  └─────────────────────────────────────────────────────────────────────┘  │    │
 │   └────────────────────────────────────────────────────────────────────────────┘    │
 │                                        │                                             │
-│                                        ▼ TGSP Package                               │
+│                                        ▼ TSSP Package                               │
 │   ┌────────────────────────────────────────────────────────────────────────────┐    │
-│   │                         Edge Layer (tensorguard.agent)                      │    │
+│   │                         Edge Layer (tensafe.agent)                          │    │
 │   │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │    │
-│   │  │  Identity   │  │ Attestation │  │    TGSP     │  │   Runtime   │       │    │
+│   │  │  Identity   │  │ Attestation │  │    TSSP     │  │   Runtime   │       │    │
 │   │  │  Manager    │  │   Verifier  │  │   Loader    │  │  (TensorRT) │       │    │
 │   │  │  (mTLS)     │  │   (TPM)     │  │             │  │             │       │    │
 │   │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘       │    │
@@ -77,15 +77,15 @@ TensorGuardFlow is a unified privacy-first ML platform that integrates four core
 
 ## Component Deep Dive
 
-### 1. TG-Tinker Training API
+### 1. TenSafe Training API
 
-The TG-Tinker subsystem provides privacy-first model fine-tuning with a Tinker-compatible API.
+The TenSafe subsystem provides privacy-first model fine-tuning with a Tinker-compatible API.
 
 #### Data Flow
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                    TG-Tinker Training Flow                                │
+│                    TenSafe Training Flow                                  │
 └──────────────────────────────────────────────────────────────────────────┘
 
   Client                     Server                    Storage
@@ -135,30 +135,30 @@ The TG-Tinker subsystem provides privacy-first model fine-tuning with a Tinker-c
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `ServiceClient` | `src/tg_tinker/client.py` | Main entry point, manages HTTP sessions |
-| `TrainingClient` | `src/tg_tinker/training_client.py` | Training primitives interface |
-| `FutureHandle` | `src/tg_tinker/futures.py` | Async operation management |
-| `DPTrainer` | `src/tensorguard/platform/tg_tinker_api/dp.py` | DP-SGD implementation |
-| `RDPAccountant` | `src/tensorguard/platform/tg_tinker_api/dp.py` | Privacy budget tracking |
-| `EncryptedArtifactStore` | `src/tensorguard/platform/tg_tinker_api/storage.py` | Per-tenant encrypted storage |
-| `AuditLogger` | `src/tensorguard/platform/tg_tinker_api/audit.py` | Hash-chained audit trail |
+| `ServiceClient` | `src/tensafe/client.py` | Main entry point, manages HTTP sessions |
+| `TrainingClient` | `src/tensafe/training_client.py` | Training primitives interface |
+| `FutureHandle` | `src/tensafe/futures.py` | Async operation management |
+| `DPTrainer` | `src/tensafe/platform/tensafe_api/dp.py` | DP-SGD implementation |
+| `RDPAccountant` | `src/tensafe/platform/tensafe_api/dp.py` | Privacy budget tracking |
+| `EncryptedArtifactStore` | `src/tensafe/platform/tensafe_api/storage.py` | Per-tenant encrypted storage |
+| `AuditLogger` | `src/tensafe/platform/tensafe_api/audit.py` | Hash-chained audit trail |
 
 ---
 
-### 2. TGSP Secure Packaging
+### 2. TSSP Secure Packaging
 
-TGSP provides cryptographically protected model distribution with post-quantum signatures.
+TSSP provides cryptographically protected model distribution with post-quantum signatures.
 
 #### Package Lifecycle
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                    TGSP Package Lifecycle                                 │
+│                    TSSP Package Lifecycle                                 │
 └──────────────────────────────────────────────────────────────────────────┘
 
   Training                    Packaging                   Edge
     │                            │                          │
-    │  TG-Tinker checkpoint      │                          │
+    │  TenSafe checkpoint        │                          │
     │───────────────────────────▶│                          │
     │                            │                          │
     │                            │  Create manifest         │
@@ -175,7 +175,7 @@ TGSP provides cryptographically protected model distribution with post-quantum s
     │                            │  ├─ Wrap for recipients  │
     │                            │  └─ AES-256-GCM encrypt  │
     │                            │                          │
-    │                            │  Package as .tgsp        │
+    │                            │  Package as .tssp        │
     │                            │───────────────────────────▶
     │                            │                          │
     │                            │                          │  Verify signature
@@ -188,7 +188,7 @@ TGSP provides cryptographically protected model distribution with post-quantum s
     │                            │                          │  Check policy
     │                            │                          │  └─ OPA/Rego eval ✓
     │                            │                          │
-    │                            │                          │  Decrypt & load
+    │                            │                          │  Load
     │                            │                          │  └─ GPU memory
 ```
 
@@ -196,9 +196,9 @@ TGSP provides cryptographically protected model distribution with post-quantum s
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `TGSPService` | `src/tensorguard/tgsp/service.py` | Package creation and verification |
-| `sign_hybrid` | `src/tensorguard/crypto/sig.py` | Hybrid Ed25519+Dilithium3 signatures |
-| `generate_hybrid_keypair` | `src/tensorguard/crypto/kem.py` | X25519+Kyber768 key generation |
+| `TSSPService` | `src/tensafe/tssp/service.py` | Package creation and verification |
+| `sign_hybrid` | `src/tensafe/crypto/sig.py` | Hybrid Ed25519+Dilithium3 signatures |
+| `generate_hybrid_keypair` | `src/tensafe/crypto/kem.py` | X25519+Kyber768 key generation |
 
 ---
 
@@ -351,15 +351,15 @@ If any entry is modified:
 └─────────────────────────────────────────────────────────────────┘
 
                     ┌───────────────┐
-                    │   tg_tinker   │
+                    │    tensafe    │
                     │     (SDK)     │
                     └───────┬───────┘
                             │ imports
                             ▼
         ┌───────────────────────────────────────┐
-        │         tensorguard.platform          │
+        │           tensafe.platform            │
         │  ┌─────────────────────────────────┐  │
-        │  │         tg_tinker_api           │  │
+        │  │         tensafe_api             │  │
         │  │  routes, storage, audit, dp     │  │
         │  └───────────────┬─────────────────┘  │
         │                  │ imports             │
@@ -373,7 +373,7 @@ If any entry is modified:
         │                   │                   │
         ▼                   ▼                   ▼
 ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
-│    crypto     │   │   identity    │   │     tgsp      │
+│    crypto     │   │   identity    │   │     tssp      │
 │  sig, kem,    │   │ keys, acme,   │   │ service,      │
 │  pqc          │   │ scheduler     │   │ format        │
 └───────┬───────┘   └───────┬───────┘   └───────┬───────┘
@@ -398,13 +398,13 @@ If any entry is modified:
 ┌─────────────────────────────────────┐
 │           Development Host          │
 │  ┌─────────────────────────────┐   │
-│  │      tensorguard server     │   │
-│  │  ├─ TG-Tinker API (:8000)   │   │
+│  │       tensafe server        │   │
+│  │  ├─ TenSafe API (:8000)     │   │
 │  │  ├─ Platform API            │   │
 │  │  └─ SQLite DB               │   │
 │  └─────────────────────────────┘   │
 │  ┌─────────────────────────────┐   │
-│  │      tg-tinker client       │   │
+│  │       tensafe client        │   │
 │  │  (Python SDK)               │   │
 │  └─────────────────────────────┘   │
 └─────────────────────────────────────┘
@@ -427,7 +427,7 @@ If any entry is modified:
         ▼                    ▼                    ▼
 ┌───────────────┐    ┌───────────────┐    ┌───────────────┐
 │   API Pod 1   │    │   API Pod 2   │    │   API Pod N   │
-│ tensorguard   │    │ tensorguard   │    │ tensorguard   │
+│  tensafe      │    │  tensafe      │    │  tensafe      │
 │   server      │    │   server      │    │   server      │
 └───────┬───────┘    └───────┬───────┘    └───────┬───────┘
         │                    │                    │
@@ -456,20 +456,19 @@ If any entry is modified:
 
 | Variable | Component | Required | Default |
 |----------|-----------|----------|---------|
-| `TG_ENVIRONMENT` | All | Yes (prod) | `development` |
-| `TG_SECRET_KEY` | Platform | Yes (prod) | - |
-| `TG_KEY_MASTER` | Identity | Yes (prod) | - |
-| `DATABASE_URL` | Platform | Yes (prod) | `sqlite:///./tensorguard.db` |
-| `TG_TINKER_API_KEY` | SDK | Yes | - |
-| `TG_TINKER_BASE_URL` | SDK | No | `https://api.tensorguard.io` |
-| `TG_PQC_REQUIRED` | Crypto | No | `false` |
-| `TG_DETERMINISTIC` | Training | No | `false` |
+| `TS_ENVIRONMENT` | All | Yes (prod) | `development` |
+| `TS_SECRET_KEY` | Platform | Yes (prod) | - |
+| `TS_KEY_MASTER` | Identity | Yes (prod) | - |
+| `DATABASE_URL` | Platform | Yes (prod) | `sqlite:///./tensafe.db` |
+| `TENSAFE_API_KEY` | SDK | Yes | - |
+| `TENSAFE_BASE_URL` | SDK | No | `https://api.tensafe.io` |
+| `TS_PQC_REQUIRED` | Crypto | No | `false` |
+| `TS_DETERMINISTIC` | Training | No | `false` |
 
 ---
 
 ## Related Documentation
 
-- [PRIVACY_TINKER_SPEC.md](PRIVACY_TINKER_SPEC.md) - TG-Tinker API specification
-- [TGSP_SPEC.md](TGSP_SPEC.md) - Secure packaging format
+- [TENSAFE_SPEC.md](TENSAFE_SPEC.md) - TenSafe API specification
+- [TSSP_SPEC.md](TSSP_SPEC.md) - Secure packaging format
 - [SECURITY.md](../SECURITY.md) - Security policy
-- [HARDENING_REPORT.md](../HARDENING_REPORT.md) - Production hardening

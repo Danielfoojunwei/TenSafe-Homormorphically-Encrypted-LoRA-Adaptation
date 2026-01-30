@@ -1,8 +1,8 @@
-# TG-Tinker
+# TenSafe
 
 **Privacy-First ML Training API**
 
-TG-Tinker is a complete privacy-preserving machine learning training platform that protects your data at every step—from training to deployment. Built for teams who need enterprise-grade security without sacrificing developer experience.
+TenSafe is a complete privacy-preserving machine learning training platform that protects your data at every step—from training to deployment. Built for teams who need enterprise-grade security without sacrificing developer experience.
 
 [![Python 3.9+](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/License-Apache%202.0-orange.svg)](LICENSE)
@@ -21,16 +21,16 @@ Training ML models on sensitive data creates significant security and compliance
 
 ## The Solution
 
-TG-Tinker provides **defense in depth** for ML training:
+TenSafe provides **defense in depth** for ML training:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           TG-Tinker Platform                             │
+│                           TenSafe Platform                              │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │   ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    │
-│   │   Client SDK    │───▶│  Training API   │───▶│  TGSP Packager  │    │
-│   │   (tg_tinker)   │    │   (FastAPI)     │    │  (Secure Dist)  │    │
+│   │   Client SDK    │───▶│  Training API   │───▶│  TSSP Packager  │    │
+│   │   (tensafe)     │    │   (FastAPI)     │    │  (Secure Dist)  │    │
 │   └─────────────────┘    └─────────────────┘    └─────────────────┘    │
 │           │                      │                      │               │
 │           ▼                      ▼                      ▼               │
@@ -57,7 +57,7 @@ TG-Tinker provides **defense in depth** for ML training:
 
 ## Core Training Primitives
 
-TG-Tinker exposes four fundamental training operations, each enhanced with privacy and security features:
+TenSafe exposes four fundamental training operations, each enhanced with privacy and security features:
 
 ### `forward_backward` — Compute Gradients
 Perform a forward pass and backward pass, accumulating privacy-preserving gradients.
@@ -148,7 +148,7 @@ Mathematically proven privacy guarantees for your training data:
 - **Budget Management**: Automatic enforcement of (ε, δ) targets
 
 ```python
-from tg_tinker import ServiceClient, TrainingConfig, DPConfig
+from tensafe import ServiceClient, TrainingConfig, DPConfig
 
 # Configure privacy-preserving training
 config = TrainingConfig(
@@ -216,21 +216,21 @@ Future-proof signatures using NIST-approved algorithms:
 | **X25519** | Classical key exchange | 128-bit |
 | **Kyber768** | Post-quantum KEM | NIST Level 3 |
 
-TGSP packages include **hybrid signatures**—both classical and PQC—ensuring security against both current and quantum adversaries.
+TSSP packages include **hybrid signatures**—both classical and PQC—ensuring security against both current and quantum adversaries.
 
-### 5. TGSP Secure Packaging
+### 5. TSSP Secure Packaging
 
 Distribute models with cryptographic protection:
 
 ```python
-from tensorguard.platform.tg_tinker_api import TinkerTGSPBridge
+from tensafe.platform.tensafe_api import TenSafeTSSPBridge
 
-bridge = TinkerTGSPBridge()
+bridge = TenSafeTSSPBridge()
 
 # Create a secure package from training checkpoint
-package = bridge.create_tgsp_from_checkpoint(
+package = bridge.create_tssp_from_checkpoint(
     artifact=checkpoint,
-    output_path="model-v1.0.tgsp",
+    output_path="model-v1.0.tssp",
     include_dp_certificate=True  # Proves privacy compliance
 )
 
@@ -248,7 +248,7 @@ package = bridge.create_tgsp_from_checkpoint(
 ### Installation
 
 ```bash
-pip install tg-tinker
+pip install tensafe
 ```
 
 ### Start the Server
@@ -258,13 +258,13 @@ pip install tg-tinker
 make serve
 
 # Or directly
-python -m uvicorn tensorguard.platform.main:app --reload --port 8000
+python -m uvicorn tensafe.platform.main:app --reload --port 8000
 ```
 
 ### Training Example
 
 ```python
-from tg_tinker import ServiceClient, TrainingConfig, LoRAConfig, DPConfig
+from tensafe import ServiceClient, TrainingConfig, LoRAConfig, DPConfig
 
 # Initialize client
 service = ServiceClient(
@@ -314,7 +314,7 @@ tc.save_state("final-checkpoint")
 
 ## Performance
 
-TG-Tinker is designed for production workloads:
+TenSafe is designed for production workloads:
 
 | Metric | Value | Conditions |
 |--------|-------|------------|
@@ -330,7 +330,7 @@ Run benchmarks locally:
 ```bash
 make bench              # Quick smoke test (~5 min)
 make bench-full         # Comprehensive benchmark (~30 min)
-make bench-comparison   # TG-Tinker vs baseline comparison
+make bench-comparison   # TenSafe vs baseline comparison
 make test-e2e-full      # Full E2E test with 10-min training
 ```
 
@@ -342,8 +342,8 @@ make test-e2e-full      # Full E2E test with 10-min training
 
 Full Llama3-8B SFT training with **realistic GPU-accelerated DP-SGD simulation**:
 
-| Metric | TG-Tinker | Baseline | Overhead |
-|--------|-----------|----------|----------|
+| Metric | TenSafe | Baseline | Overhead |
+|--------|---------|----------|----------|
 | **Training Steps** | 1,108 | 2,066 | **-46.4%** |
 | **Forward/Backward (p50)** | 204.21ms | 136.63ms | **+49.4%** |
 | **Optimizer Step (p50)** | 65.05ms | 8.42ms | **+672.6%** |
@@ -375,7 +375,7 @@ These timings are based on:
 | **Training API** |
 | forward_backward | 204.21ms | 205.10ms | 204.49ms | With per-sample clipping |
 | optim_step | 65.05ms | 70.09ms | 65.40ms | With DP noise injection |
-| **TGSP Packager** |
+| **TSSP Packager** |
 | create_package | 0.07ms | 0.77ms | 0.21ms | Manifest + metadata |
 | sign_manifest | 3.24ms | 3.66ms | 3.32ms | Hybrid PQC signature |
 | verify_signature | 1.10ms | 1.15ms | 1.13ms | Dual verification |
@@ -428,7 +428,7 @@ PQC Security: Ed25519 + Dilithium3 hybrid (NIST Level 3)
 ### Integration Test Results
 
 ```
-tests/integration/tg_tinker/test_api_integration.py  16 passed ✓
+tests/integration/tensafe/test_api_integration.py  16 passed ✓
 
 Test Coverage:
   ✓ create_training_client (with and without DP)
@@ -445,17 +445,17 @@ Test Coverage:
 
 ```
 92 tests passed across all modules:
-  - tensorguard.crypto (signatures, KEM, hybrid)
-  - tensorguard.platform.tg_tinker_api (routes, dp, storage, audit)
-  - tensorguard.tgsp (packaging, verification)
-  - tg_tinker SDK (client, futures)
+  - tensafe.crypto (signatures, KEM, hybrid)
+  - tensafe.platform.tensafe_api (routes, dp, storage, audit)
+  - tensafe.tssp (packaging, verification)
+  - tensafe SDK (client, futures)
 ```
 
 ---
 
 ## Privacy Guarantees
 
-TG-Tinker provides **mathematically proven** privacy through differential privacy:
+TenSafe provides **mathematically proven** privacy through differential privacy:
 
 ### What Differential Privacy Means
 
@@ -471,7 +471,7 @@ TG-Tinker provides **mathematically proven** privacy through differential privac
 
 ### Privacy Accounting
 
-TG-Tinker uses Rényi Differential Privacy (RDP) for tight composition:
+TenSafe uses Rényi Differential Privacy (RDP) for tight composition:
 
 ```python
 # After training, verify privacy guarantee
@@ -490,30 +490,30 @@ print(f"Steps completed: {metrics.steps}")
 
 ```
 src/
-├── tg_tinker/                    # Client SDK
+├── tensafe/                      # Client SDK
 │   ├── client.py                 # ServiceClient
 │   ├── training_client.py        # TrainingClient
 │   └── futures.py                # FutureHandle
 │
-└── tensorguard/
+└── tensafe/
     ├── platform/
-    │   └── tg_tinker_api/        # Server API
+    │   └── tensafe_api/          # Server API
     │       ├── routes.py         # FastAPI endpoints
     │       ├── dp.py             # DP-SGD engine
     │       ├── storage.py        # Encrypted storage
     │       ├── audit.py          # Hash-chain audit
-    │       └── tgsp_bridge.py    # TGSP integration
+    │       └── tssp_bridge.py    # TSSP integration
     │
     ├── crypto/                   # Cryptographic primitives
     │   ├── sig.py                # Hybrid signatures
     │   ├── kem.py                # Key encapsulation
     │   └── pqc/                  # Post-quantum algorithms
     │
-    ├── tgsp/                     # Secure packaging
-    │   └── service.py            # TGSP creation/verification
+    ├── tssp/                     # Secure packaging
+    │   └── service.py            # TSSP creation/verification
     │
     └── edge/                     # Edge deployment
-        └── tgsp_client.py        # Package loader
+        └── tssp_client.py        # Package loader
 ```
 
 ### API Endpoints
@@ -534,7 +534,7 @@ src/
 
 ### Threat Model
 
-TG-Tinker protects against:
+TenSafe protects against:
 
 | Threat | Mitigation |
 |--------|------------|
@@ -563,8 +563,8 @@ TG-Tinker protects against:
 
 ```bash
 # Clone repository
-git clone https://github.com/tg-tinker/tg-tinker.git
-cd tg-tinker
+git clone https://github.com/tensafe/tensafe.git
+cd tensafe
 
 # Install development dependencies
 make dev
@@ -579,30 +579,30 @@ make qa
 ### Project Structure
 
 ```
-tg-tinker/
+tensafe/
 ├── src/
-│   ├── tg_tinker/           # Python SDK
-│   └── tensorguard/         # Server & security layer
+│   ├── tensafe/            # Python SDK
+│   └── tensafe/            # Server & security layer
 ├── tests/
-│   ├── unit/                # Unit tests
-│   ├── integration/         # Integration tests
-│   ├── regression/          # Privacy invariant tests
-│   └── e2e/                 # End-to-end training tests
+│   ├── unit/               # Unit tests
+│   ├── integration/        # Integration tests
+│   ├── regression/         # Privacy invariant tests
+│   └── e2e/                # End-to-end training tests
 │       └── test_llama3_sft_e2e.py  # Full Llama3 SFT validation
 ├── scripts/
-│   ├── bench/               # Benchmarking
-│   │   └── comparison/      # TG-Tinker vs baseline comparison
-│   ├── qa/                  # Test matrix
-│   └── evidence/            # Value evidence generator
-├── reports/                 # Generated test reports (gitignored)
-│   ├── e2e/                 # E2E test metrics
-│   └── bench/               # Benchmark results
+│   ├── bench/              # Benchmarking
+│   │   └── comparison/     # TenSafe vs baseline comparison
+│   ├── qa/                 # Test matrix
+│   └── evidence/           # Value evidence generator
+├── reports/                # Generated test reports (gitignored)
+│   ├── e2e/                # E2E test metrics
+│   └── bench/              # Benchmark results
 ├── docs/
-│   ├── ARCHITECTURE.md      # System design
-│   ├── PRIVACY_TINKER_SPEC.md  # API specification
-│   └── TGSP_SPEC.md         # Package format
-├── Makefile                 # Build automation
-└── pyproject.toml           # Package configuration
+│   ├── ARCHITECTURE.md     # System design
+│   ├── TENSAFE_SPEC.md     # API specification
+│   └── TSSP_SPEC.md        # Package format
+├── Makefile                # Build automation
+└── pyproject.toml          # Package configuration
 ```
 
 ### Running Tests
@@ -633,8 +633,8 @@ The E2E test (`tests/e2e/test_llama3_sft_e2e.py`) validates the complete trainin
 ## Documentation
 
 - **[Architecture Guide](docs/ARCHITECTURE.md)** - System design and component deep dive
-- **[API Specification](docs/PRIVACY_TINKER_SPEC.md)** - Complete TG-Tinker API reference
-- **[TGSP Format](docs/TGSP_SPEC.md)** - Secure packaging specification
+- **[API Specification](docs/TENSAFE_SPEC.md)** - Complete TenSafe API reference
+- **[TSSP Format](docs/TSSP_SPEC.md)** - Secure packaging specification
 - **[QA & Benchmarks](docs/QUALITY_AND_BENCHMARKS.md)** - Testing and performance validation
 
 ---
@@ -652,5 +652,5 @@ We welcome contributions! Please see our contributing guidelines before submitti
 ---
 
 <p align="center">
-  <strong>TG-Tinker</strong> — Train with confidence. Deploy with proof.
+  <strong>TenSafe</strong> — Train with confidence. Deploy with proof.
 </p>
