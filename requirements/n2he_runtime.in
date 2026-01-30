@@ -1,5 +1,0 @@
-# N2HE Runtime Dependencies (Optional)
-# For homomorphic encryption privacy features
-
-tenseal>=0.3.0
-numpy>=1.24.0

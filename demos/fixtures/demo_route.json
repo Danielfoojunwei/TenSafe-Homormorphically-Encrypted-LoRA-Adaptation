@@ -1,5 +1,0 @@
-{
-    "route_key": "demo-proof-route",
-    "base_model_ref": "prajjwal1/bert-tiny",
-    "description": "Deterministic demo route for platform proof"
-}

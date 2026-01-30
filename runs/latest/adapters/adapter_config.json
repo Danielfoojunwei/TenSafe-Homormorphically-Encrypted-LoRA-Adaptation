@@ -1,6 +1,0 @@
-{
-  "base_model": "test/model",
-  "peft_type": "LORA",
-  "mode": "DEMO_MODE",
-  "warning": "This is a demo artifact - not from real training"
-}

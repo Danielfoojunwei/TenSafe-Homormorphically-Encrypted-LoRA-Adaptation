@@ -1,7 +1,0 @@
-{
-    "novelty_threshold": 0.0,
-    "promotion_threshold": 0.0,
-    "forgetting_budget": 0.1,
-    "auto_promote_to_stable": false,
-    "auto_promote_to_canary": true
-}

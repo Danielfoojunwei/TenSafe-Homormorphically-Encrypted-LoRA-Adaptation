@@ -1,5 +1,0 @@
-DEBUG: Registered Tables: ['tenant', 'user', 'fleet', 'job', 'auditlog', 'replaynonce', 'identity_endpoints', 'identity_certificates', 'identity_policies', 'identity_renewal_jobs', 'identity_audit_log', 'identity_agents', 'policyprofile', 'enablementjob', 'governanceevent', 'run', 'runartifact', 'policypack', 'runpolicyresult', 'tgsppackage', 'tgsprelease', 'peft_integration_configs', 'peft_wizard_drafts', 'peft_runs', 'fedmoeexpert', 'skillevidence', 'systemsetting', 'fleetpolicyrecord', 'kmskey', 'kmsrotationlog', 'edgenode', 'telemetrysample', 'gatingdecisionlog', 'integrationconnection', 'vlamodel', 'vlasafetycheck', 'vladeploymentlog', 'vlabenchmarkresult', 'cl_routes', 'cl_feeds', 'cl_policies', 'cl_candidate_events', 'cl_adapter_states']
-DEBUG: Test Engine: Engine(sqlite:///:memory:)
-DEBUG: Database Engine (before patch): Engine(sqlite:///:memory:)
-DEBUG: Database Engine (after patch): Engine(sqlite:///:memory:)
-DEBUG: PolicyEngine Engine: Engine(sqlite:///:memory:)

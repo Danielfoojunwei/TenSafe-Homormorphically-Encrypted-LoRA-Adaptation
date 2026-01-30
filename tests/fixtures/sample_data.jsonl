@@ -1,5 +1,0 @@
-{"input": "What is machine learning?", "output": "Machine learning is a subset of AI that enables systems to learn from data."}
-{"input": "Explain neural networks", "output": "Neural networks are computing systems inspired by biological neural networks."}
-{"input": "What is deep learning?", "output": "Deep learning uses neural networks with many layers to learn complex patterns."}
-{"input": "Define reinforcement learning", "output": "RL is learning through interaction with an environment to maximize rewards."}
-{"input": "What is transfer learning?", "output": "Transfer learning applies knowledge from one task to improve performance on another."}

@@ -3,18 +3,20 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tensorguard"
+name = "tg-tinker"
 version = "3.0.0"
-description = "Privacy-First ML Platform with TG-Tinker Training API, Post-Quantum Security, and Fleet Governance"
+description = "TG-Tinker: Privacy-First ML Training API with Differential Privacy, Encrypted Storage, and Post-Quantum Security"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.9"
 authors = [
-    {name = "TensorGuard Team"}
+    {name = "Daniel Foo"},
+    {name = "TG-Tinker Team"}
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
@@ -23,86 +25,73 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Security :: Cryptography",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Information Analysis",
 ]
-keywords = ["mlops", "federated-learning", "post-quantum", "cryptography", "security"]
+keywords = [
+    "differential-privacy",
+    "ml-training",
+    "privacy-preserving",
+    "post-quantum-cryptography",
+    "secure-ml",
+    "encrypted-storage",
+    "audit-logging",
+]
 
-# Core dependencies required for the platform
 dependencies = [
+    # API Framework
     "fastapi>=0.104.0,<1.0.0",
     "uvicorn>=0.24.0,<1.0.0",
-    "sqlmodel>=0.0.14,<1.0.0",
     "pydantic>=2.5.0,<3.0.0",
     "pydantic-settings>=2.1.0,<3.0.0",
+    # Database
+    "sqlmodel>=0.0.14,<1.0.0",
+    # Cryptography
     "cryptography>=41.0.0,<43.0.0",
-    "requests>=2.31.0,<3.0.0",
+    # HTTP Client (SDK)
     "httpx>=0.25.0,<1.0.0",
+    # Numeric
     "numpy>=1.24.0,<2.0.0",
-    "click>=8.1.0,<9.0.0",
-    # Authentication dependencies
+    # Authentication
     "python-jose[cryptography]>=3.3.0,<4.0.0",
     "passlib[argon2]>=1.7.4,<2.0.0",
     "argon2-cffi>=23.1.0,<24.0.0",
-    # Serialization and database migration
+    # Serialization
     "msgpack>=1.0.0,<2.0.0",
-    "alembic>=1.12.0,<2.0.0",
 ]
 
 [project.optional-dependencies]
-# Benchmarking and ML dependencies
-bench = [
-    "xgboost>=2.0.0,<3.0.0",
-    "scikit-learn>=1.3.0,<2.0.0",
-    "scipy>=1.11.0,<2.0.0",
-    "psutil>=5.9.0,<6.0.0",
-]
-
-# Federated Learning dependencies
-fl = [
-    "flwr>=1.5.0,<2.0.0",
-    "tenseal>=0.3.0,<1.0.0",
-]
-
-# ACME/Certificate management
-acme = [
-    "josepy>=1.14.0,<2.0.0",
-]
-
-# Post-Quantum Cryptography (requires liboqs native library)
-# Install liboqs first: https://github.com/open-quantum-safe/liboqs
+# Post-Quantum Cryptography (requires liboqs)
 pqc = [
     "liboqs-python>=0.10.0",
 ]
 
-# TG-Tinker Training API dependencies
-tinker = [
-    "httpx>=0.25.0,<1.0.0",
-    "click>=8.1.0,<9.0.0",
+# Benchmarking
+bench = [
+    "psutil>=5.9.0,<6.0.0",
+    "scipy>=1.11.0,<2.0.0",
 ]
 
-# Development dependencies
+# Development
 dev = [
     "pytest>=7.4.0,<8.0.0",
     "pytest-asyncio>=0.21.0,<1.0.0",
     "pytest-cov>=4.1.0,<5.0.0",
     "ruff>=0.1.0,<1.0.0",
     "mypy>=1.7.0,<2.0.0",
-    "httpx>=0.25.0,<1.0.0",
 ]
 
-# All optional dependencies
+# All dependencies
 all = [
-    "tensorguard[bench,fl,acme,pqc,tinker,dev]",
+    "tg-tinker[pqc,bench,dev]",
 ]
 
 [project.urls]
-Homepage = "https://github.com/tensorguard/tensorguardflow"
-Documentation = "https://tensorguard.dev/docs"
-Repository = "https://github.com/tensorguard/tensorguardflow"
+Homepage = "https://github.com/tg-tinker/tg-tinker"
+Documentation = "https://tg-tinker.dev/docs"
+Repository = "https://github.com/tg-tinker/tg-tinker"
 
 [project.scripts]
-tensorguard = "tensorguard.cli:main"
-tg-agent = "tensorguard.agent.daemon:main"
-tg-tinker = "tensorguard.platform.tg_tinker_api.cli:main"
+tg-tinker-server = "tensorguard.platform.main:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -115,16 +104,13 @@ include = ["tensorguard*", "tg_tinker*"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
-    "unit: marks tests as unit tests",
-    "crypto: marks tests requiring cryptographic operations",
-    "privacy: marks tests for privacy features",
-    "compliance: marks tests for compliance features",
-    "regression: marks tests as regression tests for critical invariants",
-    "n2he: marks tests for N2HE privacy features",
-    "perf: marks tests for performance validation",
-    "tg_tinker: marks tests for TG-Tinker privacy training API",
+    "slow: marks tests as slow",
+    "integration: integration tests",
+    "unit: unit tests",
+    "crypto: cryptographic operations",
+    "privacy: privacy features",
+    "regression: regression tests",
+    "tg_tinker: TG-Tinker API tests",
 ]
 
 [tool.ruff]
@@ -140,12 +126,12 @@ select = [
     "UP",  # pyupgrade
 ]
 ignore = [
-    "E501",  # line too long (handled by formatter)
-    "B008",  # do not perform function calls in argument defaults
+    "E501",  # line too long
+    "B008",  # function calls in argument defaults
 ]
 
 [tool.ruff.isort]
-known-first-party = ["tensorguard"]
+known-first-party = ["tensorguard", "tg_tinker"]
 
 [tool.mypy]
 python_version = "3.9"

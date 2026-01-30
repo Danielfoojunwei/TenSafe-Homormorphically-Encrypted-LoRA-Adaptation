@@ -1,1 +1,0 @@
-{"timestamp": "2026-01-18T11:48:14.770576+00:00", "action": "Create Route", "method": "POST", "url": "http://localhost:8000/api/v1/tgflow/routes", "status": 500, "payload": {"route_key": "demo-proof-route", "base_model_ref": "prajjwal1/bert-tiny", "description": "Deterministic demo route for platform proof"}, "response": {"text": "Internal Server Error"}}

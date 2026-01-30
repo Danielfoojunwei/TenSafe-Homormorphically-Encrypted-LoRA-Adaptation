@@ -1,5 +1,0 @@
-# N2HE Runtime Dependencies - Locked Versions
-# Generated for reproducible builds
-
-tenseal==0.3.14
-numpy==1.26.3
