@@ -190,9 +190,11 @@ def load_model(
 
     if use_flash_attention:
         try:
+            import flash_attn  # noqa: F401
             model_kwargs["attn_implementation"] = "flash_attention_2"
-        except Exception:
-            pass
+            logger.info("Using FlashAttention 2")
+        except ImportError:
+            logger.info("FlashAttention 2 not available, using default attention")
 
     # Load base model
     model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)

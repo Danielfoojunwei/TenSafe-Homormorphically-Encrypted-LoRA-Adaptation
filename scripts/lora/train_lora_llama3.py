@@ -256,13 +256,14 @@ def load_model_and_tokenizer(
     elif torch.cuda.is_available():
         model_kwargs["device_map"] = "auto"
 
-    # FlashAttention 2
+    # FlashAttention 2 - only use if explicitly enabled AND package is available
     if config.use_flash_attention:
         try:
+            import flash_attn  # noqa: F401
             model_kwargs["attn_implementation"] = "flash_attention_2"
             logger.info("Using FlashAttention 2")
-        except Exception:
-            logger.warning("FlashAttention 2 not available, using default attention")
+        except ImportError:
+            logger.warning("FlashAttention 2 not installed, using default attention")
 
     # Load model
     model = AutoModelForCausalLM.from_pretrained(
@@ -359,10 +360,17 @@ def prepare_dataset(
     return train_dataset, eval_dataset
 
 
-class TrainingMetricsCallback:
-    """Callback to collect training metrics."""
+try:
+    from transformers import TrainerCallback
+except ImportError:
+    TrainerCallback = object
+
+
+class TrainingMetricsCallback(TrainerCallback):
+    """Callback to collect training metrics (inherits from TrainerCallback)."""
 
     def __init__(self):
+        super().__init__()
         self.metrics = TrainingMetrics()
         self.step_times = []
         self.start_time = None
@@ -401,8 +409,7 @@ def train(
         Dictionary with training results and artifact paths
     """
     import torch
-    from transformers import TrainingArguments, DataCollatorForLanguageModeling
-    from trl import SFTTrainer
+    from trl import SFTTrainer, SFTConfig
 
     # Create run directory
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -437,8 +444,8 @@ def train(
         tokenizer, config, smoke=smoke, synthetic=synthetic
     )
 
-    # Training arguments
-    training_args = TrainingArguments(
+    # SFT Config (TRL 0.27+ uses SFTConfig instead of TrainingArguments)
+    sft_config = SFTConfig(
         output_dir=str(output_dir),
         num_train_epochs=config.num_train_epochs,
         per_device_train_batch_size=config.per_device_train_batch_size,
@@ -451,7 +458,7 @@ def train(
         max_grad_norm=config.max_grad_norm,
         bf16=config.bf16 and torch.cuda.is_available(),
         fp16=config.fp16 and torch.cuda.is_available() and not config.bf16,
-        tf32=config.tf32,
+        tf32=config.tf32 and torch.cuda.is_available(),
         logging_steps=config.logging_steps,
         eval_strategy="steps" if len(eval_dataset) > 0 else "no",
         eval_steps=config.eval_steps,
@@ -463,12 +470,10 @@ def train(
         report_to="none",  # Disable wandb/tensorboard
         remove_unused_columns=False,
         optim="adamw_torch",
-    )
-
-    # Data collator
-    data_collator = DataCollatorForLanguageModeling(
-        tokenizer=tokenizer,
-        mlm=False,
+        # SFT-specific settings
+        max_length=config.max_seq_length,
+        packing=config.packing,
+        dataset_text_field="text",
     )
 
     # Metrics callback
@@ -477,17 +482,14 @@ def train(
     # Start timing
     train_start = time.time()
 
-    # Create trainer
+    # Create trainer (TRL 0.27+ uses simplified API)
+    # SFTTrainer handles tokenization and data collation internally
     trainer = SFTTrainer(
         model=model,
-        args=training_args,
+        args=sft_config,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset if len(eval_dataset) > 0 else None,
-        tokenizer=tokenizer,
-        data_collator=data_collator,
-        dataset_text_field="text",
-        max_seq_length=config.max_seq_length,
-        packing=config.packing,
+        processing_class=tokenizer,
     )
 
     # Add callback
