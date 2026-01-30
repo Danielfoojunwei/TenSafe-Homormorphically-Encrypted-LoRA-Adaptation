@@ -1,0 +1,104 @@
+# TenSafe SFT Training Configuration
+#
+# This configuration file defines settings for supervised fine-tuning (SFT)
+# with pluggable loss functions.
+#
+# Usage:
+#   python scripts/train.py --config configs/train_sft.yaml
+
+# Training mode: sft (supervised fine-tuning) or rlvr (reinforcement learning)
+training:
+  mode: sft
+  seed: 42
+  deterministic: false
+  max_steps: 1000
+  eval_steps: 100
+  save_steps: 500
+  logging_steps: 10
+
+# Model configuration
+model:
+  ref: "meta-llama/Llama-3-8B"
+  trust_remote_code: true
+
+# LoRA configuration
+lora:
+  rank: 16
+  alpha: 32.0
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - v_proj
+    - k_proj
+    - o_proj
+  bias: none
+
+# Optimizer configuration
+optimizer:
+  name: adamw
+  learning_rate: 1.0e-4
+  weight_decay: 0.01
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+
+# Learning rate scheduler
+scheduler:
+  type: cosine
+  warmup_ratio: 0.03
+  min_lr_ratio: 0.0
+
+# Loss function configuration
+# Can be:
+#   - A built-in name: "token_ce", "margin_ranking", "contrastive", "mse"
+#   - A dotted path: "my_module.losses:custom_loss"
+loss:
+  type: token_ce
+  kwargs:
+    ignore_index: -100
+    label_smoothing: 0.0
+    reduction: mean
+
+# Batch configuration
+batch:
+  size: 8
+  gradient_accumulation_steps: 4
+  max_seq_length: 2048
+
+# Differential privacy (optional)
+dp:
+  enabled: false
+  noise_multiplier: 1.0
+  max_grad_norm: 1.0
+  target_epsilon: 8.0
+  target_delta: 1.0e-5
+  accountant_type: rdp
+
+# Checkpointing
+checkpoint:
+  save_total_limit: 3
+  resume_from: null  # Path to checkpoint to resume from
+
+# Data configuration
+data:
+  train_path: null  # Path to training data
+  eval_path: null   # Path to evaluation data
+  dataset_name: null  # HuggingFace dataset name
+  text_field: text  # Field containing text data
+
+# Output configuration
+output:
+  dir: outputs/sft
+  experiment_name: null  # Auto-generated if null
+
+# Hardware configuration
+hardware:
+  bf16: true
+  fp16: false
+  tf32: true
+  use_flash_attention: true
+
+# Logging configuration
+logging:
+  level: INFO
+  log_to_file: true
+  report_to: []  # Empty for no external reporting
