@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from .config import TGTinkerConfig, get_config, validate_api_key
+from .config import TenSafeConfig, get_config, validate_api_key
 from .exceptions import (
     ArtifactNotFoundError,
     AuthenticationError,

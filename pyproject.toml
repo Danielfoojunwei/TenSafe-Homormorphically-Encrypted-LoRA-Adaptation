@@ -3,15 +3,15 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tg-tinker"
+name = "tensafe"
 version = "3.0.0"
-description = "TG-Tinker: Privacy-First ML Training API with Differential Privacy, Encrypted Storage, and Post-Quantum Security"
+description = "TenSafe: Privacy-First ML Training API with Differential Privacy, Encrypted Storage, and Post-Quantum Security"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.9"
 authors = [
     {name = "Daniel Foo"},
-    {name = "TG-Tinker Team"}
+    {name = "TenSafe Team"}
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -82,16 +82,16 @@ dev = [
 
 # All dependencies
 all = [
-    "tg-tinker[pqc,bench,dev]",
+    "tensafe[pqc,bench,dev]",
 ]
 
 [project.urls]
-Homepage = "https://github.com/tg-tinker/tg-tinker"
-Documentation = "https://tg-tinker.dev/docs"
-Repository = "https://github.com/tg-tinker/tg-tinker"
+Homepage = "https://github.com/tensafe/tensafe"
+Documentation = "https://tensafe.dev/docs"
+Repository = "https://github.com/tensafe/tensafe"
 
 [project.scripts]
-tg-tinker-server = "tensorguard.platform.main:app"
+tensafe-server = "tensorguard.platform.main:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -110,7 +110,7 @@ markers = [
     "crypto: cryptographic operations",
     "privacy: privacy features",
     "regression: regression tests",
-    "tg_tinker: TG-Tinker API tests",
+    "tensafe: TenSafe API tests",
 ]
 
 [tool.ruff]

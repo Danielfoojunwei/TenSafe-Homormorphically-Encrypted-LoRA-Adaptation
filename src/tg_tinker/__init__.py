@@ -42,7 +42,7 @@ from .training_client import TrainingClient
 from .futures import FutureHandle
 
 # Configuration
-from .config import TGTinkerConfig, get_config
+from .config import TenSafeConfig, get_config
 
 # Schemas
 from .schemas import (
@@ -105,7 +105,7 @@ __all__ = [
     "TrainingClient",
     "FutureHandle",
     # Config
-    "TGTinkerConfig",
+    "TenSafeConfig",
     "get_config",
     # Enums
     "FutureStatus",

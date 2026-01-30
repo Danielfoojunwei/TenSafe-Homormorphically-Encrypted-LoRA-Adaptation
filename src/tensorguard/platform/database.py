@@ -8,7 +8,6 @@ health checks, and environment-based configuration.
 from sqlmodel import SQLModel, create_engine, Session
 from sqlalchemy.pool import QueuePool, NullPool
 from sqlalchemy import event, text
-from ..utils.config import settings
 import os
 import logging
 

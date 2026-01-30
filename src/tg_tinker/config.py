@@ -1,5 +1,5 @@
 """
-TG-Tinker SDK configuration.
+TenSafe SDK configuration.
 
 This module handles environment variables and SDK configuration.
 """
@@ -11,16 +11,16 @@ from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
-class TGTinkerConfig(BaseSettings):
-    """Configuration for the TG-Tinker SDK."""
+class TenSafeConfig(BaseSettings):
+    """Configuration for the TenSafe SDK."""
 
     api_key: Optional[str] = Field(
         default=None,
         description="API key for authentication",
     )
     base_url: str = Field(
-        default="https://api.tensorguard.io",
-        description="Base URL for TG-Tinker API",
+        default="https://api.tensafe.dev",
+        description="Base URL for TenSafe API",
     )
     tenant_id: Optional[str] = Field(
         default=None,
@@ -53,7 +53,7 @@ class TGTinkerConfig(BaseSettings):
     )
 
     model_config = {
-        "env_prefix": "TG_TINKER_",
+        "env_prefix": "TS_",
         "env_file": ".env",
         "extra": "ignore",
     }
@@ -64,23 +64,23 @@ def get_config(
     base_url: Optional[str] = None,
     tenant_id: Optional[str] = None,
     **kwargs,
-) -> TGTinkerConfig:
+) -> TenSafeConfig:
     """
-    Get TG-Tinker configuration.
+    Get TenSafe configuration.
 
     Explicit parameters override environment variables.
 
     Args:
-        api_key: API key (overrides TG_TINKER_API_KEY env var)
-        base_url: Base URL (overrides TG_TINKER_BASE_URL env var)
-        tenant_id: Tenant ID (overrides TG_TINKER_TENANT_ID env var)
+        api_key: API key (overrides TS_API_KEY env var)
+        base_url: Base URL (overrides TS_BASE_URL env var)
+        tenant_id: Tenant ID (overrides TS_TENANT_ID env var)
         **kwargs: Additional configuration options
 
     Returns:
-        TGTinkerConfig instance
+        TenSafeConfig instance
     """
     # Build config from environment first
-    config = TGTinkerConfig()
+    config = TenSafeConfig()
 
     # Override with explicit parameters
     if api_key is not None:
@@ -92,7 +92,7 @@ def get_config(
 
     # Apply any additional kwargs
     if kwargs:
-        valid_fields = set(TGTinkerConfig.model_fields.keys())
+        valid_fields = set(TenSafeConfig.model_fields.keys())
         updates = {k: v for k, v in kwargs.items() if k in valid_fields}
         if updates:
             config = config.model_copy(update=updates)
@@ -115,10 +115,10 @@ def validate_api_key(api_key: Optional[str]) -> str:
     """
     if not api_key:
         raise ValueError(
-            "API key is required. Set TG_TINKER_API_KEY environment variable "
+            "API key is required. Set TS_API_KEY environment variable "
             "or pass api_key parameter to ServiceClient."
         )
-    if not api_key.startswith("tg-"):
+    if not api_key.startswith("ts-"):
         # Warning only, don't fail for flexibility
         pass
     return api_key
