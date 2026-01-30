@@ -186,7 +186,105 @@ config = TrainingConfig(
 tc = service.create_training_client(config)
 ```
 
-### 2. Encrypted Artifact Storage
+### 2. Pluggable Loss Functions ⭐ NEW
+
+Bring-your-own loss function with a stable contract:
+
+- **Built-in Losses**: `token_ce`, `margin_ranking`, `contrastive`, `mse`
+- **Custom Callables**: Pass any Python function matching the LossFn protocol
+- **Dotted Path Imports**: Reference losses from external modules
+- **YAML Configuration**: Configure losses via training config files
+
+```python
+from tensafe.training.losses import resolve_loss, register_loss
+
+# Use built-in loss
+loss_fn = resolve_loss("token_ce", ignore_index=-100)
+
+# Register custom loss
+@register_loss("focal_loss")
+def focal_loss(outputs, batch, gamma=2.0, **kwargs):
+    # Custom focal loss implementation
+    return {"loss": computed_loss, "metrics": {"gamma": gamma}}
+
+# Use custom loss
+loss_fn = resolve_loss("focal_loss", gamma=2.5)
+
+# Or import from module
+loss_fn = resolve_loss("my_package.losses:custom_ce")
+```
+
+**Configuration via YAML:**
+
+```yaml
+# configs/train_sft.yaml
+training:
+  mode: sft
+
+loss:
+  type: token_ce  # or "my_module:custom_loss"
+  kwargs:
+    ignore_index: -100
+    label_smoothing: 0.1
+```
+
+See **[Custom Loss Quickstart](docs/custom_loss_quickstart.md)** for detailed examples.
+
+### 3. RLVR Mode (Reinforcement Learning with Verifiable Rewards) ⭐ NEW
+
+Fine-tune language models using RL with custom reward functions:
+
+- **Pluggable Rewards**: Built-in (`keyword_contains`, `length_penalty`, `format_compliance`) or custom
+- **REINFORCE Algorithm**: Basic policy gradient with variance reduction
+- **PPO Algorithm**: Proximal Policy Optimization with clipped objective
+- **Trajectory Management**: Rollout sampling, batching, and experience replay
+- **Checkpoint Compatibility**: Save/load algorithm state seamlessly
+
+```python
+from tensafe.rlvr import (
+    MockRolloutSampler,
+    REINFORCE,
+    REINFORCEConfig,
+    resolve_reward,
+)
+
+# Create reward function
+reward_fn = resolve_reward("keyword_contains", keywords=["solution"])
+
+# Create RL algorithm
+algo = REINFORCE(REINFORCEConfig(
+    use_baseline=True,
+    normalize_advantages=True,
+    entropy_coef=0.01,
+))
+
+# Training loop
+sampler = MockRolloutSampler(max_new_tokens=64)
+for epoch in range(10):
+    batch = sampler.generate_trajectories(prompts)
+    for traj in batch:
+        traj.reward = reward_fn(traj.prompt, traj.response)
+    result = algo.update(batch, training_client)
+    print(f"Reward: {batch.mean_reward:.3f}")
+```
+
+**Training Modes:**
+
+| Mode | Description | Config |
+|------|-------------|--------|
+| `sft` | Supervised Fine-Tuning | Standard loss-based training |
+| `rlvr` | RL with Verifiable Rewards | Policy gradient optimization |
+
+**Supported Algorithms:**
+
+| Algorithm | Description | Best For |
+|-----------|-------------|----------|
+| **REINFORCE** | Basic policy gradient | Simple tasks, debugging |
+| **PPO** | Clipped objective | Stable training, complex tasks |
+
+See **[RLVR Quickstart](docs/rlvr_quickstart.md)** for comprehensive guide.
+
+### 4. Encrypted Artifact Storage
 
 All model checkpoints and training artifacts are encrypted at rest:
 
@@ -205,7 +303,7 @@ result = tc.save_state("checkpoint-epoch-1")
 # content_hash: "sha256:e3b0c44298fc..."
 ```
 
-### 3. Hash-Chained Audit Logging
+### 5. Hash-Chained Audit Logging
 
 Tamper-evident audit trail for compliance and forensics:
 
@@ -226,7 +324,7 @@ Tamper-evident audit trail for compliance and forensics:
 
 Any modification breaks the chain—tampering is instantly detectable.
 
-### 4. Post-Quantum Cryptography
+### 6. Post-Quantum Cryptography
 
 Future-proof signatures using NIST-approved algorithms:
 
@@ -239,7 +337,7 @@ Future-proof signatures using NIST-approved algorithms:
 
 TSSP packages include **hybrid signatures**—both classical and PQC—ensuring security against both current and quantum adversaries.
 
-### 5. TSSP Secure Packaging
+### 7. TSSP Secure Packaging
 
 Distribute models with cryptographic protection:
 
@@ -262,7 +360,7 @@ package = bridge.create_tssp_from_checkpoint(
 # └── dp_certificate.json (privacy guarantee proof)
 ```
 
-### 6. N2HE Homomorphic Encryption
+### 8. N2HE Homomorphic Encryption
 
 > **Maturity Warning**: N2HE integration is in **alpha** status. The default `ToyN2HEScheme`
 > provides **NO cryptographic security**—it simulates HE operations for API testing only.
