@@ -72,6 +72,13 @@ reports/
 debug_output.txt
 
 # ============================================
+# Generated Reports (per-run outputs)
+# ============================================
+reports/bench/
+reports/compliance/
+reports/qa/
+
+# ============================================
 # OS files
 # ============================================
 .DS_Store
