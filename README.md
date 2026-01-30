@@ -78,7 +78,7 @@ TenSafe provides **defense in depth** for ML training:
 
 ## Core Training Primitives
 
-TenSafe exposes four fundamental training operations, each enhanced with privacy and security features:
+TenSafe exposes six fundamental training operations, each enhanced with privacy and security features:
 
 ### `forward_backward` — Compute Gradients
 Perform a forward pass and backward pass, accumulating privacy-preserving gradients.
@@ -154,6 +154,56 @@ print(f"Encrypted with: {result.encryption.algorithm}")
 - Content hash computed for integrity verification
 - Hybrid PQC signature (Ed25519 + Dilithium3) attached
 - Audit log entry with hash chain linkage
+
+### `resolve_loss` — Pluggable Loss Functions ⭐ NEW
+Use built-in or custom loss functions with a stable contract.
+
+```python
+from tensafe.training.losses import resolve_loss, register_loss
+
+# Use built-in loss
+loss_fn = resolve_loss("token_ce", ignore_index=-100)
+
+# Register and use custom loss
+@register_loss("focal_loss")
+def focal_loss(outputs, batch, gamma=2.0, **kwargs):
+    return {"loss": computed_loss, "metrics": {"gamma": gamma}}
+
+loss_fn = resolve_loss("focal_loss", gamma=2.5)
+result = loss_fn(model_outputs, batch)
+```
+
+**What happens under the hood:**
+- Registry lookup for named losses (`token_ce`, `mse`, `contrastive`)
+- Dotted-path import for external modules (`my_package:custom_loss`)
+- Kwargs binding for parameterized losses
+- LossReturn protocol validation (`{"loss": tensor, "metrics": dict}`)
+
+### `rlvr_update` — Reinforcement Learning with Verifiable Rewards ⭐ NEW
+Train models using policy gradients with custom reward functions.
+
+```python
+from tensafe.rlvr import MockRolloutSampler, REINFORCE, REINFORCEConfig, resolve_reward
+
+# Create components
+sampler = MockRolloutSampler(max_new_tokens=64)
+reward_fn = resolve_reward("keyword_contains", keywords=["solution"])
+algo = REINFORCE(REINFORCEConfig(use_baseline=True, entropy_coef=0.01))
+
+# RLVR training loop
+batch = sampler.generate_trajectories(prompts)
+for traj in batch:
+    traj.reward = reward_fn(traj.prompt, traj.response)
+result = algo.update(batch, training_client)
+print(f"Mean reward: {batch.mean_reward:.3f}")
+```
+
+**What happens under the hood:**
+- Rollout sampling generates trajectories from current policy
+- Reward function computes verifiable rewards per trajectory
+- REINFORCE/PPO computes policy gradients with variance reduction
+- Advantages normalized for stable training
+- Only LoRA parameters updated (base model frozen)
 
 ---
 
