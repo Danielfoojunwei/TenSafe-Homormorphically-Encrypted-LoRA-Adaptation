@@ -557,6 +557,167 @@ TenSafe protects against:
 
 ---
 
+## Compliance Evidence Framework
+
+TenSafe includes a comprehensive compliance evidence framework that generates objective, machine-readable metrics mapped to industry standards. **This is evidence collection, not certification—all outputs support audit preparation.**
+
+### Supported Standards
+
+| Standard | Focus | Evidence Categories |
+|----------|-------|---------------------|
+| **ISO/IEC 27701** | Privacy Information Management | Data minimization, retention, PII exposure, consent |
+| **ISO/IEC 27001** | Information Security Management | Access control, cryptography, logging, change mgmt |
+| **SOC 2** | Trust Services Criteria | Security, availability, confidentiality, integrity, privacy |
+
+### Compliance Make Targets
+
+```bash
+# Quick compliance smoke checks (~30 seconds)
+make compliance-smoke
+
+# Full compliance evidence pack
+make compliance
+
+# Llama3 benchmark with compliance evidence
+make bench-llama3
+```
+
+### Evidence Artifacts Generated
+
+Every compliance run produces a complete evidence pack:
+
+```
+reports/compliance/<git_sha>/
+├── metrics.json          # Raw metrics (machine-readable)
+├── evidence.json         # Structured evidence mapping
+├── evidence.md           # Human-readable report
+├── events.json           # Compliance event log
+├── pii_scan.json         # PII detection results (counts only)
+└── secrets_scan.json     # Secrets hygiene check
+```
+
+### Metrics Collected
+
+#### Privacy Metrics (ISO 27701 / SOC 2 Privacy)
+
+| Metric | Description | Evidence Artifact |
+|--------|-------------|-------------------|
+| `pii_scan_counts` | PII patterns found in dataset/logs/artifacts | `pii_scan.json` |
+| `data_minimization` | Columns dropped, examples filtered | `metrics.json` |
+| `retention_policy` | Configured retention, enforcement status | `metrics.json` |
+| `purpose_tags` | Dataset purpose classification | Dataset config |
+
+#### Security Metrics (ISO 27001 / SOC 2 Security)
+
+| Metric | Description | Evidence Artifact |
+|--------|-------------|-------------------|
+| `authn_method` | Authentication mechanism (API key/JWT/OIDC) | `auth_config.json` |
+| `authz_model` | Authorization model (RBAC/ABAC) | Policy config |
+| `at_rest_encryption` | Artifact encryption enabled | `encryption_config.json` |
+| `audit_log_enabled` | Hash-chain audit logging active | `audit_integrity.json` |
+| `secrets_exposed` | Plaintext secrets in codebase (target: 0) | `secrets_scan.json` |
+
+#### Integrity Metrics (SOC 2 Processing Integrity)
+
+| Metric | Description | Evidence Artifact |
+|--------|-------------|-------------------|
+| `hash_chain_verified` | Audit log tamper detection | `audit_integrity.json` |
+| `dataset_hash` | Training data fingerprint | `hash_manifest.json` |
+| `adapter_hash` | Model artifact fingerprint | `hash_manifest.json` |
+| `determinism_score` | Reproducibility on canonical prompts | Regression tests |
+
+### Control Mapping Matrix
+
+The evidence report maps metrics to specific controls:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                     CONTROL MAPPING EXAMPLE                                   │
+├──────────────┬────────────────────┬──────────────┬──────────────────────────┤
+│ Standard     │ Control Family     │ Metric       │ Status                   │
+├──────────────┼────────────────────┼──────────────┼──────────────────────────┤
+│ ISO 27701    │ Data Minimization  │ columns_drop │ ✓ Evidence Present       │
+│ ISO 27701    │ PII Exposure       │ pii_scan     │ ✓ Evidence Present       │
+│ ISO 27001    │ Access Control     │ authn_method │ ~ Partial (config only)  │
+│ ISO 27001    │ Cryptography       │ encryption   │ ✓ Evidence Present       │
+│ ISO 27001    │ Logging            │ audit_log    │ ✓ Evidence Present       │
+│ SOC 2        │ Security           │ secrets_scan │ ✓ Evidence Present       │
+│ SOC 2        │ Integrity          │ hash_chain   │ ✓ Evidence Present       │
+└──────────────┴────────────────────┴──────────────┴──────────────────────────┘
+```
+
+### Documentation
+
+Comprehensive compliance documentation is available:
+
+| Document | Description |
+|----------|-------------|
+| [`docs/compliance/CONTROL_MATRIX.md`](docs/compliance/CONTROL_MATRIX.md) | Full control-to-metric mapping |
+| [`docs/compliance/DATA_FLOW.md`](docs/compliance/DATA_FLOW.md) | Training, inference, artifact data flows |
+| [`docs/compliance/THREAT_MODEL.md`](docs/compliance/THREAT_MODEL.md) | STRIDE analysis and attack vectors |
+
+### Sample Evidence Report Output
+
+```markdown
+# Privacy & Security Compliance Evidence Report
+
+> **Generated**: 2026-01-30T04:19:36+00:00
+> **Git SHA**: `b7282e2`
+
+## Executive Summary
+
+**Total Controls Assessed**: 15
+
+| Status            | Count |
+|-------------------|-------|
+| Evidence Present  | 8     |
+| Partial Evidence  | 7     |
+| Gaps Identified   | 0     |
+
+### Key Findings
+
+- **PII Exposure Count**: 0
+- **Secrets Exposed**: 0
+- **Encryption at Rest**: Enabled
+- **Audit Logging**: Enabled (hash-chain verified)
+```
+
+### Compliance Event Telemetry
+
+The system emits structured compliance events during operation:
+
+```python
+from tensorguard.telemetry.compliance_events import (
+    ComplianceEventEmitter,
+    ComplianceEventType,
+    Outcome,
+)
+
+emitter = ComplianceEventEmitter(environment="production")
+
+# Emitted automatically during training
+emitter.emit(
+    event_type=ComplianceEventType.PII_SCAN,
+    outcome=Outcome.PASS,
+    details={"scope": "logs", "count": 0},
+    artifact_refs=["reports/compliance/abc123/pii_scan.json"]
+)
+```
+
+Event types mapped to standards:
+
+| Event Type | ISO 27701 | ISO 27001 | SOC 2 |
+|------------|-----------|-----------|-------|
+| `PII_SCAN` | ✓ | | Privacy |
+| `ENCRYPTION` | | A.10 | Confidentiality |
+| `AUDIT_LOG` | | A.12.4 | Security |
+| `ACCESS` | | A.9 | Security |
+| `RETENTION` | ✓ | | Privacy |
+| `SECRETS_SCAN` | | A.9.4.3 | Security |
+| `CHANGE` | | A.12.1 | CC8 |
+
+---
+
 ## Development
 
 ### Setup
@@ -581,28 +742,42 @@ make qa
 ```
 tensafe/
 ├── src/
-│   ├── tensafe/            # Python SDK
-│   └── tensafe/            # Server & security layer
+│   ├── tg_tinker/              # Python SDK
+│   │   ├── client.py           # ServiceClient
+│   │   ├── training_client.py  # TrainingClient
+│   │   └── config.py           # TenSafeConfig
+│   └── tensorguard/            # Server & security layer
+│       ├── platform/           # FastAPI server
+│       │   └── tg_tinker_api/  # TenSafe API routes
+│       ├── crypto/             # Cryptographic primitives
+│       ├── telemetry/          # Compliance event telemetry
+│       └── tgsp/               # Secure packaging
 ├── tests/
-│   ├── unit/               # Unit tests
-│   ├── integration/        # Integration tests
-│   ├── regression/         # Privacy invariant tests
-│   └── e2e/                # End-to-end training tests
-│       └── test_llama3_sft_e2e.py  # Full Llama3 SFT validation
+│   ├── unit/                   # Unit tests
+│   ├── integration/            # Integration tests
+│   ├── regression/             # Privacy invariant tests
+│   └── e2e/                    # End-to-end training tests
 ├── scripts/
-│   ├── bench/              # Benchmarking
-│   │   └── comparison/     # TenSafe vs baseline comparison
-│   ├── qa/                 # Test matrix
-│   └── evidence/           # Value evidence generator
-├── reports/                # Generated test reports (gitignored)
-│   ├── e2e/                # E2E test metrics
-│   └── bench/              # Benchmark results
+│   ├── bench/                  # Benchmarking
+│   │   └── comparison/         # TenSafe vs baseline
+│   ├── compliance/             # Compliance evidence
+│   │   ├── collect_privacy_security_metrics.py
+│   │   └── build_compliance_evidence.py
+│   ├── qa/                     # Test matrix
+│   └── evidence/               # Value evidence generator
+├── reports/                    # Generated reports (gitignored)
+│   ├── bench/                  # Benchmark results
+│   └── compliance/             # Compliance evidence packs
 ├── docs/
-│   ├── ARCHITECTURE.md     # System design
-│   ├── TENSAFE_SPEC.md     # API specification
-│   └── TSSP_SPEC.md        # Package format
-├── Makefile                # Build automation
-└── pyproject.toml          # Package configuration
+│   ├── ARCHITECTURE.md         # System design
+│   ├── TENSAFE_SPEC.md         # API specification
+│   ├── TSSP_SPEC.md            # Package format
+│   └── compliance/             # Compliance documentation
+│       ├── CONTROL_MATRIX.md   # ISO/SOC control mapping
+│       ├── DATA_FLOW.md        # Data flow diagrams
+│       └── THREAT_MODEL.md     # Security threat model
+├── Makefile                    # Build automation
+└── pyproject.toml              # Package configuration
 ```
 
 ### Running Tests
@@ -632,10 +807,21 @@ The E2E test (`tests/e2e/test_llama3_sft_e2e.py`) validates the complete trainin
 
 ## Documentation
 
+### Core Documentation
+
 - **[Architecture Guide](docs/ARCHITECTURE.md)** - System design and component deep dive
 - **[API Specification](docs/TENSAFE_SPEC.md)** - Complete TenSafe API reference
 - **[TSSP Format](docs/TSSP_SPEC.md)** - Secure packaging specification
-- **[QA & Benchmarks](docs/QUALITY_AND_BENCHMARKS.md)** - Testing and performance validation
+
+### Compliance & Security
+
+- **[Control Matrix](docs/compliance/CONTROL_MATRIX.md)** - ISO 27701, 27001, SOC 2 control mapping
+- **[Data Flow](docs/compliance/DATA_FLOW.md)** - Training, inference, and artifact data flows
+- **[Threat Model](docs/compliance/THREAT_MODEL.md)** - STRIDE analysis and security mitigations
+
+### Operations
+
+- **[Production Readiness](PRODUCTION_READINESS.md)** - Deployment validation report
 
 ---
 
