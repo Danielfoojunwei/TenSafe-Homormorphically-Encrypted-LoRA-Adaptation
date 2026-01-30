@@ -47,9 +47,7 @@ import numpy as np
 from .core import (
     Ciphertext,
     HESchemeParams,
-    LWECiphertext,
     N2HEContext,
-    create_context,
 )
 from .keys import HEKeyBundle, HEKeyManager
 
@@ -260,7 +258,7 @@ class PrivateInferenceMode:
         self._context = self.key_manager.get_context(bundle_id)
         if self._context is None:
             # Generate new bundle if needed
-            bundle = self.key_manager.generate_key_bundle(
+            self.key_manager.generate_key_bundle(
                 tenant_id="default",
                 params=self.config.he_params,
                 bundle_id=bundle_id,

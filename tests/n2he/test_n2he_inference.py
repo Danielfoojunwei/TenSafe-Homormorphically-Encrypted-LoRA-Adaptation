@@ -9,13 +9,11 @@ import pytest
 
 from tensorguard.n2he.inference import (
     PrivateInferenceConfig,
-    PrivateInferenceMode,
     PrivateInferenceProfile,
     EncryptedBatch,
     EncryptedOutput,
     create_private_inference_mode,
 )
-from tensorguard.n2he.keys import HEKeyManager
 
 
 class TestPrivateInferenceConfig:

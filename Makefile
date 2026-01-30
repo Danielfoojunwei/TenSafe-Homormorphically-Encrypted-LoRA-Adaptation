@@ -2,7 +2,7 @@
 # Privacy-First ML Training API
 # ================================================================
 
-.PHONY: help install dev test lint typecheck serve clean qa bench evidence compliance compliance-smoke bench-llama3 bench-llama3-smoke test-n2he bench-n2he bench-n2he-full n2he-smoke
+.PHONY: help install dev test lint typecheck serve clean qa bench evidence compliance compliance-smoke bench-llama3 bench-llama3-smoke build-n2he test-n2he bench-n2he bench-n2he-full n2he-smoke
 
 SHELL := /bin/bash
 PYTHON := python3
@@ -46,6 +46,7 @@ help:
 	@echo "  make bench-llama3        Run full benchmark with compliance"
 	@echo ""
 	@echo "N2HE Homomorphic Encryption:"
+	@echo "  make build-n2he          Build N2HE native library"
 	@echo "  make test-n2he           Run N2HE integration tests"
 	@echo "  make bench-n2he          Run N2HE quick benchmark"
 	@echo "  make bench-n2he-full     Run N2HE full benchmark"
@@ -215,6 +216,11 @@ bench-llama3:
 # =============================================================================
 # N2HE Homomorphic Encryption
 # =============================================================================
+
+build-n2he:
+	@echo "Building N2HE native library..."
+	bash scripts/n2he/build_n2he.sh
+	@echo "N2HE native library built."
 
 test-n2he:
 	@echo "Running N2HE integration tests..."

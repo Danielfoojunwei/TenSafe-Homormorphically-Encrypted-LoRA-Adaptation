@@ -172,14 +172,13 @@ class LWECiphertext:
 
     def to_bytes(self) -> bytes:
         """Serialize to bytes."""
-        # Header: scheme type, n, q, level
+        # Header: scheme type, level, n, b (q is in params, not serialized)
         header = struct.pack(
-            ">BBIiI",  # scheme, level, n, q, b
+            ">BBIQ",  # scheme, level, n, b (unsigned 64-bit)
             self.params.scheme_type.value.encode()[0] if isinstance(self.params.scheme_type.value, str) else 0,
             self.level,
             len(self.a),
-            self.params.q,
-            self.b % (2**32),  # Truncate for serialization
+            self.b % (2**64),  # Use 64-bit for b
         )
         # Body: a vector as int32 array
         a_bytes = self.a.astype(np.int32).tobytes()
@@ -188,9 +187,9 @@ class LWECiphertext:
     @classmethod
     def from_bytes(cls, data: bytes, params: HESchemeParams) -> "LWECiphertext":
         """Deserialize from bytes."""
-        header_size = struct.calcsize(">BBIiI")
-        header = struct.unpack(">BBIiI", data[:header_size])
-        _, level, n, q, b = header
+        header_size = struct.calcsize(">BBIQ")
+        header = struct.unpack(">BBIQ", data[:header_size])
+        _, level, n, b = header
 
         a = np.frombuffer(data[header_size:header_size + n * 4], dtype=np.int32)
         return cls(a=a, b=b, params=params, level=level)

@@ -17,7 +17,6 @@ from tensorguard.n2he.serialization import (
     CiphertextFormat,
     CiphertextSerializer,
     SerializedCiphertext,
-    CiphertextBundle,
     serialize_ciphertext,
     deserialize_ciphertext,
     create_ciphertext_bundle,

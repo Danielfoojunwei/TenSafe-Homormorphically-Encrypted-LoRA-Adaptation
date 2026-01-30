@@ -10,7 +10,6 @@ Provides reproducible benchmarking of HE operations to:
 This supports architectural option 3: reproducible cryptographic benchmarking.
 """
 
-import json
 import logging
 import secrets
 import statistics
@@ -22,15 +21,11 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from .core import (
-    Ciphertext,
     HESchemeParams,
-    LWECiphertext,
     N2HEContext,
     create_context,
 )
-from .keys import HEKeyBundle, HEKeyManager
-from .adapter import EncryptedLoRARuntime, AdapterEncryptionConfig, AdapterMode
-from .inference import PrivateInferenceMode, PrivateInferenceConfig
+from .keys import HEKeyManager
 from .serialization import CiphertextFormat, CiphertextSerializer
 
 logger = logging.getLogger(__name__)

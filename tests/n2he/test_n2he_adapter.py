@@ -15,7 +15,7 @@ from tensorguard.n2he.adapter import (
     EncryptedLoRARuntime,
     create_encrypted_runtime,
 )
-from tensorguard.n2he.keys import HEKeyManager, HEKeyBundle
+from tensorguard.n2he.keys import HEKeyManager
 
 
 class TestAdapterEncryptionConfig:
