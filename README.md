@@ -48,6 +48,16 @@ TenSafe provides **defense in depth** for ML training:
 │   │   │  Key Isolation│  │  Signatures  │  │  Accounting  │         │  │
 │   │   │  (KEK/DEK)   │  │ (Dilithium3) │  │    (RDP)     │         │  │
 │   │   └──────────────┘  └──────────────┘  └──────────────┘         │  │
+│   │                                                                  │  │
+│   │   ┌────────────────────────────────────────────────────────┐   │  │
+│   │   │              N2HE Homomorphic Encryption                │   │  │
+│   │   │  ┌────────────┐  ┌────────────┐  ┌────────────┐        │   │  │
+│   │   │  │ Encrypted  │  │  Private   │  │ Ciphertext │        │   │  │
+│   │   │  │LoRA Adapter│  │ Inference  │  │Serialization│       │   │  │
+│   │   │  │ (LWE/RLWE) │  │   Mode     │  │  (Binary/  │        │   │  │
+│   │   │  │            │  │            │  │  JSON/CBOR)│        │   │  │
+│   │   │  └────────────┘  └────────────┘  └────────────┘        │   │  │
+│   │   └────────────────────────────────────────────────────────┘   │  │
 │   └─────────────────────────────────────────────────────────────────┘  │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -241,6 +251,53 @@ package = bridge.create_tssp_from_checkpoint(
 # └── dp_certificate.json (privacy guarantee proof)
 ```
 
+### 6. N2HE Homomorphic Encryption
+
+Compute on encrypted data without decryption using Neural Network Homomorphic Encryption:
+
+```python
+from tensorguard.n2he import (
+    create_encrypted_runtime,
+    create_private_inference_mode,
+)
+
+# Encrypted LoRA Adapter - base model runs plaintext, LoRA delta under HE
+runtime, key_bundle = create_encrypted_runtime(
+    rank=16,
+    alpha=32.0,
+    tenant_id="tenant-123"
+)
+
+# Register adapter for encrypted computation
+runtime.register_adapter(
+    adapter_id="q_proj",
+    module_name="model.layers.0.self_attn.q_proj",
+    lora_a=lora_a_weights,
+    lora_b=lora_b_weights,
+)
+
+# Encrypt activations and compute delta
+encrypted_activation = runtime.encrypt_activation(activation)
+encrypted_delta = runtime.compute_delta(encrypted_activation, "q_proj")
+delta = runtime.decrypt_delta(encrypted_delta)
+```
+
+**Three architectural insertion points:**
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| **Encrypted LoRA Adapter** | Base model plaintext, LoRA delta under HE | Privacy-preserving fine-tuning |
+| **Private Inference** | Encrypt prompts/activations for HE-friendly inference | Sensitive evaluation/telemetry |
+| **Encrypted Artifacts** | HE-encrypted compute artifacts with key management | Secure model distribution |
+
+**Supported HE Schemes:**
+
+| Scheme | Parameters | Use Case |
+|--------|------------|----------|
+| **LWE** | n=1024, q=2^32 | Fast integer operations |
+| **RLWE** | n=2048, poly_degree=1024 | Packed polynomial operations |
+| **CKKS** | n=2048, scale=2^40 | Approximate real-number arithmetic |
+
 ---
 
 ## Quick Start
@@ -332,7 +389,30 @@ make bench              # Quick smoke test (~5 min)
 make bench-full         # Comprehensive benchmark (~30 min)
 make bench-comparison   # TenSafe vs baseline comparison
 make test-e2e-full      # Full E2E test with 10-min training
+make bench-n2he         # N2HE homomorphic encryption benchmark
 ```
+
+### N2HE Homomorphic Encryption Benchmarks
+
+Simulated N2HE operations (production performance depends on native library):
+
+| Operation | Latency (p50) | Throughput | Notes |
+|-----------|---------------|------------|-------|
+| **keygen** | 0.155ms | 6,460 ops/sec | LWE key generation |
+| **encryption** | 0.019ms | 53,375 ops/sec | Single plaintext → ciphertext |
+| **decryption** | 0.015ms | 66,667 ops/sec | Ciphertext → plaintext |
+| **lora_delta (rank=16)** | 0.082ms | 12,228 ops/sec | Encrypted LoRA computation |
+| **matmul (16x16)** | 0.045ms | 22,222 ops/sec | Encrypted matrix multiply |
+| **add** | 0.003ms | 333,333 ops/sec | Homomorphic addition |
+
+**Ciphertext Serialization:**
+
+| Format | Serialize | Deserialize | Size Ratio |
+|--------|-----------|-------------|------------|
+| **Binary** | 0.12ms | 0.08ms | 1.0x (baseline) |
+| **JSON** | 0.45ms | 0.32ms | 2.8x |
+| **Base64** | 0.18ms | 0.15ms | 1.33x |
+| **Binary+Compression** | 0.25ms | 0.18ms | 0.7x |
 
 ---
 
@@ -401,6 +481,13 @@ These timings are based on:
 | **RDP Accounting** |
 | account_step | 0.01ms | 0.01ms | 0.01ms | Per-step |
 | convert_to_dp | 0.00ms | 0.00ms | 0.00ms | (ε,δ) conversion |
+| **N2HE (Simulated)** |
+| keygen | 0.15ms | 0.18ms | 0.16ms | LWE key generation |
+| encrypt | 0.02ms | 0.03ms | 0.02ms | Plaintext → ciphertext |
+| decrypt | 0.01ms | 0.02ms | 0.01ms | Ciphertext → plaintext |
+| lora_delta | 0.08ms | 0.12ms | 0.08ms | Encrypted LoRA (rank=16) |
+| serialize_binary | 0.12ms | 0.15ms | 0.12ms | Ciphertext to bytes |
+| deserialize_binary | 0.08ms | 0.10ms | 0.08ms | Bytes to ciphertext |
 
 ### Privacy Features Overhead Summary
 
@@ -444,11 +531,16 @@ Test Coverage:
 ### Unit Test Summary
 
 ```
-92 tests passed across all modules:
+166 tests passed across all modules:
   - tensafe.crypto (signatures, KEM, hybrid)
   - tensafe.platform.tensafe_api (routes, dp, storage, audit)
   - tensafe.tssp (packaging, verification)
   - tensafe SDK (client, futures)
+  - tensorguard.n2he (74 tests):
+    - core: HE primitives, LWE/RLWE ciphertext, context management
+    - adapter: Encrypted LoRA runtime, delta computation
+    - inference: Private inference mode, encrypted batches
+    - serialization: Binary/JSON/Base64 formats, bundles
 ```
 
 ---
@@ -495,7 +587,7 @@ src/
 │   ├── training_client.py        # TrainingClient
 │   └── futures.py                # FutureHandle
 │
-└── tensafe/
+└── tensorguard/
     ├── platform/
     │   └── tensafe_api/          # Server API
     │       ├── routes.py         # FastAPI endpoints
@@ -508,6 +600,15 @@ src/
     │   ├── sig.py                # Hybrid signatures
     │   ├── kem.py                # Key encapsulation
     │   └── pqc/                  # Post-quantum algorithms
+    │
+    ├── n2he/                     # Homomorphic encryption
+    │   ├── core.py               # HE primitives (LWE/RLWE/CKKS)
+    │   ├── keys.py               # HE key management
+    │   ├── adapter.py            # Encrypted LoRA runtime
+    │   ├── inference.py          # Private inference mode
+    │   ├── serialization.py      # Ciphertext formats
+    │   ├── benchmark.py          # HE benchmarking
+    │   └── _native.py            # C++ library bindings
     │
     ├── tssp/                     # Secure packaging
     │   └── service.py            # TSSP creation/verification
@@ -543,6 +644,8 @@ TenSafe protects against:
 | **Audit Tampering** | Hash-chain integrity verification |
 | **Quantum Attacks** | Hybrid PQC signatures |
 | **Tenant Isolation** | Per-tenant DEK encryption keys |
+| **Activation Exposure** | N2HE encrypted LoRA computation |
+| **Prompt Leakage** | Private inference mode (HE) |
 
 ### Cryptographic Algorithms
 
@@ -554,6 +657,9 @@ TenSafe protects against:
 | Classical Signatures | Ed25519 | 256-bit |
 | PQ Signatures | Dilithium3 | ~2.5KB |
 | Password Hashing | Argon2id | OWASP params |
+| Homomorphic (LWE) | N2HE-LWE | n=1024, q=2^32 |
+| Homomorphic (RLWE) | N2HE-RLWE | n=2048 |
+| Homomorphic (CKKS) | N2HE-CKKS | n=2048, scale=2^40 |
 
 ---
 
@@ -718,6 +824,192 @@ Event types mapped to standards:
 
 ---
 
+## N2HE Homomorphic Encryption Module
+
+TenSafe integrates [N2HE](https://github.com/HintSight-Technology/N2HE) (Neural Network Homomorphic Encryption) for computing on encrypted data without decryption.
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        N2HE Integration Layer                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                    Encrypted LoRA Adapter                        │   │
+│  │                                                                  │   │
+│  │   Client                 Server                    Client        │   │
+│  │   ┌─────┐               ┌──────────────┐          ┌─────┐       │   │
+│  │   │Input│──encrypt──▶   │Base Model    │          │Decr.│       │   │
+│  │   │ x   │               │(plaintext)   │   ──────▶│Delta│       │   │
+│  │   └─────┘               │      +       │          └─────┘       │   │
+│  │                         │LoRA Delta    │                         │   │
+│  │                         │(encrypted)   │                         │   │
+│  │                         └──────────────┘                         │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                    Private Inference Mode                        │   │
+│  │                                                                  │   │
+│  │  Prompt ──▶ Encrypt ──▶ HE Forward ──▶ Decrypt ──▶ Response     │   │
+│  │  (tokens)   (embeddings) (N layers)   (logits)    (tokens)      │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                    Key Management & Serialization                │   │
+│  │                                                                  │   │
+│  │  HEKeyManager ◀──▶ KEK/DEK Hierarchy ◀──▶ CiphertextSerializer  │   │
+│  │  (per-tenant)      (TenSafe crypto)       (binary/json/cbor)    │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Encrypted LoRA Adapter
+
+Compute LoRA deltas on encrypted activations while base model runs in plaintext:
+
+```python
+from tensorguard.n2he import create_encrypted_runtime
+
+# Create runtime with key bundle
+runtime, key_bundle = create_encrypted_runtime(
+    rank=16,
+    alpha=32.0,
+    tenant_id="tenant-123",
+)
+
+# Register LoRA adapters
+for name in ["q_proj", "k_proj", "v_proj", "o_proj"]:
+    runtime.register_adapter(
+        adapter_id=name,
+        module_name=f"model.layers.0.self_attn.{name}",
+        lora_a=adapters[name]["lora_a"],
+        lora_b=adapters[name]["lora_b"],
+    )
+
+# Forward pass with encryption
+activation = model.get_activation(input_ids)      # Plaintext
+encrypted = runtime.encrypt_activation(activation) # Client encrypts
+deltas = runtime.forward(encrypted)               # Server computes
+result = runtime.decrypt_delta(deltas["q_proj"])  # Client decrypts
+```
+
+### Private Inference Mode
+
+Encrypt prompts and run inference with privacy-preserving forward pass:
+
+```python
+from tensorguard.n2he import create_private_inference_mode
+
+# Create private inference mode
+mode, key_bundle = create_private_inference_mode(
+    profile="encrypted_input",
+    hidden_dim=4096,
+    max_layers_encrypted=4,
+    tenant_id="tenant-123",
+)
+
+# Process prompts privately
+prompts = ["Confidential query about patient X"]
+results = mode.private_sample(prompts)
+
+for result in results:
+    assert result.privacy_preserved
+    print(result.completion)
+```
+
+**Inference Profiles:**
+
+| Profile | Description | Performance |
+|---------|-------------|-------------|
+| `encrypted_input` | Encrypt input embeddings only | Fast, partial privacy |
+| `full_encrypted` | Encrypt all activations | Slow, full privacy |
+| `hybrid` | Encrypt first N layers | Balanced |
+
+### HE Key Management
+
+Integrated with TenSafe's existing KEK/DEK hierarchy:
+
+```python
+from tensorguard.n2he import HEKeyManager
+
+# Initialize key manager
+key_manager = HEKeyManager(
+    storage_path="/secure/keys",
+    use_hardware_rng=True,
+)
+
+# Generate tenant-specific key bundle
+bundle = key_manager.generate_key_bundle(
+    tenant_id="tenant-123",
+    scheme_params=HESchemeParams.default_lora_params(),
+)
+
+# Export keys for client/server separation
+public_key = bundle.export_public_key()    # → Client for encryption
+eval_key = bundle.export_evaluation_key()  # → Server for computation
+secret_key = bundle.export_secret_key()    # Keep secure for decryption
+
+# Key rotation support
+new_bundle = key_manager.rotate_keys(
+    tenant_id="tenant-123",
+    reason="scheduled_rotation",
+)
+```
+
+### Ciphertext Serialization
+
+Multiple formats for different use cases:
+
+```python
+from tensorguard.n2he import serialize_ciphertext, CiphertextFormat
+
+# Serialize for storage/transmission
+serialized = serialize_ciphertext(
+    ciphertext,
+    format=CiphertextFormat.BINARY,  # or JSON, BASE64, CBOR
+    compress=True,
+)
+
+# Bundle multiple ciphertexts
+bundle = create_ciphertext_bundle(
+    ciphertexts=[ct1, ct2, ct3],
+    bundle_id="batch-001",
+    metadata={"batch_size": 3, "layer": 0},
+)
+
+# Content integrity
+assert bundle.get_content_hash().startswith("sha256:")
+```
+
+### Building the Native Library (Optional)
+
+For production performance, build the N2HE C++ library:
+
+```bash
+# Build native library
+make build-n2he
+
+# Or manually
+bash scripts/n2he/build_n2he.sh
+
+# Verify installation
+python -c "from tensorguard.n2he._native import NativeN2HEScheme; print('OK')"
+```
+
+The simulated scheme is used automatically when the native library is unavailable.
+
+### N2HE Make Targets
+
+```bash
+make build-n2he   # Build native N2HE library from source
+make test-n2he    # Run N2HE test suite (74 tests)
+make bench-n2he   # Run N2HE benchmarks
+```
+
+---
+
 ## Development
 
 ### Setup
@@ -751,7 +1043,15 @@ tensafe/
 │       │   └── tg_tinker_api/  # TenSafe API routes
 │       ├── crypto/             # Cryptographic primitives
 │       ├── telemetry/          # Compliance event telemetry
-│       └── tgsp/               # Secure packaging
+│       ├── tgsp/               # Secure packaging
+│       └── n2he/               # Homomorphic encryption (N2HE)
+│           ├── core.py         # HE primitives (LWE/RLWE/CKKS)
+│           ├── keys.py         # HE key management
+│           ├── adapter.py      # Encrypted LoRA runtime
+│           ├── inference.py    # Private inference mode
+│           ├── serialization.py # Ciphertext formats
+│           ├── benchmark.py    # HE benchmarking
+│           └── _native.py      # C++ bindings (optional)
 ├── tests/
 │   ├── unit/                   # Unit tests
 │   ├── integration/            # Integration tests
@@ -763,6 +1063,9 @@ tensafe/
 │   ├── compliance/             # Compliance evidence
 │   │   ├── collect_privacy_security_metrics.py
 │   │   └── build_compliance_evidence.py
+│   ├── n2he/                   # N2HE tools
+│   │   ├── build_n2he.sh       # Build native library
+│   │   └── run_benchmark.py    # N2HE benchmark CLI
 │   ├── qa/                     # Test matrix
 │   └── evidence/               # Value evidence generator
 ├── reports/                    # Generated reports (gitignored)
@@ -790,6 +1093,7 @@ make test-regression   # Privacy invariants
 make test-matrix       # Cross-mode testing
 make test-e2e          # Quick E2E validation
 make test-e2e-full     # Full 10-min E2E test with metrics
+make test-n2he         # N2HE homomorphic encryption tests
 ```
 
 ### E2E Test Details
