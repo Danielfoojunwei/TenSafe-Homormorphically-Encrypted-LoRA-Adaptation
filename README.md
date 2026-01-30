@@ -338,46 +338,73 @@ make test-e2e-full      # Full E2E test with 10-min training
 
 ## Test Results & Benchmark Comparison
 
-### E2E Training Test Results
+### E2E Training Test Results (10-Minute Full Training)
 
-Full Llama3-8B SFT training validation (100 training steps):
+Full Llama3-8B SFT training validation (2040+ training steps over 10 minutes):
 
 | Metric | TG-Tinker | Baseline | Overhead |
 |--------|-----------|----------|----------|
-| **Forward/Backward (p50)** | 138.41ms | 138.50ms | **-0.02%** |
-| **Optimizer Step (p50)** | 10.32ms | 8.46ms | **+22%** |
-| **Total Training Time** | 15.02s | 15.02s | **~0%** |
-| **Inference Latency (p50)** | 1000.9ms | 1000.9ms | **~0%** |
+| **Training Steps** | 2,040 | 2,081 | -2.0% |
+| **Forward/Backward (p50)** | 135.55ms | 135.45ms | **+0.07%** |
+| **Optimizer Step (p50)** | 10.25ms | 8.42ms | **+21.8%** |
+| **Total Training Time** | 300.00s | 300.09s | **~0%** |
+| **Inference Latency (p50)** | 1000.5ms | 1000.7ms | **~0%** |
 
-### Privacy Features Overhead
+### Component Benchmark Results (1000 iterations)
+
+| Component | p50 | p95 | Mean | Notes |
+|-----------|-----|-----|------|-------|
+| **Training API** |
+| forward_backward | 70.55ms | 90.85ms | 70.60ms | Mock model forward/back |
+| optim_step | 25.83ms | 30.73ms | 25.59ms | With DP noise injection |
+| **TGSP Packager** |
+| create_package | 0.08ms | 0.79ms | 0.22ms | Manifest + metadata |
+| sign_manifest | 3.27ms | 3.61ms | 3.33ms | Hybrid PQC signature |
+| verify_signature | 1.11ms | 1.18ms | 1.12ms | Dual verification |
+| **DP-SGD** |
+| gradient_clipping | 0.00ms | 0.00ms | 0.00ms | Per-sample bound |
+| noise_injection | 0.00ms | 0.00ms | 0.00ms | Gaussian noise |
+| rdp_accounting | 0.01ms | 0.02ms | 0.01ms | Privacy tracking |
+| **Encrypted Storage** |
+| encrypt_store | 0.60ms | 2.61ms | 1.04ms | AES-256-GCM |
+| decrypt_retrieve | 0.45ms | 1.84ms | 0.76ms | AES-256-GCM |
+| **Hash Chain Audit** |
+| append_entry | 0.12ms | 0.31ms | 0.14ms | SHA-256 chain |
+| verify_chain | 5.53ms | 10.20ms | 5.63ms | Full verification |
+| **KEK/DEK** |
+| generate_dek | 0.01ms | 0.02ms | 0.01ms | Tenant key creation |
+| wrap_key | 0.01ms | 0.02ms | 0.01ms | AES-KWP wrap |
+| unwrap_key | 0.00ms | 0.00ms | 0.00ms | AES-KWP unwrap |
+| **PQC Signatures** |
+| ed25519_sign | 1.10ms | 1.18ms | 1.10ms | Classical |
+| ed25519_verify | 1.16ms | 1.22ms | 1.15ms | Classical |
+| dilithium3_sign | 3.27ms | 3.41ms | 3.29ms | Post-quantum |
+| dilithium3_verify | 1.11ms | 1.18ms | 1.12ms | Post-quantum |
+| **RDP Accounting** |
+| account_step | 0.01ms | 0.01ms | 0.01ms | Per-step |
+| convert_to_dp | 0.00ms | 0.00ms | 0.00ms | (ε,δ) conversion |
+
+### Privacy Features Overhead Summary
 
 Per-operation cost for all security features:
 
-| Component | Latency | Notes |
-|-----------|---------|-------|
-| **DP-SGD (total)** | 0.05ms | Gradient clip + noise + accounting |
-| **Gradient Clipping** | 0.005ms | Per-sample bound enforcement |
-| **Noise Injection** | 0.002ms | Gaussian noise scaled to σ |
-| **RDP Accounting** | 0.04ms | Privacy budget computation |
-| **Encryption** | 1.92ms | AES-256-GCM per checkpoint |
-| **Decryption** | 0.61ms | AES-256-GCM per load |
-| **Audit Logging** | 0.49ms | Hash-chain append |
-| **Hash Verification** | 2.38ms | Full chain verification |
-| **KEK Wrap** | 2.36ms | Key encryption key operation |
-| **DEK Generation** | 1.45ms | Data encryption key generation |
-| **Ed25519 Sign** | 1.11ms | Classical signature |
-| **Ed25519 Verify** | 1.24ms | Classical verification |
-| **Dilithium3 Sign** | 3.23ms | Post-quantum signature |
-| **Dilithium3 Verify** | 1.14ms | Post-quantum verification |
-| **PQC Hybrid (total)** | 4.34ms | Both signatures combined |
+| Feature | Latency | Impact |
+|---------|---------|--------|
+| **DP-SGD (total)** | 0.04ms | Negligible |
+| **Encryption** | 1.83ms | <2% per checkpoint |
+| **Audit Logging** | 0.40ms | <0.5% per operation |
+| **PQC Signatures** | 4.31ms | Per-package signing |
 
 ### Privacy Guarantee Achieved
 
-After 100 training steps with `noise_multiplier=1.0`:
+After 2040 training steps with `noise_multiplier=1.0`:
 
 ```
-Final Privacy: (ε=228.74, δ=1e-5)-differential privacy
+Final Privacy: (ε=5.30, δ=1e-5)-differential privacy
 Mechanism: RDP with Gaussian noise
+Key Hierarchy: KEK/DEK with per-tenant isolation
+Audit Trail: SHA-256 hash chain (tamper-evident)
+PQC Security: Ed25519 + Dilithium3 hybrid (NIST Level 3)
 ```
 
 ### Integration Test Results

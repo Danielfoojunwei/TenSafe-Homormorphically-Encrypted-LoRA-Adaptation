@@ -204,7 +204,7 @@ class BenchmarkSuite:
 
             # Noise injection
             start = time.perf_counter()
-            noised = add_noise(clipped, noise_multiplier)
+            noised = add_noise(clipped, noise_multiplier, max_grad_norm=1.0)
             noise_time = (time.perf_counter() - start) * 1000
             noise_metrics.record(noise_time)
 
@@ -246,9 +246,11 @@ class BenchmarkSuite:
             for _ in range(self.iterations // 4):
                 # Encryption + storage
                 start = time.perf_counter()
-                artifact_id = store.store(
-                    tenant_id="bench-tenant",
+                artifact = store.save_artifact(
                     data=data,
+                    tenant_id="bench-tenant",
+                    training_client_id="bench-tc",
+                    artifact_type="checkpoint",
                     metadata={"size": size}
                 )
                 enc_time = (time.perf_counter() - start) * 1000
@@ -256,7 +258,7 @@ class BenchmarkSuite:
 
                 # Decryption + retrieval
                 start = time.perf_counter()
-                retrieved, meta = store.retrieve("bench-tenant", artifact_id)
+                retrieved = store.load_artifact(artifact)
                 dec_time = (time.perf_counter() - start) * 1000
                 dec_metrics.record(dec_time, size)
 
@@ -270,7 +272,7 @@ class BenchmarkSuite:
 
         from tensorguard.platform.tg_tinker_api.audit import AuditLogger
 
-        logger = AuditLogger(tenant_id="bench-tenant")
+        logger = AuditLogger()
 
         append_metrics = self._get_metrics("hash_chain", "append_entry")
         verify_metrics = self._get_metrics("hash_chain", "verify_chain")
@@ -278,9 +280,13 @@ class BenchmarkSuite:
         for i in range(self.iterations):
             # Append entry
             start = time.perf_counter()
-            logger.log(
+            logger.log_operation(
+                tenant_id="bench-tenant",
+                training_client_id="bench-tc",
                 operation="benchmark_op",
-                details={"iteration": i, "data": f"test_data_{i}"}
+                request_hash=f"sha256:{i:064x}",
+                request_size_bytes=1024,
+                success=True,
             )
             append_time = (time.perf_counter() - start) * 1000
             append_metrics.record(append_time)
@@ -308,22 +314,23 @@ class BenchmarkSuite:
         wrap_metrics = self._get_metrics("kek_dek", "wrap_key")
         unwrap_metrics = self._get_metrics("kek_dek", "unwrap_key")
 
-        for _ in range(self.iterations):
-            # Generate DEK
+        for i in range(self.iterations):
+            # Generate/Get DEK (creates if not exists)
+            tenant = f"bench-tenant-{i}"
             start = time.perf_counter()
-            dek = key_manager.generate_dek("bench-tenant")
+            dek, key_id = key_manager.get_dek(tenant)
             gen_time = (time.perf_counter() - start) * 1000
             gen_metrics.record(gen_time)
 
-            # Wrap key (simulated KEK operation)
+            # Rotate DEK (wrap with new key)
             start = time.perf_counter()
-            time.sleep(0.001)  # ~1ms for AES-KWP
+            new_dek, new_key_id = key_manager.rotate_dek(tenant)
             wrap_time = (time.perf_counter() - start) * 1000
             wrap_metrics.record(wrap_time)
 
-            # Unwrap key
+            # Get existing key (unwrap)
             start = time.perf_counter()
-            time.sleep(0.001)  # ~1ms for AES-KWP unwrap
+            retrieved_dek, _ = key_manager.get_dek(tenant)
             unwrap_time = (time.perf_counter() - start) * 1000
             unwrap_metrics.record(unwrap_time)
 
