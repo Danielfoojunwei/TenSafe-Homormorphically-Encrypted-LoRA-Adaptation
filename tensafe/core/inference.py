@@ -1,0 +1,503 @@
+"""
+TenSafe Unified Inference Module.
+
+Provides unified inference with support for:
+- Standard model inference
+- LoRA inference (plaintext)
+- HE-LoRA inference (encrypted LoRA delta)
+- Batch processing
+
+This module integrates with the training pipeline for seamless
+train-to-inference workflows.
+
+Usage:
+    from tensafe.core.inference import (
+        TenSafeInference,
+        InferenceMode,
+        InferenceResult,
+    )
+
+    # Create inference engine
+    inference = TenSafeInference.from_checkpoint("./checkpoint")
+
+    # Run inference
+    result = inference.generate("Hello, how are you?")
+    print(result.text)
+
+    # Batch inference
+    results = inference.generate_batch(["prompt1", "prompt2"])
+"""
+
+from __future__ import annotations
+
+import logging
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import numpy as np
+
+from tensafe.core.config import TenSafeConfig, InferenceConfig, LoRAConfig, load_config
+from tensafe.core.he_interface import HEBackendInterface, get_backend, HEParams, HEBackendType
+
+logger = logging.getLogger(__name__)
+
+
+class InferenceMode(Enum):
+    """Inference modes."""
+    NONE = "none"  # No LoRA
+    PLAINTEXT = "plaintext"  # Standard LoRA
+    HE_ONLY = "he_only"  # LoRA under HE, base model plaintext
+    FULL_HE = "full_he"  # Everything encrypted (not recommended)
+
+
+@dataclass
+class GenerationConfig:
+    """Configuration for text generation."""
+    max_new_tokens: int = 128
+    temperature: float = 0.7
+    top_p: float = 0.9
+    top_k: int = 50
+    do_sample: bool = True
+    repetition_penalty: float = 1.0
+    no_repeat_ngram_size: int = 0
+    eos_token_id: Optional[int] = None
+    pad_token_id: Optional[int] = None
+    use_cache: bool = True
+
+
+@dataclass
+class InferenceResult:
+    """Result from inference."""
+    output: np.ndarray
+    text: Optional[str] = None
+    tokens: Optional[List[int]] = None
+
+    # Timing
+    total_time_ms: float = 0.0
+    base_model_time_ms: float = 0.0
+    lora_time_ms: float = 0.0
+    tokens_per_second: float = 0.0
+
+    # Mode used
+    mode: str = "plaintext"
+
+    # HE metrics (for HE modes)
+    he_metrics: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class BatchInferenceResult:
+    """Result from batch inference."""
+    results: List[InferenceResult]
+    total_time_ms: float = 0.0
+    avg_tokens_per_second: float = 0.0
+
+
+class TenSafeInference:
+    """
+    Unified TenSafe inference engine.
+
+    Supports:
+    - Multiple LoRA modes (plaintext, HE)
+    - Batch processing
+    - Streaming generation (future)
+    - Multiple backends
+    """
+
+    def __init__(
+        self,
+        model: Optional[Any] = None,
+        tokenizer: Optional[Any] = None,
+        lora_weights: Optional[Dict[str, Tuple[np.ndarray, np.ndarray]]] = None,
+        config: Optional[Union[TenSafeConfig, InferenceConfig]] = None,
+        mode: InferenceMode = InferenceMode.PLAINTEXT,
+    ):
+        """
+        Initialize inference engine.
+
+        Args:
+            model: The base model
+            tokenizer: The tokenizer
+            lora_weights: Dict of module_name -> (lora_a, lora_b)
+            config: Configuration (TenSafeConfig or InferenceConfig)
+            mode: Inference mode
+        """
+        self._model = model
+        self._tokenizer = tokenizer
+        self._lora_weights = lora_weights or {}
+        self._mode = mode
+
+        # Parse config
+        if isinstance(config, TenSafeConfig):
+            self._config = config.inference
+            self._lora_config = config.lora
+            self._he_config = config.he
+        elif isinstance(config, InferenceConfig):
+            self._config = config
+            self._lora_config = LoRAConfig()
+            self._he_config = None
+        else:
+            self._config = InferenceConfig()
+            self._lora_config = LoRAConfig()
+            self._he_config = None
+
+        # HE backend (initialized lazily)
+        self._he_backend: Optional[HEBackendInterface] = None
+        self._packed_weights: Dict[str, Any] = {}
+
+        # Metrics
+        self._inference_count = 0
+        self._total_time_ms = 0.0
+
+        logger.info(f"TenSafeInference initialized: mode={mode.value}")
+
+    @classmethod
+    def from_checkpoint(
+        cls,
+        checkpoint_path: Union[str, Path],
+        mode: InferenceMode = InferenceMode.PLAINTEXT,
+    ) -> "TenSafeInference":
+        """
+        Create inference engine from checkpoint.
+
+        Args:
+            checkpoint_path: Path to checkpoint directory
+            mode: Inference mode
+
+        Returns:
+            Configured TenSafeInference
+        """
+        checkpoint_path = Path(checkpoint_path)
+
+        # Load config
+        config_path = checkpoint_path / "config.yaml"
+        if config_path.exists():
+            config = load_config(config_path)
+        else:
+            config = TenSafeConfig()
+
+        # TODO: Load model and LoRA weights from checkpoint
+
+        return cls(config=config, mode=mode)
+
+    @classmethod
+    def from_config(
+        cls,
+        config: TenSafeConfig,
+        mode: Optional[InferenceMode] = None,
+    ) -> "TenSafeInference":
+        """
+        Create inference engine from configuration.
+
+        Args:
+            config: TenSafe configuration
+            mode: Override inference mode
+
+        Returns:
+            Configured TenSafeInference
+        """
+        if mode is None:
+            mode = InferenceMode(config.inference.lora_mode)
+
+        return cls(config=config, mode=mode)
+
+    def _ensure_he_backend(self) -> None:
+        """Ensure HE backend is initialized."""
+        if self._he_backend is not None:
+            return
+
+        if self._he_config is None:
+            # Use defaults
+            params = HEParams()
+        else:
+            params = HEParams(
+                poly_modulus_degree=self._he_config.poly_modulus_degree,
+                coeff_modulus_bits=self._he_config.coeff_modulus_bits,
+                scale_bits=self._he_config.scale_bits,
+                use_column_packing=self._he_config.use_column_packing,
+            )
+
+        self._he_backend = get_backend(HEBackendType.AUTO, params)
+        logger.info(f"HE backend initialized: {self._he_backend.backend_name}")
+
+    def register_lora_weights(
+        self,
+        module_name: str,
+        lora_a: np.ndarray,
+        lora_b: np.ndarray,
+    ) -> None:
+        """
+        Register LoRA weights for a module.
+
+        Args:
+            module_name: Name of target module
+            lora_a: LoRA A matrix [rank, in_features]
+            lora_b: LoRA B matrix [out_features, rank]
+        """
+        self._lora_weights[module_name] = (lora_a, lora_b)
+
+        # Clear cached packed weights
+        self._packed_weights = {}
+
+    def forward(
+        self,
+        x: np.ndarray,
+        module_name: Optional[str] = None,
+    ) -> InferenceResult:
+        """
+        Run forward pass with configured LoRA mode.
+
+        Args:
+            x: Input activation [batch, hidden_dim] or [hidden_dim]
+            module_name: Target module (for LoRA modes)
+
+        Returns:
+            InferenceResult with output and metrics
+        """
+        start_time = time.perf_counter()
+        result = InferenceResult(output=x, mode=self._mode.value)
+
+        # Step 1: Base model forward (always plaintext)
+        base_start = time.perf_counter()
+        y_base = self._base_model_forward(x)
+        result.base_model_time_ms = (time.perf_counter() - base_start) * 1000
+
+        # Step 2: Apply LoRA based on mode
+        if self._mode == InferenceMode.NONE:
+            result.output = y_base
+
+        elif self._mode == InferenceMode.PLAINTEXT:
+            lora_start = time.perf_counter()
+            delta = self._lora_forward_plaintext(x, module_name)
+            result.output = y_base + delta
+            result.lora_time_ms = (time.perf_counter() - lora_start) * 1000
+
+        elif self._mode == InferenceMode.HE_ONLY:
+            lora_start = time.perf_counter()
+            delta, he_metrics = self._lora_forward_he(x, module_name)
+            result.output = y_base + delta
+            result.lora_time_ms = (time.perf_counter() - lora_start) * 1000
+            result.he_metrics = he_metrics
+
+        elif self._mode == InferenceMode.FULL_HE:
+            logger.warning("FULL_HE mode not recommended for latency")
+            result.output = y_base
+
+        result.total_time_ms = (time.perf_counter() - start_time) * 1000
+
+        self._inference_count += 1
+        self._total_time_ms += result.total_time_ms
+
+        return result
+
+    def _base_model_forward(self, x: np.ndarray) -> np.ndarray:
+        """Run base model forward pass."""
+        if self._model is not None:
+            if hasattr(self._model, 'forward'):
+                return self._model.forward(x)
+            elif callable(self._model):
+                return self._model(x)
+
+        # Mock: identity
+        return x.copy()
+
+    def _lora_forward_plaintext(
+        self,
+        x: np.ndarray,
+        module_name: Optional[str] = None,
+    ) -> np.ndarray:
+        """Compute LoRA delta in plaintext."""
+        if module_name is None and self._lora_weights:
+            module_name = next(iter(self._lora_weights))
+
+        if module_name not in self._lora_weights:
+            return np.zeros_like(x)
+
+        lora_a, lora_b = self._lora_weights[module_name]
+        scaling = self._lora_config.scaling
+
+        # delta = scaling * (x @ A^T @ B^T)
+        intermediate = x @ lora_a.T
+        delta = intermediate @ lora_b.T
+        return scaling * delta
+
+    def _lora_forward_he(
+        self,
+        x: np.ndarray,
+        module_name: Optional[str] = None,
+    ) -> Tuple[np.ndarray, Dict[str, Any]]:
+        """Compute LoRA delta under homomorphic encryption."""
+        self._ensure_he_backend()
+
+        if module_name is None and self._lora_weights:
+            module_name = next(iter(self._lora_weights))
+
+        if module_name not in self._lora_weights:
+            return np.zeros_like(x), {}
+
+        lora_a, lora_b = self._lora_weights[module_name]
+        scaling = self._lora_config.scaling
+
+        # Encrypt input
+        x_flat = x.flatten()
+        ct_x = self._he_backend.encrypt(x_flat)
+
+        # Compute encrypted LoRA delta
+        ct_result = self._he_backend.lora_delta(ct_x, lora_a, lora_b, scaling)
+
+        # Decrypt
+        delta = self._he_backend.decrypt(ct_result, output_size=len(x_flat))
+        delta = delta.reshape(x.shape)
+
+        # Get metrics
+        metrics = self._he_backend.get_metrics()
+
+        return delta, metrics.to_dict()
+
+    def generate(
+        self,
+        prompt: str,
+        generation_config: Optional[GenerationConfig] = None,
+    ) -> InferenceResult:
+        """
+        Generate text from a prompt.
+
+        Args:
+            prompt: Input prompt
+            generation_config: Generation parameters
+
+        Returns:
+            InferenceResult with generated text
+        """
+        config = generation_config or GenerationConfig(
+            max_new_tokens=self._config.max_new_tokens,
+            temperature=self._config.temperature,
+            top_p=self._config.top_p,
+            top_k=self._config.top_k,
+            do_sample=self._config.do_sample,
+        )
+
+        start_time = time.perf_counter()
+
+        # Tokenize
+        if self._tokenizer is not None:
+            input_ids = self._tokenizer.encode(prompt)
+        else:
+            # Mock tokenization
+            input_ids = [ord(c) for c in prompt]
+
+        # Generate (placeholder)
+        generated_ids = input_ids.copy()
+        for _ in range(config.max_new_tokens):
+            # Mock generation - would use model forward here
+            next_token = np.random.randint(0, 1000)
+            generated_ids.append(next_token)
+            if config.eos_token_id is not None and next_token == config.eos_token_id:
+                break
+
+        # Decode
+        if self._tokenizer is not None:
+            text = self._tokenizer.decode(generated_ids)
+        else:
+            text = "".join(chr(min(t, 127)) for t in generated_ids)
+
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
+        tokens_generated = len(generated_ids) - len(input_ids)
+        tps = (tokens_generated / (elapsed_ms / 1000)) if elapsed_ms > 0 else 0
+
+        return InferenceResult(
+            output=np.array(generated_ids),
+            text=text,
+            tokens=generated_ids,
+            total_time_ms=elapsed_ms,
+            tokens_per_second=tps,
+            mode=self._mode.value,
+        )
+
+    def generate_batch(
+        self,
+        prompts: List[str],
+        generation_config: Optional[GenerationConfig] = None,
+    ) -> BatchInferenceResult:
+        """
+        Generate text for a batch of prompts.
+
+        Args:
+            prompts: List of input prompts
+            generation_config: Generation parameters
+
+        Returns:
+            BatchInferenceResult with all results
+        """
+        start_time = time.perf_counter()
+
+        results = []
+        for prompt in prompts:
+            result = self.generate(prompt, generation_config)
+            results.append(result)
+
+        total_ms = (time.perf_counter() - start_time) * 1000
+
+        # Calculate average throughput
+        total_tokens = sum(len(r.tokens or []) for r in results)
+        avg_tps = (total_tokens / (total_ms / 1000)) if total_ms > 0 else 0
+
+        return BatchInferenceResult(
+            results=results,
+            total_time_ms=total_ms,
+            avg_tokens_per_second=avg_tps,
+        )
+
+    def __call__(
+        self,
+        x: Union[str, np.ndarray],
+        **kwargs: Any,
+    ) -> InferenceResult:
+        """
+        Convenience method for inference.
+
+        Args:
+            x: Input (string prompt or numpy array)
+            **kwargs: Additional arguments
+
+        Returns:
+            InferenceResult
+        """
+        if isinstance(x, str):
+            return self.generate(x, **kwargs)
+        return self.forward(x, **kwargs)
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get inference metrics."""
+        return {
+            "inference_count": self._inference_count,
+            "total_time_ms": self._total_time_ms,
+            "avg_time_ms": self._total_time_ms / max(1, self._inference_count),
+            "mode": self._mode.value,
+            "he_backend": self._he_backend.backend_name if self._he_backend else None,
+        }
+
+
+def create_inference(
+    config: Union[str, Path, TenSafeConfig],
+    mode: Optional[InferenceMode] = None,
+    **kwargs: Any,
+) -> TenSafeInference:
+    """
+    Create a TenSafe inference engine.
+
+    Args:
+        config: Configuration (path or object)
+        mode: Inference mode
+        **kwargs: Additional arguments
+
+    Returns:
+        Configured TenSafeInference
+    """
+    if isinstance(config, (str, Path)):
+        config = load_config(config)
+
+    return TenSafeInference.from_config(config, mode=mode)
