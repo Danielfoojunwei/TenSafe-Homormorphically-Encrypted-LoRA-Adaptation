@@ -365,26 +365,11 @@ class TGSPAdapterRegistry:
 
             return extract_dir
 
-        except ImportError:
-            # Fallback for testing
-            logger.warning("TGSPService not available, using mock extraction")
-            return self._mock_extract_tgsp(tgsp_path, extract_dir)
-
-    def _mock_extract_tgsp(self, tgsp_path: str, extract_dir: str) -> str:
-        """Mock extraction for testing when TGSP service not available."""
-        os.makedirs(extract_dir, exist_ok=True)
-
-        # Create mock adapter files
-        mock_config = {
-            "lora_rank": 16,
-            "lora_alpha": 32.0,
-            "target_modules": ["q_proj", "v_proj", "k_proj", "o_proj"],
-        }
-
-        with open(os.path.join(extract_dir, "adapter_config.json"), 'w') as f:
-            json.dump(mock_config, f)
-
-        return extract_dir
+        except ImportError as e:
+            raise AdapterLoadError(
+                f"TGSPService not available. Install tensorguard with: "
+                f"pip install tensorguard[tgsp]. Error: {e}"
+            )
 
     def _load_adapter_weights(
         self,
@@ -414,13 +399,17 @@ class TGSPAdapterRegistry:
         elif os.path.exists(pt_path):
             weights = self._load_pytorch_weights(pt_path, target_modules)
         else:
-            # Create mock weights for testing
-            logger.warning("No adapter weights found, creating mock weights")
-            for module in target_modules:
-                hidden_dim = 4096  # Common LLM hidden dim
-                lora_a = np.random.randn(rank, hidden_dim).astype(np.float64) * 0.01
-                lora_b = np.random.randn(hidden_dim, rank).astype(np.float64) * 0.01
-                weights[module] = (lora_a, lora_b)
+            raise AdapterLoadError(
+                f"No adapter weights found in {extract_dir}. "
+                f"Expected either 'adapter_model.safetensors' or 'adapter_model.bin'. "
+                f"Ensure the TGSP package contains valid LoRA weights."
+            )
+
+        if not weights:
+            raise AdapterLoadError(
+                f"Failed to load any LoRA weights from {extract_dir}. "
+                f"Target modules: {target_modules}"
+            )
 
         return weights
 

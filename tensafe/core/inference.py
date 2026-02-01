@@ -159,6 +159,7 @@ class TenSafeInference:
         cls,
         checkpoint_path: Union[str, Path],
         mode: InferenceMode = InferenceMode.PLAINTEXT,
+        device: str = "auto",
     ) -> "TenSafeInference":
         """
         Create inference engine from checkpoint.
@@ -166,6 +167,7 @@ class TenSafeInference:
         Args:
             checkpoint_path: Path to checkpoint directory
             mode: Inference mode
+            device: Device to load model on ("auto", "cuda", "cpu")
 
         Returns:
             Configured TenSafeInference
@@ -179,9 +181,107 @@ class TenSafeInference:
         else:
             config = TenSafeConfig()
 
-        # TODO: Load model and LoRA weights from checkpoint
+        # Load model and tokenizer
+        model = None
+        tokenizer = None
+        lora_weights = {}
 
-        return cls(config=config, mode=mode)
+        try:
+            import torch
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+
+            # Determine device
+            if device == "auto":
+                if torch.cuda.is_available():
+                    device = "cuda"
+                elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                    device = "mps"
+                else:
+                    device = "cpu"
+
+            # Load tokenizer
+            tokenizer_path = checkpoint_path / "tokenizer"
+            if tokenizer_path.exists():
+                tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_path))
+            elif config.model.name:
+                tokenizer = AutoTokenizer.from_pretrained(config.model.name)
+
+            # Load model with LoRA weights
+            model_path = checkpoint_path / "model"
+            adapter_path = checkpoint_path / "adapter"
+
+            if model_path.exists():
+                # Load full model
+                model = AutoModelForCausalLM.from_pretrained(
+                    str(model_path),
+                    torch_dtype=torch.bfloat16,
+                    device_map=device if device != "cpu" else None,
+                )
+                if device == "cpu":
+                    model = model.to(device)
+
+            elif adapter_path.exists():
+                # Load base model with adapter
+                from peft import PeftModel
+
+                base_model = AutoModelForCausalLM.from_pretrained(
+                    config.model.name,
+                    torch_dtype=torch.bfloat16,
+                    device_map=device if device != "cpu" else None,
+                )
+                model = PeftModel.from_pretrained(base_model, str(adapter_path))
+                if device == "cpu":
+                    model = model.to(device)
+
+                # Extract LoRA weights for HE inference
+                lora_weights = cls._extract_lora_weights(model, config.lora.target_modules)
+
+            logger.info(f"Loaded model from checkpoint: {checkpoint_path}")
+
+        except ImportError as e:
+            logger.warning(f"Could not load model (missing dependencies): {e}")
+        except Exception as e:
+            logger.error(f"Failed to load model from checkpoint: {e}")
+
+        return cls(
+            model=model,
+            tokenizer=tokenizer,
+            lora_weights=lora_weights,
+            config=config,
+            mode=mode,
+        )
+
+    @staticmethod
+    def _extract_lora_weights(
+        model: Any,
+        target_modules: List[str],
+    ) -> Dict[str, Tuple[np.ndarray, np.ndarray]]:
+        """Extract LoRA weights from a PEFT model."""
+        weights = {}
+
+        try:
+            state_dict = model.state_dict()
+
+            for module in target_modules:
+                lora_a_key = None
+                lora_b_key = None
+
+                for key in state_dict.keys():
+                    if module in key:
+                        if "lora_A" in key or "lora_a" in key:
+                            lora_a_key = key
+                        elif "lora_B" in key or "lora_b" in key:
+                            lora_b_key = key
+
+                if lora_a_key and lora_b_key:
+                    lora_a = state_dict[lora_a_key].cpu().numpy()
+                    lora_b = state_dict[lora_b_key].cpu().numpy()
+                    weights[module] = (lora_a, lora_b)
+
+        except Exception as e:
+            logger.warning(f"Could not extract LoRA weights: {e}")
+
+        return weights
 
     @classmethod
     def from_config(
@@ -371,6 +471,9 @@ class TenSafeInference:
 
         Returns:
             InferenceResult with generated text
+
+        Raises:
+            RuntimeError: If model or tokenizer not available
         """
         config = generation_config or GenerationConfig(
             max_new_tokens=self._config.max_new_tokens,
@@ -382,30 +485,68 @@ class TenSafeInference:
 
         start_time = time.perf_counter()
 
-        # Tokenize
-        if self._tokenizer is not None:
-            input_ids = self._tokenizer.encode(prompt)
-        else:
-            # Mock tokenization
-            input_ids = [ord(c) for c in prompt]
+        # Check requirements
+        if self._tokenizer is None:
+            raise RuntimeError(
+                "Tokenizer not available. Load a model with from_checkpoint() "
+                "or provide a tokenizer during initialization."
+            )
 
-        # Generate (placeholder)
-        generated_ids = input_ids.copy()
-        for _ in range(config.max_new_tokens):
-            # Mock generation - would use model forward here
-            next_token = np.random.randint(0, 1000)
-            generated_ids.append(next_token)
-            if config.eos_token_id is not None and next_token == config.eos_token_id:
-                break
+        if self._model is None:
+            raise RuntimeError(
+                "Model not available. Load a model with from_checkpoint() "
+                "or provide a model during initialization."
+            )
 
-        # Decode
-        if self._tokenizer is not None:
-            text = self._tokenizer.decode(generated_ids)
-        else:
-            text = "".join(chr(min(t, 127)) for t in generated_ids)
+        try:
+            import torch
+
+            # Tokenize
+            inputs = self._tokenizer(
+                prompt,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+            )
+
+            # Move to model device
+            device = next(self._model.parameters()).device
+            inputs = {k: v.to(device) for k, v in inputs.items()}
+            input_ids = inputs["input_ids"]
+
+            # Set model to eval mode
+            self._model.eval()
+
+            # Generate
+            with torch.no_grad():
+                outputs = self._model.generate(
+                    **inputs,
+                    max_new_tokens=config.max_new_tokens,
+                    temperature=config.temperature if config.do_sample else 1.0,
+                    top_p=config.top_p,
+                    top_k=config.top_k,
+                    do_sample=config.do_sample,
+                    pad_token_id=self._tokenizer.pad_token_id,
+                    eos_token_id=config.eos_token_id or self._tokenizer.eos_token_id,
+                    repetition_penalty=config.repetition_penalty,
+                    no_repeat_ngram_size=config.no_repeat_ngram_size,
+                    use_cache=config.use_cache,
+                )
+
+            # Decode
+            generated_ids = outputs[0].tolist()
+            text = self._tokenizer.decode(
+                generated_ids[input_ids.shape[1]:],
+                skip_special_tokens=True,
+            )
+
+        except ImportError:
+            raise RuntimeError(
+                "PyTorch not available. Install with: pip install torch"
+            )
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
-        tokens_generated = len(generated_ids) - len(input_ids)
+        tokens_generated = len(generated_ids) - len(inputs["input_ids"][0])
         tps = (tokens_generated / (elapsed_ms / 1000)) if elapsed_ms > 0 else 0
 
         return InferenceResult(

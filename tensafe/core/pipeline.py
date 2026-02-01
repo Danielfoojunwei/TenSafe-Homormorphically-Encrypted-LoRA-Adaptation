@@ -696,23 +696,104 @@ class TenSafePipeline:
 
         logger.info(f"Loading model: {model_config.name}")
 
-        # Placeholder - actual implementation would use transformers/peft
-        self._model = _MockModel()
+        try:
+            import torch
+            from transformers import AutoModelForCausalLM
 
-        if lora_config.enabled:
-            logger.info(
-                f"Configuring LoRA: rank={lora_config.rank}, "
-                f"alpha={lora_config.alpha}, targets={lora_config.target_modules}"
+            # Determine dtype
+            dtype_map = {
+                "bfloat16": torch.bfloat16,
+                "float16": torch.float16,
+                "float32": torch.float32,
+            }
+            torch_dtype = dtype_map.get(model_config.torch_dtype, torch.bfloat16)
+
+            # Load model
+            self._model = AutoModelForCausalLM.from_pretrained(
+                model_config.name,
+                revision=model_config.revision,
+                torch_dtype=torch_dtype,
+                device_map="auto" if torch.cuda.is_available() else None,
+                trust_remote_code=model_config.trust_remote_code,
             )
+
+            # Apply LoRA if enabled
+            if lora_config.enabled:
+                from peft import LoraConfig, get_peft_model, TaskType
+
+                peft_config = LoraConfig(
+                    r=lora_config.rank,
+                    lora_alpha=lora_config.alpha,
+                    lora_dropout=lora_config.dropout,
+                    target_modules=lora_config.target_modules,
+                    task_type=TaskType.CAUSAL_LM,
+                    bias="none",
+                )
+
+                self._model = get_peft_model(self._model, peft_config)
+                self._model.print_trainable_parameters()
+
+                logger.info(
+                    f"LoRA configured: rank={lora_config.rank}, "
+                    f"alpha={lora_config.alpha}, targets={lora_config.target_modules}"
+                )
+
+        except ImportError as e:
+            logger.warning(
+                f"PyTorch/Transformers not available ({e}). "
+                f"Using placeholder model for configuration testing."
+            )
+            self._model = _MockModel()
 
     def _create_optimizer(self) -> None:
         """Create the optimizer."""
         training_config = self.config.training
 
-        # Placeholder - actual implementation would create real optimizer
-        self._optimizer = _MockOptimizer(learning_rate=training_config.learning_rate)
+        try:
+            import torch.optim as optim
 
-        logger.info(f"Created optimizer: {training_config.optimizer}, lr={training_config.learning_rate}")
+            # Get trainable parameters
+            if hasattr(self._model, 'parameters'):
+                trainable_params = [
+                    p for p in self._model.parameters() if p.requires_grad
+                ]
+            else:
+                trainable_params = []
+
+            if not trainable_params:
+                logger.warning("No trainable parameters found, using placeholder optimizer")
+                self._optimizer = _MockOptimizer(learning_rate=training_config.learning_rate)
+                return
+
+            # Create optimizer
+            if training_config.optimizer.lower() == "adamw":
+                self._optimizer = optim.AdamW(
+                    trainable_params,
+                    lr=training_config.learning_rate,
+                    weight_decay=training_config.weight_decay,
+                )
+            elif training_config.optimizer.lower() == "adam":
+                self._optimizer = optim.Adam(
+                    trainable_params,
+                    lr=training_config.learning_rate,
+                )
+            elif training_config.optimizer.lower() == "sgd":
+                self._optimizer = optim.SGD(
+                    trainable_params,
+                    lr=training_config.learning_rate,
+                    weight_decay=training_config.weight_decay,
+                )
+            else:
+                raise ValueError(f"Unknown optimizer: {training_config.optimizer}")
+
+            logger.info(
+                f"Created optimizer: {training_config.optimizer}, "
+                f"lr={training_config.learning_rate}"
+            )
+
+        except ImportError:
+            logger.warning("PyTorch not available, using placeholder optimizer")
+            self._optimizer = _MockOptimizer(learning_rate=training_config.learning_rate)
 
     def _create_training_mode(self) -> None:
         """Create the training mode handler."""
@@ -777,9 +858,12 @@ class TenSafePipeline:
         try:
             training_config = self.config.training
 
-            # Use mock data if none provided
+            # Require a dataloader
             if train_dataloader is None:
-                train_dataloader = self._mock_dataloader()
+                raise ValueError(
+                    "train_dataloader is required. Provide a DataLoader or "
+                    "iterator that yields batches with 'input_ids' and 'labels'."
+                )
 
             # Training loop
             for step in range(self._current_step, training_config.total_steps):
@@ -789,8 +873,9 @@ class TenSafePipeline:
                 try:
                     batch = next(train_dataloader)
                 except StopIteration:
-                    train_dataloader = self._mock_dataloader()
-                    batch = next(train_dataloader)
+                    # Reset iterator for next epoch
+                    logger.info("Dataloader exhausted, epoch completed")
+                    break
 
                 # Training step
                 self._emit_event(PipelineEvent.STEP_START, {"step": step})
@@ -895,15 +980,6 @@ class TenSafePipeline:
                 except Exception as e:
                     logger.warning(f"Failed to remove checkpoint {path}: {e}")
 
-    def _mock_dataloader(self) -> Iterator[Dict[str, Any]]:
-        """Create a mock dataloader for testing."""
-        while True:
-            yield {
-                "input_ids": np.random.randint(0, 1000, (4, 128)),
-                "labels": np.random.randint(0, 1000, (4, 128)),
-                "prompts": ["Test prompt"] * 4,
-            }
-
     @property
     def state(self) -> PipelineState:
         """Get current pipeline state."""
@@ -916,14 +992,26 @@ class TenSafePipeline:
 
 
 # ==============================================================================
-# Mock classes for testing
+# Placeholder Classes (for import testing only)
 # ==============================================================================
 
 
 class _MockModel:
-    """Mock model for testing."""
+    """
+    Placeholder model for configuration testing.
+
+    WARNING: This is NOT a real model. It is only used when PyTorch/Transformers
+    are not available (e.g., for configuration validation or import testing).
+
+    Production usage requires installing:
+        pip install torch transformers peft
+    """
 
     def __init__(self):
+        logger.warning(
+            "_MockModel is a placeholder. Install PyTorch and Transformers "
+            "for production training."
+        )
         self._training = True
 
     def train(self):
@@ -936,20 +1024,37 @@ class _MockModel:
         return []
 
     def forward(self, **kwargs):
-        return {"logits": kwargs.get("input_ids")}
+        raise NotImplementedError(
+            "MockModel cannot perform forward passes. "
+            "Install PyTorch and Transformers for production training."
+        )
 
     def __call__(self, **kwargs):
         return self.forward(**kwargs)
 
 
 class _MockOptimizer:
-    """Mock optimizer for testing."""
+    """
+    Placeholder optimizer for configuration testing.
+
+    WARNING: This is NOT a real optimizer. It is only used when PyTorch
+    is not available.
+
+    Production usage requires installing:
+        pip install torch
+    """
 
     def __init__(self, learning_rate: float = 1e-4):
+        logger.warning(
+            "_MockOptimizer is a placeholder. Install PyTorch for production training."
+        )
         self.param_groups = [{"lr": learning_rate}]
 
     def step(self):
-        pass
+        raise NotImplementedError(
+            "MockOptimizer cannot perform optimization steps. "
+            "Install PyTorch for production training."
+        )
 
     def zero_grad(self):
         pass

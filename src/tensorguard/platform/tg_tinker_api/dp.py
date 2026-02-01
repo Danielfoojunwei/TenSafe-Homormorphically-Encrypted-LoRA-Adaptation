@@ -202,14 +202,32 @@ class RDPAccountant(PrivacyAccountant):
 
 class MomentsAccountant(PrivacyAccountant):
     """
-    Moments accountant (placeholder).
+    Moments accountant using production-grade implementation.
 
-    TODO: Implement moments accountant for tighter composition.
+    Wraps tensafe.privacy.ProductionRDPAccountant for moments-based accounting.
     """
 
     def __init__(self, target_delta: float = 1e-5):
         self.target_delta = target_delta
-        self._total_epsilon = 0.0
+        self._production_accountant = None
+        self._init_production_accountant()
+
+    def _init_production_accountant(self) -> None:
+        """Initialize the production accountant."""
+        try:
+            from tensafe.privacy.accountants import ProductionRDPAccountant, DPConfig
+
+            config = DPConfig(
+                target_delta=self.target_delta,
+                accountant_type="rdp",
+            )
+            self._production_accountant = ProductionRDPAccountant(config)
+            logger.info("Using production RDP accountant for moments accounting")
+
+        except ImportError:
+            logger.warning(
+                "tensafe.privacy not available, using fallback moments accountant"
+            )
 
     def step(
         self,
@@ -217,39 +235,60 @@ class MomentsAccountant(PrivacyAccountant):
         sample_rate: float,
         num_steps: int = 1,
     ) -> Tuple[float, float]:
-        """
-        Placeholder moments accountant step.
+        """Step the moments accountant."""
+        if self._production_accountant:
+            # Update config
+            self._production_accountant.config.noise_multiplier = noise_multiplier
+            self._production_accountant.config.sample_rate = sample_rate
+            self._production_accountant.step(num_steps)
+            spent = self._production_accountant.get_privacy_spent()
+            return spent.epsilon, spent.delta
 
-        WARNING: This is not a real moments accountant implementation.
-        Use opacus.privacy_analysis for production.
-        """
-        logger.warning("MomentsAccountant is a placeholder. Use a production privacy library for real guarantees.")
-
-        # Fallback to simple composition
+        # Fallback
         if noise_multiplier > 0:
-            eps_per_step = math.sqrt(2 * math.log(1.25 / self.target_delta)) / noise_multiplier
-            self._total_epsilon += eps_per_step * num_steps
-
-        return self._total_epsilon, self.target_delta
+            eps = math.sqrt(2 * math.log(1.25 / self.target_delta)) / noise_multiplier
+            return eps * num_steps, self.target_delta
+        return 0.0, self.target_delta
 
     def get_privacy_spent(self) -> Tuple[float, float]:
-        return self._total_epsilon, self.target_delta
+        if self._production_accountant:
+            spent = self._production_accountant.get_privacy_spent()
+            return spent.epsilon, spent.delta
+        return 0.0, self.target_delta
 
     def reset(self) -> None:
-        self._total_epsilon = 0.0
+        if self._production_accountant:
+            self._production_accountant.reset()
 
 
 class PRVAccountant(PrivacyAccountant):
     """
-    Privacy Random Variable (PRV) accountant (placeholder).
+    Privacy Random Variable (PRV) accountant using production implementation.
 
-    TODO: Implement PRV accountant for tight composition bounds.
+    Wraps tensafe.privacy.ProductionPRVAccountant for PRV-based accounting.
     """
 
     def __init__(self, target_delta: float = 1e-5):
         self.target_delta = target_delta
-        self._total_epsilon = 0.0
-        logger.warning("PRVAccountant is a placeholder stub. Consider using Google's dp-accounting library.")
+        self._production_accountant = None
+        self._init_production_accountant()
+
+    def _init_production_accountant(self) -> None:
+        """Initialize the production accountant."""
+        try:
+            from tensafe.privacy.accountants import ProductionPRVAccountant, DPConfig
+
+            config = DPConfig(
+                target_delta=self.target_delta,
+                accountant_type="prv",
+            )
+            self._production_accountant = ProductionPRVAccountant(config)
+            logger.info("Using production PRV accountant")
+
+        except ImportError:
+            logger.warning(
+                "tensafe.privacy not available, using fallback PRV accountant"
+            )
 
     def step(
         self,
@@ -257,17 +296,29 @@ class PRVAccountant(PrivacyAccountant):
         sample_rate: float,
         num_steps: int = 1,
     ) -> Tuple[float, float]:
-        """Placeholder PRV accountant step."""
+        """Step the PRV accountant."""
+        if self._production_accountant:
+            self._production_accountant.config.noise_multiplier = noise_multiplier
+            self._production_accountant.config.sample_rate = sample_rate
+            self._production_accountant.step(num_steps)
+            spent = self._production_accountant.get_privacy_spent()
+            return spent.epsilon, spent.delta
+
+        # Fallback
         if noise_multiplier > 0:
-            eps_per_step = math.sqrt(2 * math.log(1.25 / self.target_delta)) / noise_multiplier
-            self._total_epsilon += eps_per_step * num_steps
-        return self._total_epsilon, self.target_delta
+            eps = math.sqrt(2 * math.log(1.25 / self.target_delta)) / noise_multiplier
+            return eps * num_steps, self.target_delta
+        return 0.0, self.target_delta
 
     def get_privacy_spent(self) -> Tuple[float, float]:
-        return self._total_epsilon, self.target_delta
+        if self._production_accountant:
+            spent = self._production_accountant.get_privacy_spent()
+            return spent.epsilon, spent.delta
+        return 0.0, self.target_delta
 
     def reset(self) -> None:
-        self._total_epsilon = 0.0
+        if self._production_accountant:
+            self._production_accountant.reset()
 
 
 def create_accountant(
