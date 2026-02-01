@@ -913,6 +913,47 @@ async def health_check() -> Dict[str, str]:
 # TGSP adapter registry storage (per-tenant)
 _tgsp_registries: Dict[str, Any] = {}
 
+# Request ID counter for audit correlation (SOC 2 CC4.1)
+import uuid
+_request_id_counter = 0
+_request_id_lock = threading.Lock()
+
+
+def generate_request_id() -> str:
+    """Generate unique request ID for audit correlation."""
+    global _request_id_counter
+    with _request_id_lock:
+        _request_id_counter += 1
+        return f"tgsp-{uuid.uuid4().hex[:8]}-{_request_id_counter}"
+
+
+# Simple rate limiter for TGSP inference (SOC 2 CC6.1)
+import threading
+from collections import defaultdict
+import time
+
+_rate_limit_buckets: Dict[str, List[float]] = defaultdict(list)
+_rate_limit_lock = threading.Lock()
+TGSP_RATE_LIMIT_REQUESTS = 100  # Max requests per window
+TGSP_RATE_LIMIT_WINDOW = 60  # Window in seconds
+
+
+def check_rate_limit(tenant_id: str) -> bool:
+    """Check if tenant is within rate limits. Returns True if allowed."""
+    now = time.time()
+    with _rate_limit_lock:
+        # Clean old entries
+        _rate_limit_buckets[tenant_id] = [
+            t for t in _rate_limit_buckets[tenant_id]
+            if now - t < TGSP_RATE_LIMIT_WINDOW
+        ]
+        # Check limit
+        if len(_rate_limit_buckets[tenant_id]) >= TGSP_RATE_LIMIT_REQUESTS:
+            return False
+        # Record request
+        _rate_limit_buckets[tenant_id].append(now)
+        return True
+
 
 class TGSPAdapterLoadRequest(BaseModel):
     """Request to load a TGSP adapter."""
@@ -954,6 +995,7 @@ class TGSPInferenceResponse(BaseModel):
     inference_time_ms: float
     he_metrics: Optional[Dict[str, Any]] = None
     tgsp_compliant: bool = True
+    request_id: Optional[str] = None  # For audit correlation (SOC 2 CC4.1)
 
 
 def _get_tenant_registry(tenant_id: str) -> Any:
@@ -1238,17 +1280,35 @@ async def tgsp_encrypted_inference(
     providing privacy for user activations while maintaining fast base model
     inference in plaintext.
 
+    Rate limited to 100 requests per 60 seconds per tenant (SOC 2 CC6.1).
+
     Returns:
         Decrypted LoRA deltas for each input in the batch
     """
     import time
     import numpy as np
 
+    # Generate request ID for audit correlation (SOC 2 CC4.1)
+    request_id = generate_request_id()
+
+    # Check rate limit (SOC 2 CC6.1)
+    if not check_rate_limit(tenant_id):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "error": {
+                    "code": "RATE_LIMIT_EXCEEDED",
+                    "message": f"Rate limit exceeded. Max {TGSP_RATE_LIMIT_REQUESTS} requests per {TGSP_RATE_LIMIT_WINDOW} seconds.",
+                    "request_id": request_id,
+                }
+            },
+        )
+
     registry = _get_tenant_registry(tenant_id)
     if registry is None:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail={"error": {"code": "TGSP_NOT_AVAILABLE", "message": "TGSP registry not available"}},
+            detail={"error": {"code": "TGSP_NOT_AVAILABLE", "message": "TGSP registry not available", "request_id": request_id}},
         )
 
     # Check for active adapter
@@ -1260,6 +1320,7 @@ async def tgsp_encrypted_inference(
                 "error": {
                     "code": "NO_ACTIVE_ADAPTER",
                     "message": "No TGSP adapter is activated. Use POST /tgsp/adapters/activate first.",
+                    "request_id": request_id,
                     "details": {
                         "help": "Encrypted inference requires a TGSP-format adapter to be loaded and activated",
                     },
@@ -1281,7 +1342,7 @@ async def tgsp_encrypted_inference(
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
-        # Log to audit
+        # Log to audit with request_id (SOC 2 CC4.1)
         audit = get_audit_logger()
         audit.log_operation(
             tenant_id=tenant_id,
@@ -1297,6 +1358,7 @@ async def tgsp_encrypted_inference(
             adapter_id=active.metadata.adapter_id,
             inference_time_ms=elapsed_ms,
             tgsp_compliant=True,
+            request_id=request_id,
         )
 
     except Exception as e:
@@ -1306,6 +1368,7 @@ async def tgsp_encrypted_inference(
                 "error": {
                     "code": "INFERENCE_FAILED",
                     "message": str(e),
+                    "request_id": request_id,
                 }
             },
         )
