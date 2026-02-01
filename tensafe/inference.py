@@ -16,6 +16,26 @@ Where:
 This achieves privacy for the LoRA contribution while keeping
 base model inference fast.
 
+IMPORTANT: TGSP Format Enforcement
+----------------------------------
+For HE-encrypted inference (he_only, full_he modes), ONLY TGSP-format
+adapters are allowed. This is a security lock-in that ensures:
+1. All adapters are cryptographically signed and verified
+2. Audit trail is maintained for compliance
+3. Adapters come from trusted sources
+
+Use the TGSPAdapterRegistry for modular adapter hot-swapping:
+
+    from tensafe.tgsp_adapter_registry import TGSPAdapterRegistry
+
+    registry = TGSPAdapterRegistry()
+    adapter_id = registry.load_tgsp_adapter("adapter.tgsp", key_path)
+    registry.activate_adapter(adapter_id)
+
+    # Use with inference
+    inference = TenSafeInference.from_tgsp_registry(registry, model)
+    output = inference(input_ids)
+
 Usage:
     from tensafe.inference import TenSafeInference, LoRAMode
 
@@ -46,10 +66,24 @@ class LoRAMode(Enum):
     PLAINTEXT = "plaintext"
 
     # LoRA delta under HE, base model plaintext (MOAI-optimized)
+    # REQUIRES TGSP format adapter when enforce_tgsp=True
     HE_ONLY = "he_only"
 
     # Full HE inference (not recommended)
+    # REQUIRES TGSP format adapter when enforce_tgsp=True
     FULL_HE = "full_he"
+
+
+class TGSPEnforcementError(Exception):
+    """Raised when TGSP enforcement is violated."""
+
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(
+            f"TGSP Enforcement Violation: {message}. "
+            f"Encrypted inference (HE_ONLY/FULL_HE modes) requires TGSP-format adapters. "
+            f"Use TGSPAdapterRegistry.load_tgsp_adapter() to load adapters."
+        )
 
 
 @dataclass
@@ -68,6 +102,10 @@ class InferenceConfig:
     he_poly_modulus_degree: int = 8192
     he_coeff_modulus_bits: List[int] = None
     he_scale_bits: int = 40
+
+    # TGSP enforcement (CRITICAL for security lock-in)
+    # When True, HE_ONLY and FULL_HE modes REQUIRE TGSP format adapters
+    enforce_tgsp: bool = True
 
     # Generation parameters
     max_new_tokens: int = 128
@@ -90,7 +128,12 @@ class InferenceConfig:
             lora_alpha=getattr(args, "lora_alpha", 32.0),
             max_new_tokens=getattr(args, "max_new_tokens", 128),
             temperature=getattr(args, "temperature", 0.7),
+            enforce_tgsp=getattr(args, "enforce_tgsp", True),
         )
+
+    def requires_tgsp(self) -> bool:
+        """Check if current mode requires TGSP format."""
+        return self.enforce_tgsp and self.lora_mode in (LoRAMode.HE_ONLY, LoRAMode.FULL_HE)
 
 
 @dataclass
@@ -127,6 +170,11 @@ class TenSafeInference:
 
     This ensures the frozen model path is never encrypted, maintaining
     low latency while providing privacy for LoRA contributions.
+
+    TGSP Enforcement:
+        When enforce_tgsp=True (default), HE_ONLY and FULL_HE modes
+        REQUIRE adapters to be loaded via TGSPAdapterRegistry. This
+        ensures cryptographic verification and audit compliance.
     """
 
     def __init__(
@@ -134,6 +182,7 @@ class TenSafeInference:
         base_model: Optional[Any] = None,
         lora_weights: Optional[Dict[str, Tuple[np.ndarray, np.ndarray]]] = None,
         config: Optional[InferenceConfig] = None,
+        tgsp_registry: Optional[Any] = None,
     ):
         """
         Initialize TenSafe inference.
@@ -142,10 +191,15 @@ class TenSafeInference:
             base_model: Base model (or mock for testing)
             lora_weights: Dict of module_name -> (lora_a, lora_b)
             config: Inference configuration
+            tgsp_registry: Optional TGSPAdapterRegistry for TGSP-format adapters
         """
         self.config = config or InferenceConfig()
         self._base_model = base_model
         self._lora_weights = lora_weights or {}
+        self._tgsp_registry = tgsp_registry
+
+        # Track if weights came from TGSP format
+        self._weights_from_tgsp = tgsp_registry is not None
 
         # HE-LoRA adapter (initialized lazily)
         self._he_adapter = None
@@ -154,11 +208,70 @@ class TenSafeInference:
         self._inference_count = 0
         self._total_time_ms = 0.0
 
-        logger.info(f"TenSafeInference initialized: mode={self.config.lora_mode.value}")
+        # TGSP enforcement check
+        if self.config.requires_tgsp():
+            if not self._weights_from_tgsp and self._lora_weights:
+                raise TGSPEnforcementError(
+                    f"Attempted to use HE mode ({self.config.lora_mode.value}) "
+                    f"with non-TGSP adapter weights. Use TGSPAdapterRegistry to load adapters."
+                )
+
+        logger.info(
+            f"TenSafeInference initialized: mode={self.config.lora_mode.value}, "
+            f"enforce_tgsp={self.config.enforce_tgsp}, "
+            f"weights_from_tgsp={self._weights_from_tgsp}"
+        )
 
         # Initialize HE adapter if needed
         if self.config.lora_mode in (LoRAMode.HE_ONLY, LoRAMode.FULL_HE):
             self._init_he_adapter()
+
+    @classmethod
+    def from_tgsp_registry(
+        cls,
+        registry: Any,
+        base_model: Optional[Any] = None,
+        config: Optional[InferenceConfig] = None,
+    ) -> "TenSafeInference":
+        """
+        Create TenSafeInference from a TGSP adapter registry.
+
+        This is the RECOMMENDED method for creating inference with
+        encrypted LoRA modes, as it ensures TGSP format compliance.
+
+        Args:
+            registry: TGSPAdapterRegistry with loaded adapter
+            base_model: Optional base model
+            config: Optional inference configuration
+
+        Returns:
+            TenSafeInference configured with TGSP adapter
+
+        Raises:
+            TGSPEnforcementError: If no adapter is activated in registry
+        """
+        active_adapter = registry.get_active_adapter()
+        if active_adapter is None:
+            raise TGSPEnforcementError(
+                "No active adapter in registry. Call registry.activate_adapter() first."
+            )
+
+        # Create config if not provided
+        if config is None:
+            config = InferenceConfig(
+                lora_mode=LoRAMode.HE_ONLY,
+                lora_rank=active_adapter.metadata.lora_rank,
+                lora_alpha=active_adapter.metadata.lora_alpha,
+                lora_target_modules=active_adapter.metadata.target_modules,
+                enforce_tgsp=True,
+            )
+
+        return cls(
+            base_model=base_model,
+            lora_weights=active_adapter.weights,
+            config=config,
+            tgsp_registry=registry,
+        )
 
     def _init_he_adapter(self) -> None:
         """Initialize the HE-LoRA adapter."""
@@ -202,6 +315,7 @@ class TenSafeInference:
         module_name: str,
         lora_a: np.ndarray,
         lora_b: np.ndarray,
+        from_tgsp: bool = False,
     ) -> None:
         """
         Register LoRA weights for a module.
@@ -210,8 +324,23 @@ class TenSafeInference:
             module_name: Name of target module
             lora_a: LoRA A matrix [rank, in_features]
             lora_b: LoRA B matrix [out_features, rank]
+            from_tgsp: Flag indicating weights came from TGSP format
+
+        Raises:
+            TGSPEnforcementError: If HE mode requires TGSP but weights are not from TGSP
         """
+        # Enforce TGSP for HE modes
+        if self.config.requires_tgsp() and not from_tgsp:
+            raise TGSPEnforcementError(
+                f"Cannot register non-TGSP weights when using {self.config.lora_mode.value} mode. "
+                f"Use TGSPAdapterRegistry to load adapters, or set enforce_tgsp=False (not recommended)."
+            )
+
         self._lora_weights[module_name] = (lora_a, lora_b)
+
+        # Track TGSP provenance
+        if from_tgsp:
+            self._weights_from_tgsp = True
 
         # Also register with HE adapter if initialized
         if self._he_adapter is not None:
@@ -364,6 +493,9 @@ class TenSafeInference:
             "total_time_ms": self._total_time_ms,
             "avg_time_ms": self._total_time_ms / max(1, self._inference_count),
             "lora_mode": self.config.lora_mode.value,
+            "enforce_tgsp": self.config.enforce_tgsp,
+            "weights_from_tgsp": self._weights_from_tgsp,
+            "tgsp_compliant": self._weights_from_tgsp or self.config.lora_mode == LoRAMode.PLAINTEXT,
             "he_adapter_metrics": (
                 self._he_adapter.get_metrics() if self._he_adapter else None
             ),
@@ -425,6 +557,22 @@ def add_inference_args(parser: argparse.ArgumentParser) -> None:
         type=float,
         default=0.7,
         help="Sampling temperature",
+    )
+
+    group.add_argument(
+        "--enforce_tgsp",
+        type=bool,
+        default=True,
+        help="Enforce TGSP format for encrypted inference modes (he_only, full_he). "
+             "When enabled, only adapters loaded via TGSPAdapterRegistry are allowed. "
+             "Default: True (RECOMMENDED for production)",
+    )
+
+    group.add_argument(
+        "--tgsp_adapter",
+        type=str,
+        default=None,
+        help="Path to TGSP-format adapter file (.tgsp) for encrypted inference",
     )
 
 
