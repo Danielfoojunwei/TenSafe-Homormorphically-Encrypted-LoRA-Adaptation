@@ -516,21 +516,168 @@ class RLVRTrainingMode(TrainingModeInterface):
         prompts: List[str],
         sample: bool = True,
     ) -> Tuple[List[str], List[Any]]:
-        """Generate rollouts (placeholder)."""
-        # Placeholder - actual implementation depends on model
-        responses = ["Generated response" for _ in prompts]
-        log_probs = [0.0 for _ in prompts]
-        return responses, log_probs
+        """
+        Generate rollouts using the model for policy gradient training.
+
+        Args:
+            prompts: List of input prompts
+            sample: Whether to sample (True) or use greedy decoding (False)
+
+        Returns:
+            Tuple of (responses, log_probs) for policy gradient computation
+        """
+        if self.model is None:
+            logger.warning("No model available for rollout generation")
+            return [""] * len(prompts), [0.0] * len(prompts)
+
+        responses = []
+        log_probs_list = []
+
+        try:
+            import torch
+
+            # Get generation config from RLVR settings
+            rlvr_config = self.config.rlvr
+            max_new_tokens = getattr(rlvr_config, 'max_response_length', 128)
+            temperature = getattr(rlvr_config, 'temperature', 0.8 if sample else 0.0)
+
+            # Check if model has tokenizer attribute or use from config
+            tokenizer = getattr(self.model, 'tokenizer', None)
+            if tokenizer is None and hasattr(self.model, 'get_tokenizer'):
+                tokenizer = self.model.get_tokenizer()
+
+            if tokenizer is None:
+                logger.warning("No tokenizer available, cannot generate proper rollouts")
+                return [""] * len(prompts), [0.0] * len(prompts)
+
+            # Set model to eval mode
+            self.model.eval()
+
+            for prompt in prompts:
+                # Tokenize prompt
+                inputs = tokenizer(
+                    prompt,
+                    return_tensors="pt",
+                    padding=True,
+                    truncation=True,
+                )
+                device = next(self.model.parameters()).device
+                inputs = {k: v.to(device) for k, v in inputs.items()}
+                input_length = inputs["input_ids"].shape[1]
+
+                with torch.no_grad():
+                    # Generate with output scores for log prob computation
+                    outputs = self.model.generate(
+                        **inputs,
+                        max_new_tokens=max_new_tokens,
+                        do_sample=sample and temperature > 0,
+                        temperature=temperature if sample else 1.0,
+                        output_scores=True,
+                        return_dict_in_generate=True,
+                        pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
+                    )
+
+                    # Extract generated tokens
+                    generated_ids = outputs.sequences[0, input_length:]
+                    response = tokenizer.decode(generated_ids, skip_special_tokens=True)
+                    responses.append(response)
+
+                    # Compute log probabilities from scores
+                    if hasattr(outputs, 'scores') and outputs.scores:
+                        total_log_prob = 0.0
+                        for step_idx, (scores, token_id) in enumerate(
+                            zip(outputs.scores, generated_ids)
+                        ):
+                            log_probs = torch.log_softmax(scores[0], dim=-1)
+                            total_log_prob += log_probs[token_id].item()
+                        log_probs_list.append(total_log_prob)
+                    else:
+                        log_probs_list.append(0.0)
+
+            # Return to training mode
+            self.model.train()
+
+        except ImportError:
+            logger.warning("PyTorch not available for rollout generation")
+            return [""] * len(prompts), [0.0] * len(prompts)
+        except Exception as e:
+            logger.error(f"Rollout generation failed: {e}")
+            return [""] * len(prompts), [0.0] * len(prompts)
+
+        return responses, log_probs_list
 
     def _reinforce_loss(self, log_probs: List[Any], advantages: np.ndarray) -> Any:
-        """Compute REINFORCE loss."""
-        # Placeholder
-        return sum([-lp * adv for lp, adv in zip(log_probs, advantages)])
+        """
+        Compute REINFORCE policy gradient loss.
+
+        Loss = -sum(log_prob * advantage) for vanilla REINFORCE.
+
+        Args:
+            log_probs: Log probabilities of generated actions
+            advantages: Advantage estimates (rewards - baseline)
+
+        Returns:
+            Scalar loss value (torch.Tensor if available, else float)
+        """
+        try:
+            import torch
+
+            # Convert to tensors
+            log_probs_tensor = torch.tensor(log_probs, dtype=torch.float32, requires_grad=True)
+            advantages_tensor = torch.tensor(advantages, dtype=torch.float32)
+
+            # REINFORCE loss: -E[log_prob * advantage]
+            loss = -(log_probs_tensor * advantages_tensor).mean()
+            return loss
+
+        except ImportError:
+            # Fallback to numpy computation
+            return -float(np.mean(np.array(log_probs) * advantages))
 
     def _ppo_loss(self, log_probs: List[Any], advantages: np.ndarray) -> Any:
-        """Compute PPO loss."""
-        # Placeholder - actual PPO implementation would include clipping
-        return sum([-lp * adv for lp, adv in zip(log_probs, advantages)])
+        """
+        Compute PPO (Proximal Policy Optimization) clipped loss.
+
+        Uses clipped surrogate objective to prevent large policy updates.
+
+        Args:
+            log_probs: Log probabilities of generated actions under current policy
+            advantages: Advantage estimates
+
+        Returns:
+            Scalar loss value (torch.Tensor if available, else float)
+        """
+        try:
+            import torch
+
+            rlvr_config = self.config.rlvr
+            clip_range = getattr(rlvr_config, 'ppo_clip_range', 0.2)
+
+            log_probs_tensor = torch.tensor(log_probs, dtype=torch.float32, requires_grad=True)
+            advantages_tensor = torch.tensor(advantages, dtype=torch.float32)
+
+            # For PPO, we need old log probs - use stored or current as approximation
+            # In full implementation, old_log_probs would be stored from rollout
+            old_log_probs = getattr(self, '_old_log_probs', log_probs_tensor.detach())
+
+            # Compute ratio
+            ratio = torch.exp(log_probs_tensor - old_log_probs)
+
+            # Clipped surrogate objective
+            surr1 = ratio * advantages_tensor
+            surr2 = torch.clamp(ratio, 1.0 - clip_range, 1.0 + clip_range) * advantages_tensor
+
+            # PPO loss is the minimum of the two surrogates
+            loss = -torch.min(surr1, surr2).mean()
+
+            # Store current log probs for next iteration
+            self._old_log_probs = log_probs_tensor.detach()
+
+            return loss
+
+        except ImportError:
+            # Fallback: use simple REINFORCE loss without clipping
+            return -float(np.mean(np.array(log_probs) * advantages))
 
     def _backward(self, loss: Any) -> None:
         if hasattr(loss, 'backward'):
