@@ -1396,3 +1396,350 @@ async def get_tgsp_audit_log(
         return []
 
     return registry.get_audit_log()
+
+
+# ==============================================================================
+# LoRA to TGSP Conversion Endpoints
+# ==============================================================================
+
+class LoRAConvertRequest(BaseModel):
+    """Request to convert a LoRA adapter to TGSP format."""
+    input_path: str = Field(..., description="Path to LoRA adapter file or directory")
+    output_path: Optional[str] = Field(None, description="Output TGSP file path (auto-generated if not provided)")
+    model_name: Optional[str] = Field(None, description="Model name (auto-detected if not provided)")
+    model_version: str = Field(default="1.0.0", description="Model version")
+    validate_weights: bool = Field(default=True, description="Validate LoRA weights before conversion")
+    auto_generate_keys: bool = Field(default=True, description="Auto-generate missing cryptographic keys")
+
+
+class LoRAConvertResponse(BaseModel):
+    """Response from LoRA to TGSP conversion."""
+    success: bool
+    output_path: str
+    adapter_id: str
+    model_name: str
+    model_version: str
+
+    # Cryptographic info
+    manifest_hash: str
+    payload_hash: str
+    signature_key_id: str
+
+    # LoRA config
+    lora_rank: int
+    lora_alpha: float
+    target_modules: List[str]
+
+    # Statistics
+    input_format: str
+    input_size_bytes: int
+    output_size_bytes: int
+    conversion_time_ms: float
+
+    # Error (if any)
+    error: Optional[str] = None
+
+
+class BatchLoRAConvertRequest(BaseModel):
+    """Request to convert multiple LoRA adapters to TGSP format."""
+    input_paths: List[str] = Field(..., description="List of paths to LoRA adapters")
+    output_dir: str = Field(..., description="Output directory for TGSP files")
+    model_version: str = Field(default="1.0.0", description="Model version for all adapters")
+    validate_weights: bool = Field(default=True, description="Validate LoRA weights")
+    auto_generate_keys: bool = Field(default=True, description="Auto-generate missing keys")
+
+
+class BatchLoRAConvertResponse(BaseModel):
+    """Response from batch LoRA to TGSP conversion."""
+    total: int
+    successful: int
+    failed: int
+    results: List[LoRAConvertResponse]
+
+
+@router.post(
+    "/tgsp/convert",
+    response_model=LoRAConvertResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["tgsp-conversion"],
+)
+async def convert_lora_to_tgsp(
+    request: LoRAConvertRequest,
+    tenant_id: str = Depends(get_tenant_id),
+) -> LoRAConvertResponse:
+    """
+    Convert a standard LoRA adapter to TGSP format.
+
+    This endpoint allows users to convert their existing LoRA adapters
+    (safetensors, PyTorch .bin/.pt, or Hugging Face directories) into
+    the TGSP (TensorGuard Secure Package) format for use with HE-encrypted
+    inference.
+
+    Supported input formats:
+    - safetensors (.safetensors)
+    - PyTorch (.bin, .pt)
+    - Hugging Face adapter directory (with adapter_config.json)
+
+    The conversion:
+    1. Detects and validates the input format
+    2. Extracts LoRA weights and configuration
+    3. Validates compatibility with HE operations
+    4. Creates a TGSP package with cryptographic signatures
+
+    The output .tgsp file can then be loaded using POST /tgsp/adapters
+    for encrypted inference.
+    """
+    try:
+        from tensafe.lora_to_tgsp_converter import LoRAToTGSPConverter
+
+        # Determine output path
+        import os
+        from pathlib import Path
+
+        if request.output_path:
+            output_path = request.output_path
+        else:
+            # Auto-generate output path
+            input_stem = Path(request.input_path).stem
+            if Path(request.input_path).is_dir():
+                input_stem = Path(request.input_path).name
+            output_path = f"/tmp/tgsp_outputs/{tenant_id}/{input_stem}.tgsp"
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # Ensure output has .tgsp extension
+        if not output_path.lower().endswith('.tgsp'):
+            output_path += '.tgsp'
+
+        converter = LoRAToTGSPConverter(
+            auto_generate_keys=request.auto_generate_keys,
+        )
+
+        try:
+            result = converter.convert(
+                input_path=request.input_path,
+                output_path=output_path,
+                model_name=request.model_name,
+                model_version=request.model_version,
+                validate=request.validate_weights,
+            )
+
+            # Log to audit
+            audit = get_audit_logger()
+            audit.log_operation(
+                tenant_id=tenant_id,
+                training_client_id="tgsp-converter",
+                operation="convert_lora_to_tgsp",
+                request_hash=f"sha256:{hashlib.sha256(request.input_path.encode()).hexdigest()}",
+                request_size_bytes=result.input_size_bytes,
+                artifact_ids_produced=[result.adapter_id] if result.success else [],
+                success=result.success,
+                error_message=result.error,
+            )
+
+            return LoRAConvertResponse(
+                success=result.success,
+                output_path=result.output_path,
+                adapter_id=result.adapter_id,
+                model_name=result.model_name,
+                model_version=result.model_version,
+                manifest_hash=result.manifest_hash,
+                payload_hash=result.payload_hash,
+                signature_key_id=result.signature_key_id,
+                lora_rank=result.lora_config.rank,
+                lora_alpha=result.lora_config.alpha,
+                target_modules=result.lora_config.target_modules,
+                input_format=result.input_format.value,
+                input_size_bytes=result.input_size_bytes,
+                output_size_bytes=result.output_size_bytes,
+                conversion_time_ms=result.conversion_time_ms,
+                error=result.error,
+            )
+
+        finally:
+            converter.cleanup()
+
+    except ImportError as e:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail={
+                "error": {
+                    "code": "CONVERTER_NOT_AVAILABLE",
+                    "message": f"LoRA to TGSP converter not available: {e}",
+                }
+            },
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": {
+                    "code": "CONVERSION_FAILED",
+                    "message": str(e),
+                }
+            },
+        )
+
+
+@router.post(
+    "/tgsp/convert/batch",
+    response_model=BatchLoRAConvertResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["tgsp-conversion"],
+)
+async def batch_convert_lora_to_tgsp(
+    request: BatchLoRAConvertRequest,
+    tenant_id: str = Depends(get_tenant_id),
+) -> BatchLoRAConvertResponse:
+    """
+    Convert multiple LoRA adapters to TGSP format in batch.
+
+    This endpoint converts multiple LoRA adapters at once, which is
+    useful for migrating a collection of adapters to the TGSP format.
+
+    Each input adapter will be converted to a separate .tgsp file
+    in the specified output directory.
+    """
+    import os
+
+    try:
+        from tensafe.lora_to_tgsp_converter import LoRAToTGSPConverter
+
+        os.makedirs(request.output_dir, exist_ok=True)
+
+        converter = LoRAToTGSPConverter(
+            auto_generate_keys=request.auto_generate_keys,
+        )
+
+        try:
+            results = converter.batch_convert(
+                input_paths=request.input_paths,
+                output_dir=request.output_dir,
+                model_version=request.model_version,
+                validate=request.validate_weights,
+            )
+
+            # Convert to response models
+            response_results = []
+            for result in results:
+                response_results.append(LoRAConvertResponse(
+                    success=result.success,
+                    output_path=result.output_path,
+                    adapter_id=result.adapter_id,
+                    model_name=result.model_name,
+                    model_version=result.model_version,
+                    manifest_hash=result.manifest_hash,
+                    payload_hash=result.payload_hash,
+                    signature_key_id=result.signature_key_id,
+                    lora_rank=result.lora_config.rank,
+                    lora_alpha=result.lora_config.alpha,
+                    target_modules=result.lora_config.target_modules,
+                    input_format=result.input_format.value,
+                    input_size_bytes=result.input_size_bytes,
+                    output_size_bytes=result.output_size_bytes,
+                    conversion_time_ms=result.conversion_time_ms,
+                    error=result.error,
+                ))
+
+            successful = sum(1 for r in results if r.success)
+
+            # Log to audit
+            audit = get_audit_logger()
+            audit.log_operation(
+                tenant_id=tenant_id,
+                training_client_id="tgsp-converter",
+                operation="batch_convert_lora_to_tgsp",
+                request_hash=f"sha256:{hashlib.sha256(str(request.input_paths).encode()).hexdigest()}",
+                request_size_bytes=sum(r.input_size_bytes for r in results),
+                artifact_ids_produced=[r.adapter_id for r in results if r.success],
+                success=successful == len(results),
+            )
+
+            return BatchLoRAConvertResponse(
+                total=len(results),
+                successful=successful,
+                failed=len(results) - successful,
+                results=response_results,
+            )
+
+        finally:
+            converter.cleanup()
+
+    except ImportError as e:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail={
+                "error": {
+                    "code": "CONVERTER_NOT_AVAILABLE",
+                    "message": f"LoRA to TGSP converter not available: {e}",
+                }
+            },
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": {
+                    "code": "BATCH_CONVERSION_FAILED",
+                    "message": str(e),
+                }
+            },
+        )
+
+
+@router.get(
+    "/tgsp/convert/formats",
+    response_model=Dict[str, Any],
+    tags=["tgsp-conversion"],
+)
+async def get_supported_formats() -> Dict[str, Any]:
+    """
+    Get information about supported LoRA formats for conversion.
+
+    Returns details about which input formats are supported and
+    what configuration options are available.
+    """
+    return {
+        "supported_formats": [
+            {
+                "format": "safetensors",
+                "extensions": [".safetensors"],
+                "description": "Safetensors format (recommended)",
+                "requires_config": False,
+            },
+            {
+                "format": "pytorch_bin",
+                "extensions": [".bin"],
+                "description": "PyTorch binary format",
+                "requires_config": False,
+            },
+            {
+                "format": "pytorch_pt",
+                "extensions": [".pt"],
+                "description": "PyTorch checkpoint format",
+                "requires_config": False,
+            },
+            {
+                "format": "huggingface_dir",
+                "extensions": ["(directory)"],
+                "description": "Hugging Face adapter directory with adapter_config.json",
+                "requires_config": True,
+            },
+        ],
+        "output_format": {
+            "format": "tgsp",
+            "version": "1.0",
+            "extension": ".tgsp",
+            "description": "TensorGuard Secure Package - Post-quantum hybrid encrypted container",
+            "features": [
+                "Hybrid post-quantum signatures (Ed25519 + Dilithium)",
+                "Hybrid encryption (Kyber + ChaCha20Poly1305)",
+                "Manifest with integrity hashes",
+                "Audit trail support",
+                "Compatible with HE-encrypted inference",
+            ],
+        },
+        "auto_detection": {
+            "config_file": "adapter_config.json",
+            "weight_patterns": ["lora_A", "lora_B", "lora_embedding_A", "lora_embedding_B"],
+        },
+    }
