@@ -62,10 +62,27 @@ class LocalStorageBackend(StorageBackend):
         self.base_path.mkdir(parents=True, exist_ok=True)
 
     def _get_path(self, key: str) -> Path:
-        """Get full path for a storage key."""
-        # Sanitize key to prevent path traversal
-        safe_key = key.replace("..", "").replace("/", "_").replace("\\", "_")
-        return self.base_path / safe_key
+        """Get full path for a storage key with secure path traversal prevention."""
+        import re
+
+        # Validate key format: only allow alphanumeric, dash, underscore, dot
+        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$', key):
+            raise ValueError(f"Invalid storage key format: {key!r}")
+
+        # Length limit to prevent DoS
+        if len(key) > 255:
+            raise ValueError(f"Storage key too long: {len(key)} > 255")
+
+        # Create candidate path
+        candidate = (self.base_path / key).resolve()
+
+        # Verify the resolved path is within base_path (prevents traversal)
+        try:
+            candidate.relative_to(self.base_path.resolve())
+        except ValueError:
+            raise ValueError(f"Path traversal attempt detected: {key!r}")
+
+        return candidate
 
     def write(self, key: str, data: bytes) -> None:
         """Write data to local filesystem."""
