@@ -58,7 +58,6 @@ class HEBackendType(Enum):
     TOY = "toy"  # Toy/simulation (NOT SECURE)
     N2HE = "n2he"  # N2HE pure Python with optional native
     HEXL = "hexl"  # N2HE-HEXL production backend (Intel HEXL - Intel CPU only)
-    HINTSIGHT = "hintsight"  # HintSight N2HE backend (portable, uses FasterNTT)
     CKKS_MOAI = "ckks_moai"  # CKKS MOAI backend (Pyfhel, MOAI-style optimizations)
     AUTO = "auto"  # Auto-select best available
 
@@ -757,129 +756,6 @@ class HEXLBackendWrapper(HEBackendInterface):
 
 
 # ==============================================================================
-# HintSight N2HE Backend Wrapper
-# ==============================================================================
-
-
-class HintSightBackendWrapper(HEBackendInterface):
-    """
-    Wrapper for the HintSight N2HE backend.
-
-    This backend uses LWE-based encryption from the HintSight N2HE library,
-    which uses FasterNTT for polynomial operations instead of Intel HEXL.
-    This makes it portable across different CPU architectures.
-
-    Key features:
-    - LWE-based encryption for weighted sums
-    - FHEW ciphertexts for non-polynomial activations
-    - Works on Intel, AMD, ARM CPUs (not Intel-specific)
-
-    Repository: https://github.com/HintSight-Technology/N2HE
-    """
-
-    def __init__(self, params: Optional[HEParams] = None):
-        super().__init__(params)
-        self._backend = None
-
-    @property
-    def backend_type(self) -> HEBackendType:
-        return HEBackendType.HINTSIGHT
-
-    @property
-    def backend_name(self) -> str:
-        return "HintSight-N2HE"
-
-    @property
-    def is_production_ready(self) -> bool:
-        return True
-
-    def setup(self) -> None:
-        try:
-            from crypto_backend.n2he_hintsight import N2HEHintSightBackend, N2HEParams
-
-            # Convert params to HintSight format
-            hintsight_params = N2HEParams(
-                n=self.params.n,
-                q=self.params.q,
-                t=self.params.t,
-                std_dev=self.params.std_dev,
-                security_level=self.params.security_level,
-            )
-
-            self._backend = N2HEHintSightBackend(hintsight_params)
-            self._backend.setup_context()
-            self._backend.generate_keys()
-
-            self._is_setup = True
-            self._keys_generated = True
-
-            logger.info(
-                f"HintSight N2HE backend initialized: "
-                f"n={self.params.n}, security={self.params.security_level}"
-            )
-
-        except ImportError as e:
-            raise RuntimeError(
-                f"HintSight N2HE backend not available: {e}\n"
-                "Build with: ./scripts/build_n2he_hintsight.sh"
-            )
-
-    def generate_keys(self, generate_galois: bool = True) -> None:
-        # Keys are generated in setup() for HintSight
-        pass
-
-    def encrypt(self, plaintext: np.ndarray) -> Any:
-        self.validate_ready()
-        self._metrics.operations_count += 1
-        return self._backend.encrypt(plaintext)
-
-    def decrypt(self, ciphertext: Any, output_size: int = 0) -> np.ndarray:
-        self.validate_ready()
-        return self._backend.decrypt(ciphertext, output_size)
-
-    def add(self, ct1: Any, ct2: Any) -> Any:
-        self.validate_ready()
-        self._metrics.operations_count += 1
-        return self._backend.add(ct1, ct2)
-
-    def multiply_plain(self, ct: Any, plaintext: np.ndarray) -> Any:
-        self.validate_ready()
-        self._metrics.operations_count += 1
-        self._metrics.multiplications_count += 1
-        return self._backend.multiply_plain(ct, plaintext)
-
-    def matmul(self, ct: Any, weight: np.ndarray) -> Any:
-        self.validate_ready()
-        self._metrics.operations_count += 1
-        self._metrics.multiplications_count += 1
-        return self._backend.matmul(ct, weight)
-
-    def lora_delta(
-        self,
-        ct_x: Any,
-        lora_a: np.ndarray,
-        lora_b: np.ndarray,
-        scaling: float = 1.0,
-    ) -> Any:
-        self.validate_ready()
-        return self._backend.lora_delta(ct_x, lora_a, lora_b, scaling)
-
-    def get_slot_count(self) -> int:
-        # LWE doesn't have SIMD slots like CKKS
-        return self.params.n
-
-    def get_noise_budget(self, ct: Any) -> Optional[float]:
-        return self._backend.get_noise_budget(ct)
-
-    def get_metrics(self) -> HEMetrics:
-        if self._backend:
-            stats = self._backend.get_operation_stats()
-            self._metrics.operations_count = stats.get("operations", 0)
-            self._metrics.multiplications_count = stats.get("multiplications", 0)
-        return self._metrics
-
-
-# ==============================================================================
 # CKKS MOAI Backend Wrapper
 # ==============================================================================
 
@@ -1045,8 +921,6 @@ def get_backend(
         backend = N2HEBackendWrapper(params)
     elif backend_type == HEBackendType.HEXL:
         backend = HEXLBackendWrapper(params)
-    elif backend_type == HEBackendType.HINTSIGHT:
-        backend = HintSightBackendWrapper(params)
     elif backend_type == HEBackendType.CKKS_MOAI:
         backend = CKKSMOAIBackendWrapper(params)
     else:
@@ -1066,9 +940,8 @@ def _auto_select_backend(params: Optional[HEParams] = None) -> HEBackendInterfac
     Priority:
     1. CKKS MOAI (Pyfhel, best for neural network float arithmetic)
     2. HEXL (Intel CPU only, production)
-    3. HintSight N2HE (LWE-based, portable)
-    4. N2HE native
-    5. N2HE toy (if allowed)
+    3. N2HE native
+    4. N2HE toy (if allowed)
     """
     # Try CKKS MOAI first (best for neural network float arithmetic)
     try:
@@ -1078,15 +951,6 @@ def _auto_select_backend(params: Optional[HEParams] = None) -> HEBackendInterfac
         return backend
     except (ImportError, RuntimeError):
         logger.debug("CKKS MOAI backend not available")
-
-    # Try HintSight N2HE (portable, works on any CPU, but LWE-based)
-    try:
-        backend = HintSightBackendWrapper(params)
-        # Quick availability check
-        from crypto_backend.n2he_hintsight import N2HEHintSightBackend
-        return backend
-    except (ImportError, RuntimeError):
-        logger.debug("HintSight N2HE backend not available")
 
     # Try HEXL (Intel CPU only)
     try:
@@ -1107,10 +971,9 @@ def _auto_select_backend(params: Optional[HEParams] = None) -> HEBackendInterfac
     raise RuntimeError(
         "No HE backend available. Options:\n"
         "1. Install Pyfhel for CKKS MOAI: pip install Pyfhel (recommended, best for neural networks)\n"
-        "2. Install HintSight N2HE: ./scripts/build_n2he_hintsight.sh (LWE-based, portable)\n"
-        "3. Install N2HE-HEXL: ./scripts/build_n2he_hexl.sh (Intel CPU only)\n"
-        "4. Install N2HE native library\n"
-        "5. Enable toy mode: TENSAFE_TOY_HE=1 (development only)"
+        "2. Install N2HE-HEXL: ./scripts/build_n2he_hexl.sh (Intel CPU only)\n"
+        "3. Install N2HE native library\n"
+        "4. Enable toy mode: TENSAFE_TOY_HE=1 (development only)"
     )
 
 
@@ -1135,9 +998,6 @@ def is_backend_available(backend_type: Union[HEBackendType, str]) -> bool:
             return True
         elif backend_type == HEBackendType.HEXL:
             from tensafe.he_lora.backend import HEBackend
-            return True
-        elif backend_type == HEBackendType.HINTSIGHT:
-            from crypto_backend.n2he_hintsight import N2HEHintSightBackend
             return True
         elif backend_type == HEBackendType.CKKS_MOAI:
             from crypto_backend.ckks_moai import CKKSMOAIBackend
