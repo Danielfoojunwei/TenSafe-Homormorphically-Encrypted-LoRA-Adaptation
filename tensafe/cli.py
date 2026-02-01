@@ -411,6 +411,12 @@ def _handle_train(args: argparse.Namespace) -> int:
 
 def _handle_inference(args: argparse.Namespace) -> int:
     """Handle inference command."""
+    from tensafe.core.inference import (
+        TenSafeInference,
+        InferenceMode,
+        GenerationConfig,
+    )
+
     logger.info(f"Loading model: {args.model}")
 
     # Read prompts
@@ -426,14 +432,65 @@ def _handle_inference(args: argparse.Namespace) -> int:
 
     logger.info(f"Running inference on {len(prompts)} prompts...")
 
-    # Placeholder - actual implementation would use TenSafeInference
+    # Determine inference mode
+    mode = InferenceMode(args.lora_mode)
+
+    # Create generation config
+    gen_config = GenerationConfig(
+        max_new_tokens=args.max_tokens,
+        temperature=args.temperature,
+        do_sample=args.temperature > 0,
+    )
+
+    # Load inference engine
+    try:
+        model_path = Path(args.model)
+        if model_path.exists() and model_path.is_dir():
+            # Load from checkpoint
+            inference = TenSafeInference.from_checkpoint(
+                checkpoint_path=model_path,
+                mode=mode,
+            )
+        else:
+            # Load from model name (HuggingFace)
+            try:
+                import torch
+                from transformers import AutoModelForCausalLM, AutoTokenizer
+
+                logger.info(f"Loading model from HuggingFace: {args.model}")
+                tokenizer = AutoTokenizer.from_pretrained(args.model)
+                model = AutoModelForCausalLM.from_pretrained(
+                    args.model,
+                    torch_dtype=torch.bfloat16,
+                    device_map="auto",
+                )
+
+                inference = TenSafeInference(
+                    model=model,
+                    tokenizer=tokenizer,
+                    mode=mode,
+                )
+            except ImportError as e:
+                logger.error(f"PyTorch/Transformers required for model loading: {e}")
+                return 1
+    except Exception as e:
+        logger.error(f"Failed to load model: {e}")
+        return 1
+
+    # Run inference
     outputs = []
     for prompt in prompts:
-        # Mock generation
-        output = f"[Generated response for: {prompt[:50]}...]"
-        outputs.append(output)
-        print(f"\nPrompt: {prompt}")
-        print(f"Output: {output}")
+        try:
+            result = inference.generate(prompt, generation_config=gen_config)
+            output = result.text
+            outputs.append(output)
+            print(f"\nPrompt: {prompt}")
+            print(f"Output: {output}")
+            if result.tokens_per_second > 0:
+                logger.info(f"Generated {len(result.tokens)} tokens at {result.tokens_per_second:.1f} tok/s")
+        except RuntimeError as e:
+            logger.error(f"Generation failed for prompt: {e}")
+            outputs.append(f"[Error: {e}]")
 
     # Write outputs if requested
     if args.output_file:
