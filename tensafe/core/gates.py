@@ -499,6 +499,34 @@ class ProductionGates:
         requires_audit=True,
     )
 
+    # TGSP Format Enforcement Gates
+    TGSP_ENFORCEMENT = FeatureGate(
+        name="tgsp_enforcement",
+        description="Enforce TGSP format for encrypted inference (lock-in)",
+        default_allowed=True,  # Enabled by default for security
+        env_var="TENSAFE_TGSP_ENFORCEMENT",
+        production_allowed=True,
+        requires_audit=True,
+    )
+
+    TGSP_BYPASS = FeatureGate(
+        name="tgsp_bypass",
+        description="Bypass TGSP format requirement for encrypted inference (DANGEROUS)",
+        default_allowed=False,  # Must be explicitly enabled
+        env_var="TENSAFE_TGSP_BYPASS",
+        production_allowed=False,  # NEVER allow in production
+        requires_audit=True,
+    )
+
+    TGSP_SIGNATURE_SKIP = FeatureGate(
+        name="tgsp_signature_skip",
+        description="Skip TGSP signature verification (DANGEROUS)",
+        default_allowed=False,
+        env_var="TENSAFE_TGSP_SKIP_SIG",
+        production_allowed=False,  # NEVER allow in production
+        requires_audit=True,
+    )
+
     # All gates for iteration
     _ALL_GATES: List[FeatureGate] = []
 
@@ -731,6 +759,8 @@ class ProductionValidator:
             ("TENSAFE_INSECURE_SSL", "Insecure SSL cannot be enabled in production"),
             ("TENSAFE_ALLOW_HTTP", "HTTP cannot be allowed in production"),
             ("TENSAFE_WEAK_CRYPTO", "Weak crypto cannot be enabled in production"),
+            ("TENSAFE_TGSP_BYPASS", "TGSP format bypass cannot be enabled in production"),
+            ("TENSAFE_TGSP_SKIP_SIG", "TGSP signature skip cannot be enabled in production"),
         ]
 
         # Warning-level environment variables in production
@@ -884,6 +914,9 @@ def security_audit() -> Dict[str, Any]:
         ProductionGates.RATE_LIMIT_BYPASS,
         ProductionGates.AUDIT_BYPASS,
         ProductionGates.DEMO_MODE,
+        ProductionGates.TGSP_ENFORCEMENT,
+        ProductionGates.TGSP_BYPASS,
+        ProductionGates.TGSP_SIGNATURE_SKIP,
     ]
 
     gate_status = {}

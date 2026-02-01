@@ -904,3 +904,432 @@ async def get_artifact_content(
 async def health_check() -> Dict[str, str]:
     """Health check endpoint."""
     return {"status": "healthy", "service": "tg-tinker"}
+
+
+# ==============================================================================
+# TGSP Adapter Management Endpoints (Encrypted Inference Lock-In)
+# ==============================================================================
+
+# TGSP adapter registry storage (per-tenant)
+_tgsp_registries: Dict[str, Any] = {}
+
+
+class TGSPAdapterLoadRequest(BaseModel):
+    """Request to load a TGSP adapter."""
+    tgsp_path: str = Field(..., description="Path to .tgsp file")
+    adapter_id: Optional[str] = Field(None, description="Custom adapter ID")
+    recipient_key_path: Optional[str] = Field(None, description="Path to recipient private key")
+
+
+class TGSPAdapterResponse(BaseModel):
+    """Response containing TGSP adapter details."""
+    adapter_id: str
+    tgsp_path: str
+    model_name: str
+    model_version: str
+    signature_verified: bool
+    lora_rank: int
+    lora_alpha: float
+    target_modules: List[str]
+    is_active: bool
+    forward_count: int
+    loaded_at: datetime
+
+
+class TGSPAdapterActivateRequest(BaseModel):
+    """Request to activate a TGSP adapter."""
+    adapter_id: str
+
+
+class TGSPInferenceRequest(BaseModel):
+    """Request for encrypted inference with TGSP adapter."""
+    inputs: List[List[float]]  # Batch of input activations
+    module_name: Optional[str] = Field(None, description="Target module for LoRA")
+
+
+class TGSPInferenceResponse(BaseModel):
+    """Response from encrypted inference."""
+    outputs: List[List[float]]
+    adapter_id: str
+    inference_time_ms: float
+    he_metrics: Optional[Dict[str, Any]] = None
+    tgsp_compliant: bool = True
+
+
+def _get_tenant_registry(tenant_id: str) -> Any:
+    """Get or create TGSP registry for tenant."""
+    if tenant_id not in _tgsp_registries:
+        try:
+            from tensafe.tgsp_adapter_registry import TGSPAdapterRegistry
+            _tgsp_registries[tenant_id] = TGSPAdapterRegistry(
+                enforce_tgsp=True,
+                auto_verify_signatures=True,
+            )
+        except ImportError:
+            # Fallback for testing
+            _tgsp_registries[tenant_id] = None
+    return _tgsp_registries[tenant_id]
+
+
+@router.post(
+    "/tgsp/adapters",
+    response_model=TGSPAdapterResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["tgsp-adapters"],
+)
+async def load_tgsp_adapter(
+    request: TGSPAdapterLoadRequest,
+    tenant_id: str = Depends(get_tenant_id),
+) -> TGSPAdapterResponse:
+    """
+    Load a LoRA adapter from a TGSP package.
+
+    This endpoint ONLY accepts TGSP-format adapters (.tgsp files).
+    The TGSP format ensures:
+    - Cryptographic signature verification
+    - Audit trail for compliance
+    - Secure key management
+
+    This is part of the encrypted inference lock-in - TGSP format is REQUIRED
+    for all adapters used with HE-encrypted inference.
+    """
+    registry = _get_tenant_registry(tenant_id)
+    if registry is None:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail={"error": {"code": "TGSP_NOT_AVAILABLE", "message": "TGSP registry not available"}},
+        )
+
+    # Validate file extension
+    if not request.tgsp_path.lower().endswith('.tgsp'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": {
+                    "code": "TGSP_FORMAT_REQUIRED",
+                    "message": "Only TGSP-format adapters (.tgsp) are allowed for encrypted inference",
+                    "details": {
+                        "provided_path": request.tgsp_path,
+                        "required_extension": ".tgsp",
+                        "help": "Use 'tgsp build' to create a TGSP package from your adapter",
+                    },
+                }
+            },
+        )
+
+    try:
+        adapter_id = registry.load_tgsp_adapter(
+            tgsp_path=request.tgsp_path,
+            recipient_key_path=request.recipient_key_path,
+            adapter_id=request.adapter_id,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": {
+                    "code": "TGSP_LOAD_FAILED",
+                    "message": str(e),
+                }
+            },
+        )
+
+    # Get adapter info
+    info = registry.get_adapter_info(adapter_id)
+
+    # Log to audit
+    audit = get_audit_logger()
+    audit.log_operation(
+        tenant_id=tenant_id,
+        training_client_id="tgsp-registry",
+        operation="load_tgsp_adapter",
+        request_hash=f"sha256:{hashlib.sha256(request.tgsp_path.encode()).hexdigest()}",
+        request_size_bytes=len(request.tgsp_path),
+        artifact_ids_produced=[adapter_id],
+        success=True,
+    )
+
+    return TGSPAdapterResponse(
+        adapter_id=info["adapter_id"],
+        tgsp_path=info["tgsp_path"],
+        model_name=info["model_name"],
+        model_version=info["model_version"],
+        signature_verified=info["signature_verified"],
+        lora_rank=info["lora_rank"],
+        lora_alpha=info["lora_alpha"],
+        target_modules=info["target_modules"],
+        is_active=info["is_active"],
+        forward_count=info["forward_count"],
+        loaded_at=datetime.fromisoformat(info["loaded_at"]),
+    )
+
+
+@router.get(
+    "/tgsp/adapters",
+    response_model=List[TGSPAdapterResponse],
+    tags=["tgsp-adapters"],
+)
+async def list_tgsp_adapters(
+    tenant_id: str = Depends(get_tenant_id),
+) -> List[TGSPAdapterResponse]:
+    """
+    List all loaded TGSP adapters for the tenant.
+
+    Returns information about each adapter including:
+    - Adapter ID and source path
+    - Model information
+    - Signature verification status
+    - LoRA configuration
+    - Usage statistics
+    """
+    registry = _get_tenant_registry(tenant_id)
+    if registry is None:
+        return []
+
+    adapters = registry.list_adapters()
+
+    return [
+        TGSPAdapterResponse(
+            adapter_id=a["adapter_id"],
+            tgsp_path=a["tgsp_path"],
+            model_name=a["model_name"],
+            model_version=a["model_version"],
+            signature_verified=a["signature_verified"],
+            lora_rank=a["lora_rank"],
+            lora_alpha=a["lora_alpha"],
+            target_modules=a["target_modules"],
+            is_active=a["is_active"],
+            forward_count=a["forward_count"],
+            loaded_at=datetime.fromisoformat(a["loaded_at"]),
+        )
+        for a in adapters
+    ]
+
+
+@router.post(
+    "/tgsp/adapters/activate",
+    response_model=TGSPAdapterResponse,
+    tags=["tgsp-adapters"],
+)
+async def activate_tgsp_adapter(
+    request: TGSPAdapterActivateRequest,
+    tenant_id: str = Depends(get_tenant_id),
+) -> TGSPAdapterResponse:
+    """
+    Activate a TGSP adapter for encrypted inference.
+
+    This enables hot-swapping of adapters without restarting the inference
+    engine. The activated adapter will be used for all subsequent encrypted
+    inference requests.
+
+    Only one adapter can be active at a time per tenant.
+    """
+    registry = _get_tenant_registry(tenant_id)
+    if registry is None:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail={"error": {"code": "TGSP_NOT_AVAILABLE", "message": "TGSP registry not available"}},
+        )
+
+    try:
+        registry.activate_adapter(request.adapter_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": {
+                    "code": "ADAPTER_NOT_FOUND",
+                    "message": str(e),
+                }
+            },
+        )
+
+    info = registry.get_adapter_info(request.adapter_id)
+
+    # Log to audit
+    audit = get_audit_logger()
+    audit.log_operation(
+        tenant_id=tenant_id,
+        training_client_id="tgsp-registry",
+        operation="activate_tgsp_adapter",
+        request_hash=f"sha256:{hashlib.sha256(request.adapter_id.encode()).hexdigest()}",
+        request_size_bytes=len(request.adapter_id),
+        success=True,
+    )
+
+    return TGSPAdapterResponse(
+        adapter_id=info["adapter_id"],
+        tgsp_path=info["tgsp_path"],
+        model_name=info["model_name"],
+        model_version=info["model_version"],
+        signature_verified=info["signature_verified"],
+        lora_rank=info["lora_rank"],
+        lora_alpha=info["lora_alpha"],
+        target_modules=info["target_modules"],
+        is_active=info["is_active"],
+        forward_count=info["forward_count"],
+        loaded_at=datetime.fromisoformat(info["loaded_at"]),
+    )
+
+
+@router.delete(
+    "/tgsp/adapters/{adapter_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["tgsp-adapters"],
+)
+async def unload_tgsp_adapter(
+    adapter_id: str,
+    tenant_id: str = Depends(get_tenant_id),
+):
+    """
+    Unload a TGSP adapter from the registry.
+
+    This removes the adapter from memory and cleans up any temporary files.
+    If the adapter is currently active, it will be deactivated first.
+    """
+    registry = _get_tenant_registry(tenant_id)
+    if registry is None:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail={"error": {"code": "TGSP_NOT_AVAILABLE", "message": "TGSP registry not available"}},
+        )
+
+    success = registry.unload_adapter(adapter_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": {
+                    "code": "ADAPTER_NOT_FOUND",
+                    "message": f"Adapter '{adapter_id}' not found",
+                }
+            },
+        )
+
+    # Log to audit
+    audit = get_audit_logger()
+    audit.log_operation(
+        tenant_id=tenant_id,
+        training_client_id="tgsp-registry",
+        operation="unload_tgsp_adapter",
+        request_hash=f"sha256:{hashlib.sha256(adapter_id.encode()).hexdigest()}",
+        request_size_bytes=len(adapter_id),
+        artifact_ids_consumed=[adapter_id],
+        success=True,
+    )
+
+
+@router.post(
+    "/tgsp/inference",
+    response_model=TGSPInferenceResponse,
+    tags=["tgsp-adapters"],
+)
+async def tgsp_encrypted_inference(
+    request: TGSPInferenceRequest,
+    tenant_id: str = Depends(get_tenant_id),
+) -> TGSPInferenceResponse:
+    """
+    Run encrypted inference using the active TGSP adapter.
+
+    This endpoint REQUIRES a TGSP-format adapter to be loaded and activated.
+    It enforces the TGSP format lock-in for all encrypted inference operations.
+
+    The inference computes LoRA deltas under homomorphic encryption (CKKS),
+    providing privacy for user activations while maintaining fast base model
+    inference in plaintext.
+
+    Returns:
+        Decrypted LoRA deltas for each input in the batch
+    """
+    import time
+    import numpy as np
+
+    registry = _get_tenant_registry(tenant_id)
+    if registry is None:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail={"error": {"code": "TGSP_NOT_AVAILABLE", "message": "TGSP registry not available"}},
+        )
+
+    # Check for active adapter
+    active = registry.get_active_adapter()
+    if active is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": {
+                    "code": "NO_ACTIVE_ADAPTER",
+                    "message": "No TGSP adapter is activated. Use POST /tgsp/adapters/activate first.",
+                    "details": {
+                        "help": "Encrypted inference requires a TGSP-format adapter to be loaded and activated",
+                    },
+                }
+            },
+        )
+
+    start_time = time.perf_counter()
+
+    try:
+        # Convert inputs to numpy
+        inputs = np.array(request.inputs, dtype=np.float64)
+
+        # Run encrypted forward pass
+        outputs = []
+        for i in range(len(inputs)):
+            delta = registry.forward_he(inputs[i], request.module_name)
+            outputs.append(delta.tolist())
+
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+        # Log to audit
+        audit = get_audit_logger()
+        audit.log_operation(
+            tenant_id=tenant_id,
+            training_client_id="tgsp-registry",
+            operation="tgsp_encrypted_inference",
+            request_hash=f"sha256:{hashlib.sha256(str(len(request.inputs)).encode()).hexdigest()}",
+            request_size_bytes=len(request.inputs) * 8 * (len(request.inputs[0]) if request.inputs else 0),
+            success=True,
+        )
+
+        return TGSPInferenceResponse(
+            outputs=outputs,
+            adapter_id=active.metadata.adapter_id,
+            inference_time_ms=elapsed_ms,
+            tgsp_compliant=True,
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": {
+                    "code": "INFERENCE_FAILED",
+                    "message": str(e),
+                }
+            },
+        )
+
+
+@router.get(
+    "/tgsp/audit",
+    response_model=List[Dict[str, Any]],
+    tags=["tgsp-adapters"],
+)
+async def get_tgsp_audit_log(
+    tenant_id: str = Depends(get_tenant_id),
+) -> List[Dict[str, Any]]:
+    """
+    Get the TGSP adapter audit log for compliance.
+
+    Returns all adapter-related operations including:
+    - Adapter loading and unloading
+    - Activation changes
+    - Inference requests
+    - Signature verification results
+    """
+    registry = _get_tenant_registry(tenant_id)
+    if registry is None:
+        return []
+
+    return registry.get_audit_log()
