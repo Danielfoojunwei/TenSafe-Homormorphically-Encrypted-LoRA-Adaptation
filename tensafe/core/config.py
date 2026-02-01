@@ -269,7 +269,7 @@ class HEConfig:
 
 @dataclass
 class InferenceConfig:
-    """Inference configuration."""
+    """Inference configuration with TGSP enforcement support."""
 
     # Generation parameters
     max_new_tokens: int = 128
@@ -289,11 +289,20 @@ class InferenceConfig:
     # LoRA mode for inference
     lora_mode: str = "plaintext"  # "none", "plaintext", "he_only", "full_he"
 
+    # TGSP enforcement (required for HE modes)
+    enforce_tgsp: bool = True
+
     # Batching
     batch_size: int = 1
 
     # Caching
     use_cache: bool = True
+
+    def requires_tgsp(self) -> bool:
+        """Check if current configuration requires TGSP format adapters."""
+        if not self.enforce_tgsp:
+            return False
+        return self.lora_mode in ("he_only", "full_he")
 
 
 @dataclass

@@ -1,14 +1,20 @@
 """
-TenSafe Unified Inference Module.
+TenSafe Unified Inference Module with TGSP Enforcement.
 
 Provides unified inference with support for:
 - Standard model inference
 - LoRA inference (plaintext)
-- HE-LoRA inference (encrypted LoRA delta)
+- HE-LoRA inference (encrypted LoRA delta via MOAI-optimized CKKS)
 - Batch processing
+- TGSP format enforcement for secure adapter loading
 
-This module integrates with the training pipeline for seamless
-train-to-inference workflows.
+IMPORTANT: TGSP Format Enforcement
+----------------------------------
+For HE-encrypted inference (HE_ONLY, FULL_HE modes), ONLY TGSP-format
+adapters are allowed. This is a security lock-in that ensures:
+1. All adapters are cryptographically signed and verified
+2. Audit trail is maintained for compliance
+3. Adapters come from trusted sources
 
 Usage:
     from tensafe.core.inference import (
@@ -17,15 +23,19 @@ Usage:
         InferenceResult,
     )
 
-    # Create inference engine
+    # Standard inference from checkpoint
     inference = TenSafeInference.from_checkpoint("./checkpoint")
-
-    # Run inference
     result = inference.generate("Hello, how are you?")
-    print(result.text)
 
-    # Batch inference
-    results = inference.generate_batch(["prompt1", "prompt2"])
+    # HE inference with TGSP adapter (required for security)
+    from tensafe.tgsp_adapter_registry import TGSPAdapterRegistry
+
+    registry = TGSPAdapterRegistry()
+    adapter_id = registry.load_tgsp_adapter("adapter.tgsp", key_path)
+    registry.activate_adapter(adapter_id)
+
+    inference = TenSafeInference.from_tgsp_registry(registry, model)
+    result = inference(input_ids)
 """
 
 from __future__ import annotations
@@ -45,12 +55,24 @@ from tensafe.core.he_interface import HEBackendInterface, get_backend, HEParams,
 logger = logging.getLogger(__name__)
 
 
+class TGSPEnforcementError(Exception):
+    """Raised when TGSP enforcement is violated."""
+
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(
+            f"TGSP Enforcement Violation: {message}. "
+            f"Encrypted inference (HE_ONLY/FULL_HE modes) requires TGSP-format adapters. "
+            f"Use TGSPAdapterRegistry.load_tgsp_adapter() to load adapters."
+        )
+
+
 class InferenceMode(Enum):
     """Inference modes."""
-    NONE = "none"  # No LoRA
-    PLAINTEXT = "plaintext"  # Standard LoRA
-    HE_ONLY = "he_only"  # LoRA under HE, base model plaintext
-    FULL_HE = "full_he"  # Everything encrypted (not recommended)
+    NONE = "none"  # No LoRA, just base model
+    PLAINTEXT = "plaintext"  # Standard LoRA (no encryption)
+    HE_ONLY = "he_only"  # LoRA under HE, base model plaintext (REQUIRES TGSP)
+    FULL_HE = "full_he"  # Everything encrypted (REQUIRES TGSP, not recommended)
 
 
 @dataclass
@@ -98,13 +120,19 @@ class BatchInferenceResult:
 
 class TenSafeInference:
     """
-    Unified TenSafe inference engine.
+    Unified TenSafe inference engine with TGSP enforcement.
 
     Supports:
-    - Multiple LoRA modes (plaintext, HE)
+    - Multiple LoRA modes (plaintext, HE via MOAI-optimized CKKS)
     - Batch processing
     - Streaming generation (future)
     - Multiple backends
+    - TGSP format enforcement for HE modes (security lock-in)
+
+    TGSP Enforcement:
+        When mode is HE_ONLY or FULL_HE, adapters MUST be loaded via
+        TGSPAdapterRegistry. This ensures cryptographic verification
+        and audit compliance for encrypted inference.
     """
 
     def __init__(
@@ -114,6 +142,8 @@ class TenSafeInference:
         lora_weights: Optional[Dict[str, Tuple[np.ndarray, np.ndarray]]] = None,
         config: Optional[Union[TenSafeConfig, InferenceConfig]] = None,
         mode: InferenceMode = InferenceMode.PLAINTEXT,
+        tgsp_registry: Optional[Any] = None,
+        enforce_tgsp: bool = True,
     ):
         """
         Initialize inference engine.
@@ -124,11 +154,21 @@ class TenSafeInference:
             lora_weights: Dict of module_name -> (lora_a, lora_b)
             config: Configuration (TenSafeConfig or InferenceConfig)
             mode: Inference mode
+            tgsp_registry: Optional TGSPAdapterRegistry for TGSP-format adapters
+            enforce_tgsp: Enforce TGSP format for HE modes (default: True)
+
+        Raises:
+            TGSPEnforcementError: If HE mode used without TGSP adapter
         """
         self._model = model
         self._tokenizer = tokenizer
         self._lora_weights = lora_weights or {}
         self._mode = mode
+        self._tgsp_registry = tgsp_registry
+        self._enforce_tgsp = enforce_tgsp
+
+        # Track if weights came from TGSP format
+        self._weights_from_tgsp = tgsp_registry is not None
 
         # Parse config
         if isinstance(config, TenSafeConfig):
@@ -152,7 +192,22 @@ class TenSafeInference:
         self._inference_count = 0
         self._total_time_ms = 0.0
 
-        logger.info(f"TenSafeInference initialized: mode={mode.value}")
+        # TGSP enforcement check for HE modes
+        if self._requires_tgsp():
+            if not self._weights_from_tgsp and self._lora_weights:
+                raise TGSPEnforcementError(
+                    f"Attempted to use HE mode ({mode.value}) with non-TGSP adapter weights. "
+                    f"Use TGSPAdapterRegistry to load adapters."
+                )
+
+        logger.info(
+            f"TenSafeInference initialized: mode={mode.value}, "
+            f"enforce_tgsp={enforce_tgsp}, weights_from_tgsp={self._weights_from_tgsp}"
+        )
+
+    def _requires_tgsp(self) -> bool:
+        """Check if current mode requires TGSP format."""
+        return self._enforce_tgsp and self._mode in (InferenceMode.HE_ONLY, InferenceMode.FULL_HE)
 
     @classmethod
     def from_checkpoint(
@@ -304,6 +359,61 @@ class TenSafeInference:
 
         return cls(config=config, mode=mode)
 
+    @classmethod
+    def from_tgsp_registry(
+        cls,
+        registry: Any,
+        model: Optional[Any] = None,
+        tokenizer: Optional[Any] = None,
+        config: Optional[Union[TenSafeConfig, InferenceConfig]] = None,
+        mode: InferenceMode = InferenceMode.HE_ONLY,
+    ) -> "TenSafeInference":
+        """
+        Create TenSafeInference from a TGSP adapter registry.
+
+        This is the RECOMMENDED method for creating inference with
+        encrypted LoRA modes, as it ensures TGSP format compliance.
+
+        Args:
+            registry: TGSPAdapterRegistry with loaded adapter
+            model: Optional base model
+            tokenizer: Optional tokenizer
+            config: Optional inference configuration
+            mode: Inference mode (default: HE_ONLY)
+
+        Returns:
+            TenSafeInference configured with TGSP adapter
+
+        Raises:
+            TGSPEnforcementError: If no adapter is activated in registry
+        """
+        active_adapter = registry.get_active_adapter()
+        if active_adapter is None:
+            raise TGSPEnforcementError(
+                "No active adapter in registry. Call registry.activate_adapter() first."
+            )
+
+        # Extract LoRA config from adapter metadata if available
+        lora_config = None
+        if hasattr(active_adapter, 'metadata'):
+            meta = active_adapter.metadata
+            if hasattr(meta, 'lora_rank'):
+                lora_config = LoRAConfig(
+                    rank=meta.lora_rank,
+                    alpha=getattr(meta, 'lora_alpha', meta.lora_rank * 2),
+                    target_modules=getattr(meta, 'target_modules', ['q_proj', 'v_proj', 'k_proj', 'o_proj']),
+                )
+
+        return cls(
+            model=model,
+            tokenizer=tokenizer,
+            lora_weights=active_adapter.weights,
+            config=config,
+            mode=mode,
+            tgsp_registry=registry,
+            enforce_tgsp=True,
+        )
+
     def _ensure_he_backend(self) -> None:
         """Ensure HE backend is initialized."""
         if self._he_backend is not None:
@@ -328,6 +438,7 @@ class TenSafeInference:
         module_name: str,
         lora_a: np.ndarray,
         lora_b: np.ndarray,
+        from_tgsp: bool = False,
     ) -> None:
         """
         Register LoRA weights for a module.
@@ -336,8 +447,23 @@ class TenSafeInference:
             module_name: Name of target module
             lora_a: LoRA A matrix [rank, in_features]
             lora_b: LoRA B matrix [out_features, rank]
+            from_tgsp: Whether weights came from TGSP format
+
+        Raises:
+            TGSPEnforcementError: If HE mode requires TGSP but weights are not from TGSP
         """
+        # Check TGSP enforcement
+        if self._requires_tgsp() and not from_tgsp:
+            raise TGSPEnforcementError(
+                f"Cannot register non-TGSP weights in HE mode ({self._mode.value}). "
+                f"Use TGSPAdapterRegistry to load adapters."
+            )
+
         self._lora_weights[module_name] = (lora_a, lora_b)
+
+        # Track TGSP status
+        if from_tgsp:
+            self._weights_from_tgsp = True
 
         # Clear cached packed weights
         self._packed_weights = {}
