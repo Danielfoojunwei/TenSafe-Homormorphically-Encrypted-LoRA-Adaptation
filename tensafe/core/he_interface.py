@@ -57,7 +57,8 @@ class HEBackendType(Enum):
     """Available HE backend types."""
     TOY = "toy"  # Toy/simulation (NOT SECURE)
     N2HE = "n2he"  # N2HE pure Python with optional native
-    HEXL = "hexl"  # N2HE-HEXL production backend
+    HEXL = "hexl"  # N2HE-HEXL production backend (Intel HEXL - Intel CPU only)
+    CKKS_MOAI = "ckks_moai"  # CKKS MOAI backend (Pyfhel, MOAI-style optimizations)
     AUTO = "auto"  # Auto-select best available
 
 
@@ -755,6 +756,135 @@ class HEXLBackendWrapper(HEBackendInterface):
 
 
 # ==============================================================================
+# CKKS MOAI Backend Wrapper
+# ==============================================================================
+
+
+class CKKSMOAIBackendWrapper(HEBackendInterface):
+    """
+    Wrapper for the CKKS MOAI backend.
+
+    This backend implements the MOAI (Modular Optimizing Architecture for Inference)
+    approach from Digital Trust Center NTU for homomorphic encryption in neural networks.
+
+    Key features:
+    - CKKS encryption scheme for approximate arithmetic on floats
+    - Column packing for rotation-free plaintext-ciphertext matrix multiplication
+    - Consistent packing strategies across layers (no format conversions)
+    - Optimized for LoRA/adapter computations
+
+    Uses Pyfhel (Python wrapper for Microsoft SEAL) for CKKS operations.
+
+    Based on: "MOAI: Module-Optimizing Architecture for Non-Interactive Secure
+    Transformer Inference" (eprint.iacr.org/2025/991)
+    """
+
+    def __init__(self, params: Optional[HEParams] = None):
+        super().__init__(params)
+        self._backend = None
+
+    @property
+    def backend_type(self) -> HEBackendType:
+        return HEBackendType.CKKS_MOAI
+
+    @property
+    def backend_name(self) -> str:
+        return "CKKS-MOAI"
+
+    @property
+    def is_production_ready(self) -> bool:
+        return True
+
+    def setup(self) -> None:
+        try:
+            from crypto_backend.ckks_moai import CKKSMOAIBackend, CKKSParams
+
+            # Convert params to CKKS format
+            ckks_params = CKKSParams(
+                poly_modulus_degree=self.params.poly_modulus_degree,
+                coeff_modulus_bits=self.params.coeff_modulus_bits,
+                scale_bits=self.params.scale_bits,
+                security_level=self.params.security_level,
+                use_column_packing=self.params.use_column_packing,
+                use_interleaved_batching=self.params.use_interleaved_batching,
+            )
+
+            self._backend = CKKSMOAIBackend(ckks_params)
+            self._backend.setup_context()
+            self._backend.generate_keys()
+
+            self._is_setup = True
+            self._keys_generated = True
+
+            logger.info(
+                f"CKKS MOAI backend initialized: "
+                f"N={self.params.poly_modulus_degree}, "
+                f"scale=2^{self.params.scale_bits}"
+            )
+
+        except ImportError as e:
+            raise RuntimeError(
+                f"CKKS MOAI backend not available: {e}\n"
+                "Install with: pip install Pyfhel"
+            )
+
+    def generate_keys(self, generate_galois: bool = True) -> None:
+        # Keys are generated in setup() for CKKS MOAI
+        pass
+
+    def encrypt(self, plaintext: np.ndarray) -> Any:
+        self.validate_ready()
+        self._metrics.operations_count += 1
+        return self._backend.encrypt(plaintext)
+
+    def decrypt(self, ciphertext: Any, output_size: int = 0) -> np.ndarray:
+        self.validate_ready()
+        return self._backend.decrypt(ciphertext, output_size)
+
+    def add(self, ct1: Any, ct2: Any) -> Any:
+        self.validate_ready()
+        self._metrics.operations_count += 1
+        return self._backend.add(ct1, ct2)
+
+    def multiply_plain(self, ct: Any, plaintext: np.ndarray) -> Any:
+        self.validate_ready()
+        self._metrics.operations_count += 1
+        self._metrics.multiplications_count += 1
+        return self._backend.multiply_plain(ct, plaintext)
+
+    def matmul(self, ct: Any, weight: np.ndarray) -> Any:
+        self.validate_ready()
+        self._metrics.operations_count += 1
+        self._metrics.multiplications_count += 1
+        return self._backend.matmul(ct, weight)
+
+    def lora_delta(
+        self,
+        ct_x: Any,
+        lora_a: np.ndarray,
+        lora_b: np.ndarray,
+        scaling: float = 1.0,
+    ) -> Any:
+        self.validate_ready()
+        return self._backend.lora_delta(ct_x, lora_a, lora_b, scaling)
+
+    def get_slot_count(self) -> int:
+        return self._backend.get_slot_count()
+
+    def get_noise_budget(self, ct: Any) -> Optional[float]:
+        return self._backend.get_noise_budget(ct)
+
+    def get_metrics(self) -> HEMetrics:
+        if self._backend:
+            stats = self._backend.get_operation_stats()
+            self._metrics.operations_count = stats.get("operations", 0)
+            self._metrics.multiplications_count = stats.get("multiplications", 0)
+            self._metrics.rotations_count = stats.get("rotations", 0)
+            self._metrics.rescale_count = stats.get("rescales", 0)
+        return self._metrics
+
+
+# ==============================================================================
 # Backend Factory
 # ==============================================================================
 
@@ -791,6 +921,8 @@ def get_backend(
         backend = N2HEBackendWrapper(params)
     elif backend_type == HEBackendType.HEXL:
         backend = HEXLBackendWrapper(params)
+    elif backend_type == HEBackendType.CKKS_MOAI:
+        backend = CKKSMOAIBackendWrapper(params)
     else:
         raise ValueError(f"Unknown backend type: {backend_type}")
 
@@ -806,11 +938,21 @@ def _auto_select_backend(params: Optional[HEParams] = None) -> HEBackendInterfac
     Automatically select the best available backend.
 
     Priority:
-    1. HEXL (production)
-    2. N2HE native
-    3. N2HE toy (if allowed)
+    1. CKKS MOAI (Pyfhel, best for neural network float arithmetic)
+    2. HEXL (Intel CPU only, production)
+    3. N2HE native
+    4. N2HE toy (if allowed)
     """
-    # Try HEXL first
+    # Try CKKS MOAI first (best for neural network float arithmetic)
+    try:
+        backend = CKKSMOAIBackendWrapper(params)
+        # Quick availability check
+        from crypto_backend.ckks_moai import CKKSMOAIBackend
+        return backend
+    except (ImportError, RuntimeError):
+        logger.debug("CKKS MOAI backend not available")
+
+    # Try HEXL (Intel CPU only)
     try:
         return HEXLBackendWrapper(params)
     except (ImportError, RuntimeError):
@@ -828,9 +970,10 @@ def _auto_select_backend(params: Optional[HEParams] = None) -> HEBackendInterfac
 
     raise RuntimeError(
         "No HE backend available. Options:\n"
-        "1. Install N2HE-HEXL: ./scripts/build_n2he_hexl.sh\n"
-        "2. Install N2HE native library\n"
-        "3. Enable toy mode: TENSAFE_TOY_HE=1 (development only)"
+        "1. Install Pyfhel for CKKS MOAI: pip install Pyfhel (recommended, best for neural networks)\n"
+        "2. Install N2HE-HEXL: ./scripts/build_n2he_hexl.sh (Intel CPU only)\n"
+        "3. Install N2HE native library\n"
+        "4. Enable toy mode: TENSAFE_TOY_HE=1 (development only)"
     )
 
 
@@ -855,6 +998,9 @@ def is_backend_available(backend_type: Union[HEBackendType, str]) -> bool:
             return True
         elif backend_type == HEBackendType.HEXL:
             from tensafe.he_lora.backend import HEBackend
+            return True
+        elif backend_type == HEBackendType.CKKS_MOAI:
+            from crypto_backend.ckks_moai import CKKSMOAIBackend
             return True
         elif backend_type == HEBackendType.AUTO:
             return True

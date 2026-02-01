@@ -7,9 +7,15 @@ production-grade homomorphic encryption operations.
 The N2HE library provides:
 - LWE-based additive homomorphic encryption for weighted operations
 - FHEW ciphertexts for non-polynomial activation functions
-- FasterNTT-accelerated polynomial operations
+- FasterNTT-accelerated polynomial operations (portable, not Intel-specific)
+
+IMPORTANT: This implementation uses the HintSight Technology N2HE library
+which is portable across different CPU architectures (Intel, AMD, ARM).
+Repository: https://github.com/HintSight-Technology/N2HE
 
 Installation:
+    1. Run: ./scripts/build_n2he_hintsight.sh
+    OR manually:
     1. Clone N2HE: git clone https://github.com/HintSight-Technology/N2HE.git
     2. Build library: cd N2HE && mkdir build && cd build && cmake .. && make
     3. Install to system or set N2HE_LIB_PATH environment variable
@@ -55,11 +61,17 @@ from .core import (
 logger = logging.getLogger(__name__)
 
 
-# Library search paths
+# Library search paths (HintSight N2HE)
 N2HE_LIB_PATHS = [
     os.environ.get("N2HE_LIB_PATH", ""),
+    # HintSight N2HE build paths (project-local)
+    str(Path(__file__).parent.parent.parent.parent.parent / "third_party" / "N2HE-HintSight" / "build" / "libn2he.so"),
+    str(Path(__file__).parent.parent.parent.parent.parent / "crypto_backend" / "n2he_hintsight" / "lib" / "libn2he.so"),
+    # System paths
     "/usr/local/lib/libn2he.so",
     "/usr/lib/libn2he.so",
+    # Home directory paths
+    str(Path.home() / "N2HE-HintSight" / "build" / "libn2he.so"),
     str(Path.home() / "N2HE" / "build" / "libn2he.so"),
     str(Path.home() / ".local" / "lib" / "libn2he.so"),
     "./libn2he.so",
@@ -162,12 +174,17 @@ def _load_library() -> ctypes.CDLL:
 
     if lib_path is None:
         raise N2HELibraryNotFoundError(
-            "N2HE native library not found. Please install N2HE:\n"
+            "HintSight N2HE native library not found.\n"
+            "\n"
+            "Quick install (recommended):\n"
+            "  ./scripts/build_n2he_hintsight.sh\n"
+            "\n"
+            "Manual install:\n"
             "  1. git clone https://github.com/HintSight-Technology/N2HE.git\n"
             "  2. cd N2HE && mkdir build && cd build && cmake .. && make\n"
             "  3. sudo make install  (or set N2HE_LIB_PATH)\n"
             "\n"
-            "For development, use SimulatedN2HEScheme instead."
+            "For development, use ToyN2HEScheme with TENSAFE_TOY_HE=1 instead."
         )
 
     try:
