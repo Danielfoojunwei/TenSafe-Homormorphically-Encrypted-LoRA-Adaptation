@@ -434,17 +434,24 @@ class TenSafeConfig:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
-        def convert(obj):
-            if hasattr(obj, 'to_dict'):
-                return obj.to_dict()
-            elif hasattr(obj, '__dataclass_fields__'):
-                return {k: convert(v) for k, v in asdict(obj).items()}
+        def convert(obj, seen=None):
+            if seen is None:
+                seen = set()
+
+            # Prevent infinite recursion by tracking seen objects
+            obj_id = id(obj)
+            if obj_id in seen:
+                return None
+
+            if hasattr(obj, '__dataclass_fields__'):
+                seen.add(obj_id)
+                return {k: convert(v, seen) for k, v in asdict(obj).items()}
             elif isinstance(obj, Enum):
                 return obj.value
             elif isinstance(obj, (list, tuple)):
-                return [convert(v) for v in obj]
+                return [convert(v, seen) for v in obj]
             elif isinstance(obj, dict):
-                return {k: convert(v) for k, v in obj.items()}
+                return {k: convert(v, seen) for k, v in obj.items()}
             return obj
 
         return convert(self)
