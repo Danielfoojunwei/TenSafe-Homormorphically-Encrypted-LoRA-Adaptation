@@ -110,3 +110,14 @@ tmp_keys/
 *.zip
 *.tar
 
+# ============================================
+# Third Party Dependencies (cloned during build)
+# ============================================
+third_party/
+
+# ============================================
+# Compiled Native Extensions
+# ============================================
+*.so
+crypto_backend/n2he_hintsight/lib/
+
