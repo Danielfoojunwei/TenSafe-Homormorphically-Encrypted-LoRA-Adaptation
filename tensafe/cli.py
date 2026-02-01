@@ -535,6 +535,8 @@ def _handle_config_show(args: argparse.Namespace) -> int:
 
 def _handle_verify(args: argparse.Namespace) -> int:
     """Handle verify command."""
+    import numpy as np  # Import here to avoid requiring numpy for other commands
+
     print("TenSafe Backend Verification")
     print("=" * 50)
 
@@ -589,9 +591,6 @@ def _handle_verify(args: argparse.Namespace) -> int:
     for name, status in results.items():
         emoji = "[OK]" if status == "OK" else "[--]" if "NOT_INSTALLED" in status else "[XX]"
         print(f"  {emoji} {name}: {status}")
-
-    # Import numpy here for toy backend test
-    import numpy as np
 
     return 0 if all(s == "OK" or "NOT_INSTALLED" in s for s in results.values()) else 1
 
