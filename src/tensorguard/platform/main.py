@@ -18,6 +18,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from .database import check_db_health, engine
 from .tg_tinker_api import router as tinker_router
 
+# Security modules
+from ..security.rate_limiter import RateLimitMiddleware, RateLimitConfig
+from ..security.csp import CSPMiddleware, ContentSecurityPolicy
+from ..security.sanitization import ValidationMiddleware
+
 logger = logging.getLogger(__name__)
 
 # Environment configuration
@@ -34,6 +39,9 @@ else:
 
 TG_ENABLE_SECURITY_HEADERS = os.getenv("TG_ENABLE_SECURITY_HEADERS", "true").lower() == "true"
 TG_ALLOW_CREDENTIALS = os.getenv("TG_ALLOW_CREDENTIALS", "false").lower() == "true"
+TG_ENABLE_RATE_LIMITING = os.getenv("TG_ENABLE_RATE_LIMITING", "true").lower() == "true"
+TG_ENABLE_CSP = os.getenv("TG_ENABLE_CSP", "true").lower() == "true"
+TG_ENABLE_INPUT_VALIDATION = os.getenv("TG_ENABLE_INPUT_VALIDATION", "true").lower() == "true"
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -91,6 +99,29 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Tenant-ID"],
 )
 
+# Rate limiting middleware
+if TG_ENABLE_RATE_LIMITING:
+    rate_limit_config = RateLimitConfig.from_env()
+    app.add_middleware(RateLimitMiddleware, config=rate_limit_config)
+    logger.info("Rate limiting enabled")
+
+# Content Security Policy middleware
+if TG_ENABLE_CSP:
+    csp_policy = ContentSecurityPolicy.for_api()
+    app.add_middleware(CSPMiddleware, policy=csp_policy)
+    logger.info("Content Security Policy enabled")
+
+# Input validation middleware
+if TG_ENABLE_INPUT_VALIDATION:
+    app.add_middleware(
+        ValidationMiddleware,
+        check_sql_injection=True,
+        check_command_injection=True,
+        check_xss=True,
+        exclude_paths=["/health", "/ready", "/live", "/metrics", "/docs", "/redoc", "/openapi.json"],
+    )
+    logger.info("Input validation middleware enabled")
+
 
 # Health endpoints
 @app.get("/health", tags=["health"])
@@ -128,10 +159,16 @@ async def version_info():
     """Version information endpoint."""
     return {
         "service": "TG-Tinker",
-        "version": "3.0.0",
+        "version": "4.0.0",
         "api_version": "v1",
         "python_version": "3.9+",
         "environment": TG_ENVIRONMENT,
+        "security_features": {
+            "rate_limiting": TG_ENABLE_RATE_LIMITING,
+            "csp": TG_ENABLE_CSP,
+            "input_validation": TG_ENABLE_INPUT_VALIDATION,
+            "security_headers": TG_ENABLE_SECURITY_HEADERS,
+        },
     }
 
 
