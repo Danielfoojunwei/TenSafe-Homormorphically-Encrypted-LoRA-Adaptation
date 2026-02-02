@@ -65,8 +65,11 @@ class LocalStorageBackend(StorageBackend):
         """Get full path for a storage key with secure path traversal prevention."""
         import re
 
-        # Validate key format: only allow alphanumeric, dash, underscore, dot
-        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$', key):
+        # Validate key format: allow alphanumeric, dash, underscore, dot, and forward slash
+        # But prevent path traversal patterns like '..' or '//'
+        if '..' in key or '//' in key:
+            raise ValueError(f"Path traversal attempt detected: {key!r}")
+        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._/-]*$', key):
             raise ValueError(f"Invalid storage key format: {key!r}")
 
         # Length limit to prevent DoS
@@ -87,6 +90,7 @@ class LocalStorageBackend(StorageBackend):
     def write(self, key: str, data: bytes) -> None:
         """Write data to local filesystem."""
         path = self._get_path(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
 
     def read(self, key: str) -> bytes:

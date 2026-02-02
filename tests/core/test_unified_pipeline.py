@@ -142,7 +142,8 @@ class TestUnifiedConfiguration:
         assert config.training.mode == TrainingMode.RLVR
         assert config.model.name == "test-model"
         assert config.dp.enabled is True
-        assert config.he.mode == HEMode.N2HE_HEXL
+        # HE mode defaults to PRODUCTION when with_he=True
+        assert config.he.mode == HEMode.PRODUCTION
 
 
 # ==============================================================================
@@ -302,20 +303,21 @@ class TestHEBackendInterface:
     """Tests for the unified HE backend interface."""
 
     def test_toy_backend_creation(self):
-        """Test creating toy HE backend."""
+        """Test creating toy HE backend (simulation mode)."""
         from tensafe.core.he_interface import ToyHEBackend, HEParams
 
-        backend = ToyHEBackend(HEParams(), _force_enable=True)
+        backend = ToyHEBackend(HEParams())
         backend.setup()
 
         assert backend.is_setup
+        # Simulation mode is not production ready
         assert not backend.is_production_ready
 
     def test_toy_backend_encrypt_decrypt(self):
         """Test encrypt/decrypt with toy backend."""
         from tensafe.core.he_interface import ToyHEBackend, HEParams
 
-        backend = ToyHEBackend(HEParams(), _force_enable=True)
+        backend = ToyHEBackend(HEParams())
         backend.setup()
 
         plaintext = np.array([1.0, 2.0, 3.0, 4.0])
@@ -328,7 +330,7 @@ class TestHEBackendInterface:
         """Test LoRA delta computation with toy backend."""
         from tensafe.core.he_interface import ToyHEBackend, HEParams
 
-        backend = ToyHEBackend(HEParams(), _force_enable=True)
+        backend = ToyHEBackend(HEParams())
         backend.setup()
 
         # Create test data
@@ -357,8 +359,9 @@ class TestHEBackendInterface:
 
         available = list_available_backends()
         assert isinstance(available, list)
-        # Toy should be available in test env
-        assert "toy" in available
+        # simulation (replaces toy) is always available
+        assert "simulation" in available
+        assert "disabled" in available
 
 
 # ==============================================================================

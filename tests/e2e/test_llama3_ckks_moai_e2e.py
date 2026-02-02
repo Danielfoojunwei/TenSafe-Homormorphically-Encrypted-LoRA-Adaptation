@@ -552,13 +552,14 @@ class TestLlama3HELoRAIntegration:
         assert error < 0.01, f"Interface error: {error}"
 
     def test_auto_select_backend(self, mock_layer):
-        """Test auto-selection chooses CKKS MOAI as first priority."""
+        """Test auto-selection chooses PRODUCTION (unified backend) as first priority."""
         from tensafe.core.he_interface import get_backend, HEBackendType
 
         backend = get_backend(HEBackendType.AUTO)
 
-        # Should select CKKS MOAI as first priority
-        assert backend.backend_type == HEBackendType.CKKS_MOAI
+        # AUTO now maps to PRODUCTION (unified backend with MOAI optimizations)
+        # CKKS_MOAI is deprecated and also maps to PRODUCTION
+        assert backend.backend_type == HEBackendType.PRODUCTION
         assert backend.is_production_ready
 
 
