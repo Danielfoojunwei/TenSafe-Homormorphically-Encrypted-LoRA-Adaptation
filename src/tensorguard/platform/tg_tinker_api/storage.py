@@ -254,36 +254,84 @@ class KeyManager:
     """
     Key management for DEKs.
 
-    In production, this would integrate with a key vault (HashiCorp Vault,
-    AWS KMS, etc.). This implementation provides a local fallback.
+    Integrates with the TenSafe KMS plugin system for production deployments.
+    Supports AWS KMS, HashiCorp Vault, GCP KMS, Azure Key Vault, and local
+    fallback for development.
     """
 
     def __init__(
         self,
         master_key: Optional[bytes] = None,
         key_store_path: Optional[str] = None,
+        kms_provider: Optional["KMSProvider"] = None,
     ):
         """
         Initialize key manager.
 
         Args:
             master_key: Master KEK (32 bytes). If None, generates one.
-            key_store_path: Path to store wrapped DEKs. If None, uses memory.
+            key_store_path: Path to store wrapped DEKs (legacy mode).
+            kms_provider: KMS provider for production key management.
+                         If provided, master_key and key_store_path are ignored.
         """
+        self._kms_provider = kms_provider
+        self._dek_cache: dict[str, Tuple[bytes, str]] = {}
+
+        # If using KMS provider, delegate key management
+        if kms_provider is not None:
+            logger.info(f"KeyManager using KMS provider: {kms_provider.provider_name}")
+            self._master_key = None
+            self._key_store_path = None
+            return
+
+        # Legacy local mode
         if master_key is None:
             # In production, this should come from a secure vault
             self._master_key = secrets.token_bytes(32)
+            logger.warning("KeyManager using generated master key - use KMS in production")
         else:
             if len(master_key) != 32:
                 raise ValueError("Master key must be 32 bytes")
             self._master_key = master_key
 
         self._key_store_path = key_store_path
-        self._dek_cache: dict[str, Tuple[bytes, str]] = {}
 
         # Load existing keys from store
         if key_store_path:
             self._load_keys()
+
+    @classmethod
+    def from_kms(cls, kms_provider: "KMSProvider") -> "KeyManager":
+        """Create a KeyManager using a KMS provider."""
+        return cls(kms_provider=kms_provider)
+
+    @classmethod
+    def from_environment(cls) -> "KeyManager":
+        """
+        Create a KeyManager based on environment configuration.
+
+        Uses the KMS plugin system if configured, otherwise falls back to local.
+        """
+        try:
+            from tensorguard.kms import create_kms_provider, KMSConfig
+
+            config = KMSConfig.from_env()
+            if config.provider != "local":
+                provider = create_kms_provider(config)
+                return cls(kms_provider=provider)
+        except ImportError:
+            logger.debug("KMS module not available, using local key management")
+        except Exception as e:
+            logger.warning(f"KMS provider initialization failed, using local: {e}")
+
+        # Fall back to local
+        key_store_path = os.getenv("TENSAFE_KEY_STORE_PATH")
+        master_key = None
+        master_key_b64 = os.getenv("TENSAFE_MASTER_KEY")
+        if master_key_b64:
+            master_key = base64.b64decode(master_key_b64)
+
+        return cls(master_key=master_key, key_store_path=key_store_path)
 
     def get_dek(self, tenant_id: str) -> Tuple[bytes, str]:
         """
@@ -298,7 +346,11 @@ class KeyManager:
         if tenant_id in self._dek_cache:
             return self._dek_cache[tenant_id]
 
-        # Generate new DEK
+        # Use KMS provider if available
+        if self._kms_provider is not None:
+            return self._get_dek_from_kms(tenant_id)
+
+        # Legacy local mode
         dek = secrets.token_bytes(32)
         dek_id = f"dek-{secrets.token_hex(8)}"
 
@@ -311,6 +363,62 @@ class KeyManager:
 
         return dek, dek_id
 
+    def _get_dek_from_kms(self, tenant_id: str) -> Tuple[bytes, str]:
+        """Get or create DEK using KMS provider."""
+        from tensorguard.kms import KeyType, KeyAlgorithm, KMSKeyNotFoundError
+
+        dek_key_id = f"tenant-dek-{tenant_id}"
+
+        try:
+            # Try to get existing DEK
+            dek = self._kms_provider.get_key_material(dek_key_id)
+            self._dek_cache[tenant_id] = (dek, dek_key_id)
+            return dek, dek_key_id
+        except KMSKeyNotFoundError:
+            pass
+        except Exception as e:
+            # Provider might not support key export (AWS, GCP)
+            # In that case, generate a wrapped DEK
+            logger.debug(f"Key material not exportable, using wrapped DEK: {e}")
+
+        # For providers that don't support key export, use generate_data_key if available
+        if hasattr(self._kms_provider, "generate_data_key"):
+            try:
+                # Use a master key for the tenant
+                master_key_id = f"tenant-master-{tenant_id}"
+                try:
+                    self._kms_provider.get_key_metadata(master_key_id)
+                except KMSKeyNotFoundError:
+                    self._kms_provider.generate_key(
+                        master_key_id,
+                        key_type=KeyType.KEK,
+                        algorithm=KeyAlgorithm.AES_256_GCM,
+                    )
+
+                plaintext, encrypted = self._kms_provider.generate_data_key(
+                    master_key_id,
+                    context={"tenant_id": tenant_id},
+                )
+                dek_id = f"wrapped-dek-{secrets.token_hex(8)}"
+                self._dek_cache[tenant_id] = (plaintext, dek_id)
+                return plaintext, dek_id
+            except Exception as e:
+                logger.warning(f"generate_data_key failed: {e}")
+
+        # Generate DEK in KMS
+        try:
+            self._kms_provider.generate_key(
+                dek_key_id,
+                key_type=KeyType.DEK,
+                algorithm=KeyAlgorithm.AES_256_GCM,
+                tags={"tenant_id": tenant_id},
+            )
+            dek = self._kms_provider.get_key_material(dek_key_id)
+            self._dek_cache[tenant_id] = (dek, dek_key_id)
+            return dek, dek_key_id
+        except Exception as e:
+            raise RuntimeError(f"Failed to create DEK for tenant {tenant_id}: {e}")
+
     def rotate_dek(self, tenant_id: str) -> Tuple[bytes, str]:
         """
         Rotate DEK for a tenant.
@@ -321,7 +429,26 @@ class KeyManager:
         Returns:
             Tuple of (new DEK bytes, new DEK ID)
         """
-        # Generate new DEK
+        # Invalidate cache
+        if tenant_id in self._dek_cache:
+            del self._dek_cache[tenant_id]
+
+        # Use KMS provider if available
+        if self._kms_provider is not None:
+            dek_key_id = f"tenant-dek-{tenant_id}"
+            try:
+                self._kms_provider.rotate_key(dek_key_id)
+                return self._get_dek_from_kms(tenant_id)
+            except Exception as e:
+                logger.warning(f"KMS rotation failed, generating new key: {e}")
+                # Delete old key and create new
+                try:
+                    self._kms_provider.delete_key(dek_key_id, schedule_days=0)
+                except Exception:
+                    pass
+                return self._get_dek_from_kms(tenant_id)
+
+        # Legacy local mode
         dek = secrets.token_bytes(32)
         dek_id = f"dek-{secrets.token_hex(8)}"
 
@@ -336,6 +463,8 @@ class KeyManager:
 
     def _wrap_key(self, dek: bytes) -> bytes:
         """Wrap a DEK with the master KEK."""
+        if self._master_key is None:
+            raise RuntimeError("No master key available for wrapping")
         nonce = secrets.token_bytes(12)
         aesgcm = AESGCM(self._master_key)
         wrapped = aesgcm.encrypt(nonce, dek, None)
@@ -343,6 +472,8 @@ class KeyManager:
 
     def _unwrap_key(self, wrapped: bytes) -> bytes:
         """Unwrap a DEK with the master KEK."""
+        if self._master_key is None:
+            raise RuntimeError("No master key available for unwrapping")
         nonce = wrapped[:12]
         ciphertext = wrapped[12:]
         aesgcm = AESGCM(self._master_key)
@@ -384,6 +515,21 @@ class KeyManager:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, indent=2))
         os.chmod(path, 0o600)
+
+    def health_check(self) -> dict:
+        """Check key manager health."""
+        if self._kms_provider is not None:
+            return self._kms_provider.health_check()
+        return {
+            "status": "healthy",
+            "provider": "local",
+            "warning": "Using local key management - not production grade",
+        }
+
+
+# Type hint import for KMS provider
+if TYPE_CHECKING:
+    from tensorguard.kms import KMSProvider
 
 
 class IdentityKeyManager(KeyManager):

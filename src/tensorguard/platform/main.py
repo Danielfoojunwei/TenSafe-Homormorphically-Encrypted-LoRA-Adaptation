@@ -153,8 +153,54 @@ async def root():
     }
 
 
-if __name__ == "__main__":
+def run_development():
+    """Run server in development mode (single-process)."""
     import uvicorn
 
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    log_level = os.getenv("TG_LOG_LEVEL", "info")
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=port,
+        log_level=log_level,
+        access_log=True,
+    )
+
+
+def run_production():
+    """Run server in production mode (multi-worker via gunicorn)."""
+    import subprocess
+    import sys
+
+    workers = os.getenv("WORKERS", "4")
+    port = os.getenv("PORT", "8000")
+    timeout = os.getenv("TIMEOUT", "120")
+    keepalive = os.getenv("KEEPALIVE", "5")
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "gunicorn",
+        "tensorguard.platform.main:app",
+        "-c",
+        "tensorguard/platform/gunicorn_config.py",
+        "--workers",
+        workers,
+        "--bind",
+        f"0.0.0.0:{port}",
+        "--timeout",
+        timeout,
+        "--keep-alive",
+        keepalive,
+    ]
+
+    logger.info(f"Starting production server with {workers} workers on port {port}")
+    subprocess.run(cmd, check=True)
+
+
+if __name__ == "__main__":
+    if TG_ENVIRONMENT == "production":
+        run_production()
+    else:
+        run_development()

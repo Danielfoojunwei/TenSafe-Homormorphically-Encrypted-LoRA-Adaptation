@@ -150,7 +150,7 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /readiness
+            path: /ready
             port: 8000
           initialDelaySeconds: 5
           periodSeconds: 10
