@@ -956,26 +956,44 @@ class TenSafePipeline:
         self._training_mode.prepare(self.config, self._model, self._optimizer)
 
     def _setup_he_backend(self) -> None:
-        """Set up the HE backend."""
+        """
+        Set up the HE backend using the unified microkernel architecture.
+
+        All HE modes now route through the single UnifiedHEBackend which
+        uses the HE-LoRA Microkernel with MOAI optimizations.
+        """
         from tensafe.core.he_interface import get_backend, HEParams, HEBackendType
 
         he_config = self.config.he
+
+        # Resolve legacy modes to modern equivalents
+        resolved_mode = HEMode.resolve(he_config.mode)
 
         params = HEParams(
             poly_modulus_degree=he_config.poly_modulus_degree,
             coeff_modulus_bits=he_config.coeff_modulus_bits,
             scale_bits=he_config.scale_bits,
             use_column_packing=he_config.use_column_packing,
+            use_interleaved_batching=he_config.use_interleaved_batching,
         )
 
+        # Map HEMode to HEBackendType (unified architecture)
         backend_type = {
-            HEMode.TOY: HEBackendType.TOY,
-            HEMode.N2HE: HEBackendType.N2HE,
-            HEMode.N2HE_HEXL: HEBackendType.HEXL,
-        }.get(he_config.mode, HEBackendType.AUTO)
+            HEMode.DISABLED: HEBackendType.DISABLED,
+            HEMode.PRODUCTION: HEBackendType.PRODUCTION,
+            HEMode.SIMULATION: HEBackendType.SIMULATION,
+        }.get(resolved_mode, HEBackendType.PRODUCTION)
 
         self._he_backend = get_backend(backend_type, params)
-        logger.info(f"HE backend ready: {self._he_backend.backend_name}")
+
+        # Log backend information
+        if self._he_backend.is_production_ready:
+            logger.info(f"HE backend ready (production): {self._he_backend.backend_name}")
+        else:
+            logger.warning(
+                f"HE backend ready (non-production): {self._he_backend.backend_name}. "
+                "Use HEMode.PRODUCTION for deployment."
+            )
 
     def train(
         self,
