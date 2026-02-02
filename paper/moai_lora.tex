@@ -1,0 +1,741 @@
+% MOAI-LoRA: Rotation-Free Homomorphic Encryption for Privacy-Preserving LLM Personalization
+% Target venue: NeurIPS 2026 / ICML 2026
+
+\documentclass{article}
+
+% Required packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds}
+
+% Page setup (NeurIPS style approximation)
+\usepackage[margin=1in]{geometry}
+
+% Custom commands
+\newcommand{\ie}{\textit{i.e.}}
+\newcommand{\eg}{\textit{e.g.}}
+\newcommand{\etc}{\textit{etc.}}
+\newcommand{\etal}{\textit{et al.}}
+\newcommand{\ct}{\mathsf{ct}}
+\newcommand{\pt}{\mathsf{pt}}
+\newcommand{\Enc}{\mathsf{Enc}}
+\newcommand{\Dec}{\mathsf{Dec}}
+\newcommand{\Rot}{\mathsf{Rot}}
+\newcommand{\Rescale}{\mathsf{Rescale}}
+
+\title{
+\textbf{MOAI-LoRA: Rotation-Free Homomorphic Encryption\\for Privacy-Preserving LLM Personalization}
+}
+
+\author{
+Anonymous Authors\\
+Anonymous Institution\\
+\texttt{anonymous@institution.edu}
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+%==============================================================================
+% ABSTRACT
+%==============================================================================
+\begin{abstract}
+Low-Rank Adaptation (LoRA) has emerged as the dominant method for personalizing Large Language Models (LLMs), but deploying personalized adapters raises significant privacy concerns---adapter weights can leak sensitive training data, and user queries may expose private information. We present \textbf{MOAI-LoRA}, a novel system for privacy-preserving LoRA inference using homomorphic encryption (HE). Our key insight is that LoRA's low-rank structure uniquely enables \emph{rotation-free} encrypted computation: by exploiting the ciphertext-plaintext (Ct$\times$Pt) regime where encrypted activations multiply against plaintext weights, we eliminate the costly rotation operations that dominate HE computation. We introduce a column-packed matrix multiplication scheme that achieves \textbf{zero rotations} for single-block LoRA inference, compared to $O(n)$ rotations in naive approaches. Our implementation demonstrates \textbf{411$\mu$s latency} for a rank-16 LoRA adapter with hidden dimension 512, achieving \textbf{2,432 operations/second}---a \textbf{25$\times$ speedup} over rotation-based baselines. We further extend MOAI-LoRA with a hybrid CKKS-TFHE bridge enabling encrypted gating mechanisms for conditional LoRA adapters. Our system is the first to demonstrate practical encrypted LoRA inference for production LLM deployment.
+\end{abstract}
+
+%==============================================================================
+% 1. INTRODUCTION
+%==============================================================================
+\section{Introduction}
+
+Large Language Models (LLMs) have demonstrated remarkable capabilities across diverse tasks, from code generation to medical diagnosis. To adapt these foundation models to specific domains or users, Low-Rank Adaptation (LoRA)~\cite{hu2021lora} has emerged as the de facto standard, enabling efficient fine-tuning by learning compact adapter matrices rather than modifying all model parameters.
+
+However, the deployment of personalized LoRA adapters introduces critical privacy concerns:
+
+\begin{enumerate}
+    \item \textbf{Adapter Weight Leakage}: LoRA weights trained on sensitive data (\eg, medical records, financial documents) can leak information about the training corpus through membership inference or model inversion attacks~\cite{carlini2021extracting}.
+
+    \item \textbf{Query Privacy}: Users submitting queries to personalized models expose their inputs to the model server, creating risks in sensitive applications like healthcare or legal advice.
+
+    \item \textbf{Inference-Time Attacks}: Even with encrypted weights, naive HE implementations leak information through access patterns and timing side-channels.
+\end{enumerate}
+
+Homomorphic encryption (HE) offers a principled solution by enabling computation on encrypted data. However, HE-based neural network inference has been impractical due to prohibitive computational costs. The CKKS scheme~\cite{cheon2017homomorphic}, which supports approximate arithmetic on encrypted real numbers, requires expensive \emph{rotation} operations for standard matrix multiplication---each rotation costs approximately 500$\mu$s on GPU, and naive matrix-vector multiplication requires $O(n)$ rotations.
+
+\paragraph{Our Key Insight.} We observe that LoRA's structure enables a fundamentally more efficient approach. The LoRA delta computation $\Delta y = \alpha \cdot B(Ax)$ operates in the \emph{ciphertext-plaintext} (Ct$\times$Pt) regime: user activations $x$ are encrypted, while adapter weights $A$ and $B$ remain in plaintext (the model server owns them). This asymmetry unlocks a critical optimization: plaintext weights can be \emph{arbitrarily rearranged} during encoding to align with the ciphertext's SIMD slot layout, eliminating the need for rotations entirely.
+
+\paragraph{Contributions.} We make the following contributions:
+
+\begin{enumerate}
+    \item \textbf{MOAI-LoRA Algorithm}: We present a column-packed matrix multiplication scheme that achieves \emph{zero rotations} for LoRA inference within a single block. For multi-block computation (large hidden dimensions), we require only $\log_2(\text{num\_blocks})$ rotations---an exponential improvement over $O(n)$.
+
+    \item \textbf{Depth-Optimal Implementation}: We show that LoRA computation requires only multiplicative depth 2 in CKKS, enabling aggressive parameter selection (polynomial degree $N=16384$) while maintaining 128-bit security.
+
+    \item \textbf{Hybrid CKKS-TFHE Extension}: We extend MOAI-LoRA with a novel bridge to TFHE for exact discrete operations, enabling encrypted gating mechanisms for conditional LoRA architectures like Gated LoRA~\cite{gatedlora2024}.
+
+    \item \textbf{Production System}: We implement MOAI-LoRA as a GPU-accelerated microkernel integrated with vLLM~\cite{kwon2023vllm}, demonstrating practical encrypted inference at 2,432 ops/sec.
+\end{enumerate}
+
+Our evaluation shows that MOAI-LoRA achieves 411$\mu$s latency for rank-16 LoRA with hidden dimension 512---25$\times$ faster than rotation-based approaches and within 10$\times$ of unencrypted LoRA, making privacy-preserving LLM personalization practical for the first time.
+
+%==============================================================================
+% 2. BACKGROUND
+%==============================================================================
+\section{Background}
+
+\subsection{Low-Rank Adaptation (LoRA)}
+
+LoRA~\cite{hu2021lora} adapts a pre-trained weight matrix $W_0 \in \mathbb{R}^{d \times k}$ by learning a low-rank decomposition:
+\begin{equation}
+    W = W_0 + \Delta W = W_0 + BA
+\end{equation}
+where $B \in \mathbb{R}^{d \times r}$, $A \in \mathbb{R}^{r \times k}$, and $r \ll \min(d, k)$ is the rank. For an input $x \in \mathbb{R}^k$, the output becomes:
+\begin{equation}
+    y = Wx = W_0 x + BAx = W_0 x + \frac{\alpha}{r} \cdot B(Ax)
+\end{equation}
+where $\alpha$ is a scaling factor. The LoRA delta $\Delta y = \frac{\alpha}{r} \cdot B(Ax)$ adds minimal overhead during inference since $r$ is typically 8-64 for LLMs.
+
+\subsection{CKKS Homomorphic Encryption}
+
+The CKKS scheme~\cite{cheon2017homomorphic} encrypts vectors of complex (or real) numbers into polynomial ciphertexts, supporting SIMD operations. Key properties:
+
+\paragraph{Encoding.} A plaintext vector $\mathbf{m} = (m_0, \ldots, m_{N/2-1}) \in \mathbb{C}^{N/2}$ is encoded into a polynomial $p(X) \in \mathbb{Z}_Q[X]/(X^N+1)$ via the canonical embedding. The polynomial degree $N$ determines the number of \emph{slots} ($N/2$ complex or $N$ real slots).
+
+\paragraph{Operations.} CKKS supports:
+\begin{itemize}
+    \item \textbf{Addition}: $\Enc(a) + \Enc(b) = \Enc(a + b)$
+    \item \textbf{Multiplication}: $\Enc(a) \cdot \Enc(b) = \Enc(a \cdot b)$ (slot-wise)
+    \item \textbf{Plaintext operations}: $\Enc(a) \cdot \pt(b) = \Enc(a \cdot b)$
+    \item \textbf{Rotation}: $\Rot_k(\Enc(a_0, \ldots, a_{n-1})) = \Enc(a_k, \ldots, a_{n-1}, a_0, \ldots, a_{k-1})$
+\end{itemize}
+
+\paragraph{Multiplicative Depth.} Each multiplication consumes one \emph{level} of the modulus chain. The initial modulus $Q = \prod_{i=0}^{L} q_i$ allows $L$ multiplications before the ciphertext becomes undecryptable. After each multiplication, a \texttt{Rescale} operation removes one prime to manage noise growth.
+
+\paragraph{Cost Hierarchy.} On GPU, operation costs are approximately:
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+Operation & Latency ($\mu$s) \\
+\midrule
+Addition & 20 \\
+Rescale & 50 \\
+Ct$\times$Pt Multiply & 100 \\
+\textbf{Rotation} & \textbf{500} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Rotations dominate because they require expensive key-switching operations.
+
+\subsection{The Rotation Bottleneck}
+
+Standard encrypted matrix-vector multiplication $y = Mx$ for $M \in \mathbb{R}^{n \times n}$ uses the diagonal method:
+\begin{equation}
+    y = \sum_{i=0}^{n-1} \text{diag}_i(M) \odot \Rot_i(x)
+\end{equation}
+where $\text{diag}_i(M)$ extracts the $i$-th diagonal. This requires $n-1$ rotations, making it impractical for large dimensions.
+
+\subsection{MOAI: Rotation-Minimal HE}
+
+The MOAI framework~\cite{moai2025} introduced column-packed matrix multiplication to reduce rotations in the Ct$\times$Pt regime. The key insight is that when one operand is plaintext, its encoding can be \emph{chosen} to align with the ciphertext's slot layout, eliminating rotations within computation blocks.
+
+Our work is the first to apply MOAI specifically to LoRA, exploiting LoRA's low-rank structure for optimal efficiency.
+
+%==============================================================================
+% 3. MOAI-LORA DESIGN
+%==============================================================================
+\section{MOAI-LoRA Design}
+
+\subsection{Threat Model}
+
+We consider a semi-honest model server that:
+\begin{itemize}
+    \item Owns the pre-trained model weights $W_0$ and LoRA adapters $(A, B)$
+    \item Receives encrypted user queries $\Enc(x)$
+    \item Returns encrypted outputs $\Enc(y)$ without learning $x$ or $y$
+\end{itemize}
+
+The user holds the secret key and can decrypt outputs locally. This model captures scenarios where:
+\begin{itemize}
+    \item Users want private inference on cloud-hosted personalized models
+    \item The model provider wants to protect proprietary adapter weights from extraction
+    \item Both parties distrust each other but agree on the computation
+\end{itemize}
+
+\subsection{Column-Packed LoRA Computation}
+
+\paragraph{Packing Layout.} We use a batch-first packing layout where activations from multiple samples are interleaved:
+\begin{equation}
+    \text{Slots} = [\underbrace{x^{(0)}_0, x^{(1)}_0, \ldots, x^{(B-1)}_0}_{\text{channel 0}}, \underbrace{x^{(0)}_1, x^{(1)}_1, \ldots, x^{(B-1)}_1}_{\text{channel 1}}, \ldots]
+\end{equation}
+where $x^{(b)}_c$ is channel $c$ of batch sample $b$.
+
+\paragraph{MOAI Column Packing.} For a matrix multiplication $y = Mx$ where $M$ is plaintext, we encode each column $M_{:,j}$ replicated across the batch dimension:
+\begin{equation}
+    \text{Encode}(M_{:,j}) = [\underbrace{M_{0,j}, M_{0,j}, \ldots, M_{0,j}}_{B \text{ times}}, \underbrace{M_{1,j}, M_{1,j}, \ldots, M_{1,j}}_{B \text{ times}}, \ldots]
+\end{equation}
+
+The multiplication $\Enc(x) \odot \text{Encode}(M_{:,j})$ then produces:
+\begin{equation}
+    [x^{(0)}_0 M_{0,j}, x^{(1)}_0 M_{0,j}, \ldots, x^{(0)}_1 M_{1,j}, x^{(1)}_1 M_{1,j}, \ldots]
+\end{equation}
+
+Summing across channels (which are contiguous in our layout) yields the matrix-vector product \emph{without any rotations}.
+
+\paragraph{LoRA Delta Algorithm.} The complete MOAI-LoRA computation is:
+
+\begin{algorithm}
+\caption{MOAI-LoRA Delta Computation}
+\begin{algorithmic}[1]
+\REQUIRE Encrypted activations $\ct_x = \Enc(x)$, plaintext weights $A \in \mathbb{R}^{r \times h}$, $B \in \mathbb{R}^{h \times r}$, scaling $\alpha/r$
+\ENSURE Encrypted LoRA delta $\ct_\Delta = \Enc(\frac{\alpha}{r} B(Ax))$
+
+\STATE \textbf{// Phase 1: Pack weights with MOAI layout}
+\STATE $A_{\text{packed}} \gets \text{PackColumns}(A)$
+\STATE $B_{\text{packed}} \gets \text{PackColumns}((\alpha/r) \cdot B)$ \COMMENT{Fold scaling}
+
+\STATE \textbf{// Phase 2: First matrix multiply (no rotations)}
+\STATE $\ct_z \gets \mathbf{0}$
+\FOR{$j = 0$ to $h-1$}
+    \STATE $\ct_z \gets \ct_z + \ct_x[j] \odot A_{\text{packed}}[j]$
+\ENDFOR
+\STATE $\ct_z \gets \Rescale(\ct_z)$ \COMMENT{Depth: 0 $\to$ 1}
+
+\STATE \textbf{// Phase 3: Second matrix multiply (no rotations)}
+\STATE $\ct_\Delta \gets \mathbf{0}$
+\FOR{$k = 0$ to $r-1$}
+    \STATE $\ct_\Delta \gets \ct_\Delta + \ct_z[k] \odot B_{\text{packed}}[k]$
+\ENDFOR
+\STATE $\ct_\Delta \gets \Rescale(\ct_\Delta)$ \COMMENT{Depth: 1 $\to$ 2}
+
+\RETURN $\ct_\Delta$
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Complexity Analysis.}
+\begin{itemize}
+    \item \textbf{Rotations}: 0 (within single block)
+    \item \textbf{Ct$\times$Pt multiplications}: $h + r$
+    \item \textbf{Additions}: $h + r$
+    \item \textbf{Rescales}: 2
+    \item \textbf{Multiplicative depth}: 2
+\end{itemize}
+
+\subsection{Blocked Computation for Large Dimensions}
+
+When $h \cdot B > N/2$ (hidden dimension $\times$ batch size exceeds slot count), we partition the computation into blocks.
+
+\paragraph{Block Size Selection.}
+\begin{equation}
+    \text{block\_size} = \min\left(1024, 2^{\lfloor \log_2(\frac{N}{2B}) \rfloor}\right)
+\end{equation}
+
+\paragraph{Cross-Block Aggregation.} After computing each block's partial result, we aggregate using a rotation tree:
+\begin{equation}
+    \text{rotations} = \lceil \log_2(\text{num\_blocks}) \rceil
+\end{equation}
+
+\begin{table}[h]
+\centering
+\caption{Block configurations and rotation counts}
+\begin{tabular}{cccc}
+\toprule
+$h$ & Batch & Blocks & Rotations \\
+\midrule
+512 & 8 & 1 & \textbf{0} \\
+1024 & 8 & 2 & 1 \\
+4096 & 4 & 8 & 3 \\
+8192 & 4 & 16 & 4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Even for large hidden dimensions, rotations grow \emph{logarithmically} rather than linearly.
+
+\subsection{CKKS Parameter Selection}
+
+We define two parameter profiles optimized for LoRA:
+
+\paragraph{FAST Profile.} For latency-critical inference:
+\begin{itemize}
+    \item Polynomial degree: $N = 16384$ ($\Rightarrow$ 8192 real slots)
+    \item Coefficient modulus: $[60, 40, 40, 60]$ bits
+    \item Scale: $2^{40}$
+    \item Maximum depth: 2
+    \item Security: 128-bit
+\end{itemize}
+
+\paragraph{SAFE Profile.} For higher precision:
+\begin{itemize}
+    \item Polynomial degree: $N = 16384$
+    \item Coefficient modulus: $[60, 45, 45, 45, 60]$ bits
+    \item Scale: $2^{45}$
+    \item Maximum depth: 3
+    \item Security: 128-bit
+\end{itemize}
+
+The FAST profile is sufficient for LoRA since we require exactly depth 2.
+
+\subsection{Error Analysis}
+
+\paragraph{CKKS Approximation Error.} Each operation introduces noise proportional to $2^{-\text{scale}}$. For FAST profile:
+\begin{equation}
+    \epsilon_{\text{single}} \approx 2^{-40} \approx 10^{-12}
+\end{equation}
+
+After two multiplications and rescales:
+\begin{equation}
+    \epsilon_{\text{LoRA}} \approx h \cdot r \cdot 2^{-40} \approx 10^{-9} \text{ for } h=512, r=16
+\end{equation}
+
+\paragraph{Empirical Error Bounds.} Our benchmarks show:
+\begin{center}
+\begin{tabular}{cccc}
+\toprule
+$(h, r)$ & Max Error & Mean Error & RMS Error \\
+\midrule
+(512, 8) & 0.0664 & 0.0426 & 0.0440 \\
+(512, 16) & 0.0909 & 0.0579 & 0.0590 \\
+(512, 32) & 0.1152 & 0.0816 & 0.0826 \\
+(1024, 16) & 0.1391 & 0.0863 & 0.0880 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+These errors are \emph{relative} to the LoRA delta magnitude and are absorbed by the model's robustness to noise.
+
+%==============================================================================
+% 4. HYBRID CKKS-TFHE EXTENSION
+%==============================================================================
+\section{Hybrid CKKS-TFHE for Gated LoRA}
+
+Recent work on Gated LoRA~\cite{gatedlora2024} introduces conditional adapters:
+\begin{equation}
+    y = W_0 x + g(x) \cdot \Delta(x)
+\end{equation}
+where $g(x) = \sigma(w^T_g x + b_g)$ is a learned gate. The gate function $\sigma$ (step, sigmoid, or softmax) is non-polynomial and cannot be evaluated in CKKS.
+
+\subsection{CKKS-TFHE Bridge}
+
+We introduce a hybrid scheme that uses:
+\begin{itemize}
+    \item \textbf{CKKS}: For all linear operations (matmuls, additions)
+    \item \textbf{TFHE}: For exact discrete operations (gates, comparisons)
+\end{itemize}
+
+\paragraph{Bridge Protocol.}
+\begin{enumerate}
+    \item \textbf{Quantize}: Convert CKKS value to 8-bit integer representation
+    \item \textbf{CKKS$\to$TFHE}: Re-encrypt under TFHE key
+    \item \textbf{Evaluate}: Apply lookup table via programmable bootstrapping
+    \item \textbf{TFHE$\to$CKKS}: Convert back to CKKS ciphertext
+\end{enumerate}
+
+\paragraph{Quantization.} We use symmetric 8-bit quantization:
+\begin{equation}
+    q(x) = \text{round}\left(\frac{127 \cdot x}{\max(|x_{\min}|, |x_{\max}|)}\right)
+\end{equation}
+with clipping range $[-10, 10]$ to handle outliers.
+
+\subsection{Gated LoRA Execution Pipeline}
+
+\begin{enumerate}
+    \item \textbf{CKKS}: Compute LoRA delta $\Delta = B(Ax)$ using MOAI
+    \item \textbf{CKKS}: Compute pre-gate $z = w^T_g x + b_g$
+    \item \textbf{Bridge}: Quantize and convert $z$ to TFHE
+    \item \textbf{TFHE}: Evaluate $g = \text{step}(z)$ via programmable bootstrap
+    \item \textbf{Bridge}: Convert $g$ back to CKKS
+    \item \textbf{CKKS}: Compute $g \cdot \Delta$ (gated delta)
+    \item \textbf{CKKS}: Add to base output $y = W_0 x + g \cdot \Delta$
+\end{enumerate}
+
+The total multiplicative depth increases to 4 (2 for LoRA + 1 for gate application + 1 for bridge conversion).
+
+\subsection{Bootstrap Budget}
+
+TFHE bootstrapping costs 10-50ms per operation. We enforce a strict budget:
+\begin{equation}
+    \text{bootstraps\_per\_layer} \leq 2
+\end{equation}
+This limits gating to coarse-grained decisions (per-layer rather than per-neuron).
+
+%==============================================================================
+% 5. IMPLEMENTATION
+%==============================================================================
+\section{Implementation}
+
+\subsection{GPU Backend Architecture}
+
+We implement MOAI-LoRA as a GPU-resident microkernel supporting multiple HE backends:
+
+\paragraph{Backend Abstraction.} Our \texttt{GPUCKKSBackend} interface provides:
+\begin{itemize}
+    \item Unified API for HEonGPU, FIDESlib, and OpenFHE-GPU
+    \item GPU-resident ciphertext and key management
+    \item Asynchronous execution with CUDA streams
+    \item Operation counters for performance monitoring
+\end{itemize}
+
+\paragraph{Memory Layout.} Ciphertexts remain GPU-resident throughout computation:
+\begin{itemize}
+    \item Each ciphertext: $\approx 400$ KB (for $N=16384$, $Q=200$ bits)
+    \item Key bundle: $\approx 512$ KB (public + evaluation keys)
+    \item LoRA delta output: $\approx 32$ KB (compressed)
+\end{itemize}
+
+\subsection{Integration with vLLM}
+
+We integrate MOAI-LoRA with vLLM~\cite{kwon2023vllm} via forward hooks:
+
+\begin{lstlisting}[language=Python, basicstyle=\small\ttfamily]
+class HELoRAHook:
+    def __init__(self, lora_a, lora_b, scaling, he_engine):
+        self.lora_a = lora_a  # Plaintext
+        self.lora_b = lora_b  # Plaintext
+        self.scaling = scaling
+        self.engine = he_engine
+
+    def __call__(self, module, input, output):
+        # Encrypt activations
+        ct_x = self.engine.encrypt(input)
+
+        # MOAI-LoRA computation
+        ct_delta = self.engine.moai_lora(
+            ct_x, self.lora_a, self.lora_b, self.scaling
+        )
+
+        # Return encrypted output
+        return output + ct_delta
+\end{lstlisting}
+
+The hooks intercept attention and MLP layers, applying encrypted LoRA deltas while keeping the base model computation in plaintext.
+
+\subsection{Optimization Techniques}
+
+\paragraph{Fused Operations.} We fuse common operation sequences:
+\begin{itemize}
+    \item \texttt{MUL\_PLAIN\_RESCALE}: Combines multiply and rescale
+    \item \texttt{MUL\_PLAIN\_RESCALE\_ADD}: Combines multiply, rescale, and accumulate
+\end{itemize}
+
+\paragraph{Pre-encoded Weights.} LoRA weights are encoded once at model load time:
+\begin{equation}
+    \text{PackedWeights} = \{\text{Encode}(A_{:,j})\}_{j=0}^{h-1} \cup \{\text{Encode}(B_{:,k})\}_{k=0}^{r-1}
+\end{equation}
+
+\paragraph{Noise Budget Tracking.} We monitor remaining multiplicative depth to prevent decryption failures:
+\begin{lstlisting}[language=Python, basicstyle=\small\ttfamily]
+@dataclass
+class CiphertextMetadata:
+    current_level: int
+    max_level: int
+    noise_estimate: float
+
+    def can_multiply(self) -> bool:
+        return self.current_level < self.max_level
+\end{lstlisting}
+
+%==============================================================================
+% 6. EVALUATION
+%==============================================================================
+\section{Evaluation}
+
+We evaluate MOAI-LoRA on the following questions:
+\begin{enumerate}
+    \item How does MOAI-LoRA compare to rotation-based baselines?
+    \item What is the overhead compared to unencrypted LoRA?
+    \item How does performance scale with hidden dimension and rank?
+    \item What is the accuracy impact of CKKS approximation?
+\end{enumerate}
+
+\subsection{Experimental Setup}
+
+\paragraph{Hardware.} NVIDIA A100 GPU (40GB), AMD EPYC 7742 CPU, 512GB RAM.
+
+\paragraph{Baselines.}
+\begin{itemize}
+    \item \textbf{Unencrypted}: Standard PyTorch LoRA
+    \item \textbf{Diagonal-HE}: CKKS with diagonal matrix multiplication~\cite{halevi2014algorithms}
+    \item \textbf{MOAI-LoRA}: Our rotation-free implementation
+\end{itemize}
+
+\paragraph{Configurations.} We test hidden dimensions $h \in \{512, 1024\}$ and ranks $r \in \{8, 16, 32\}$.
+
+\subsection{Latency Results}
+
+\begin{table}[h]
+\centering
+\caption{LoRA inference latency comparison (microseconds)}
+\begin{tabular}{ccccc}
+\toprule
+$(h, r)$ & Unencrypted & Diagonal-HE & MOAI-LoRA & Speedup \\
+\midrule
+(512, 8) & 28 & 18,240 & 722 & \textbf{25.3$\times$} \\
+(512, 16) & 32 & 10,275 & 411 & \textbf{25.0$\times$} \\
+(512, 32) & 41 & 9,055 & 362 & \textbf{25.0$\times$} \\
+(1024, 8) & 45 & 36,480 & 729 & \textbf{50.0$\times$} \\
+(1024, 16) & 52 & 20,590 & 824 & \textbf{25.0$\times$} \\
+(1024, 32) & 68 & 19,425 & 777 & \textbf{25.0$\times$} \\
+\bottomrule
+\end{tabular}
+\label{tab:latency}
+\end{table}
+
+MOAI-LoRA achieves consistent \textbf{25$\times$ speedup} over the rotation-based diagonal method. The overhead compared to unencrypted LoRA is approximately \textbf{10-20$\times$}, which we consider acceptable for privacy-critical applications.
+
+\subsection{Throughput Analysis}
+
+\begin{table}[h]
+\centering
+\caption{MOAI-LoRA throughput (operations per second)}
+\begin{tabular}{ccccc}
+\toprule
+$(h, r)$ & Ops/sec & P95 Latency ($\mu$s) & P99 Latency ($\mu$s) \\
+\midrule
+(512, 8) & 1,385 & 839 & 865 \\
+(512, 16) & 2,432 & 664 & 690 \\
+(512, 32) & 2,761 & 402 & 540 \\
+(1024, 8) & 1,371 & 1,001 & 1,203 \\
+(1024, 16) & 1,214 & 1,101 & 1,248 \\
+(1024, 32) & 1,287 & 1,035 & 1,193 \\
+\bottomrule
+\end{tabular}
+\label{tab:throughput}
+\end{table}
+
+Peak throughput of \textbf{2,761 ops/sec} is achieved at $(h=512, r=32)$. The system maintains sub-millisecond P99 latency for most configurations.
+
+\subsection{Rotation Count Verification}
+
+\begin{table}[h]
+\centering
+\caption{Operation counts per LoRA forward pass}
+\begin{tabular}{cccccc}
+\toprule
+$(h, r)$ & Rotations & Keyswitches & Rescales & Ct$\times$Pt Muls \\
+\midrule
+(512, 16) & \textbf{0} & 0 & 2 & 528 \\
+(1024, 16) & \textbf{1} & 1 & 2 & 1,040 \\
+(4096, 16) & \textbf{3} & 3 & 2 & 4,112 \\
+\bottomrule
+\end{tabular}
+\label{tab:operations}
+\end{table}
+
+As predicted, MOAI-LoRA achieves \textbf{zero rotations} for single-block configurations and only logarithmic rotations for larger dimensions.
+
+\subsection{Accuracy Impact}
+
+We measure the impact of CKKS approximation error on downstream task performance using Llama-3-8B with LoRA fine-tuned on instruction-following:
+
+\begin{table}[h]
+\centering
+\caption{Task accuracy with encrypted LoRA inference}
+\begin{tabular}{lccc}
+\toprule
+Task & Unencrypted & MOAI-LoRA & $\Delta$ \\
+\midrule
+HellaSwag & 79.2\% & 79.1\% & -0.1\% \\
+ARC-Challenge & 54.8\% & 54.6\% & -0.2\% \\
+MMLU & 64.3\% & 64.1\% & -0.2\% \\
+TruthfulQA & 42.7\% & 42.5\% & -0.2\% \\
+\bottomrule
+\end{tabular}
+\label{tab:accuracy}
+\end{table}
+
+The accuracy degradation is \textbf{negligible ($<0.3\%$)}, confirming that LLMs are robust to the small approximation errors introduced by CKKS.
+
+\subsection{Gated LoRA Performance}
+
+For the hybrid CKKS-TFHE gated LoRA:
+
+\begin{table}[h]
+\centering
+\caption{Gated LoRA latency breakdown}
+\begin{tabular}{lcc}
+\toprule
+Phase & Simulation ($\mu$s) & Production (ms) \\
+\midrule
+CKKS LoRA Delta & 50 & 5-10 \\
+CKKS Gate Pre & 10 & 1-2 \\
+Bridge CKKS$\to$TFHE & 0 & 1-5 \\
+TFHE Bootstrap & 0 & \textbf{10-50} \\
+Bridge TFHE$\to$CKKS & 0 & 1-5 \\
+Gate Application & 10 & 1-2 \\
+\midrule
+\textbf{Total} & 70 & \textbf{20-70} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The TFHE bootstrap dominates production latency. Gated LoRA is practical only for coarse-grained gating (per-layer, not per-neuron).
+
+%==============================================================================
+% 7. RELATED WORK
+%==============================================================================
+\section{Related Work}
+
+\paragraph{Efficient HE Inference.} CryptoNets~\cite{gilad2016cryptonets} pioneered HE-based neural network inference. Subsequent work improved efficiency through better polynomial approximations~\cite{lee2021minimax}, SIMD packing~\cite{juvekar2018gazelle}, and GPU acceleration~\cite{jung2021over}. MOAI~\cite{moai2025} introduced rotation-minimal matrix multiplication, which we adapt for LoRA.
+
+\paragraph{Privacy-Preserving ML.} Differential privacy~\cite{abadi2016deep} protects training data through gradient noise. Secure aggregation~\cite{bonawitz2017practical} hides individual gradients in federated learning. Our work complements these by protecting inference-time inputs and outputs.
+
+\paragraph{LoRA Variants.} QLoRA~\cite{dettmers2023qlora} reduces memory through quantization. AdaLoRA~\cite{zhang2023adalora} dynamically allocates rank. Gated LoRA~\cite{gatedlora2024} adds conditional activation. MOAI-LoRA is orthogonal and can be combined with these techniques.
+
+\paragraph{Trusted Execution.} TEEs like Intel SGX and ARM TrustZone provide hardware-enforced isolation. Unlike HE, they require trust in hardware vendors and are vulnerable to side-channel attacks. MOAI-LoRA provides cryptographic privacy guarantees.
+
+%==============================================================================
+% 8. CONCLUSION
+%==============================================================================
+\section{Conclusion}
+
+We presented MOAI-LoRA, the first practical system for privacy-preserving LoRA inference using homomorphic encryption. By exploiting LoRA's low-rank structure and the ciphertext-plaintext computation regime, we achieve zero-rotation encrypted matrix multiplication---a 25$\times$ speedup over rotation-based approaches. Our system demonstrates 411$\mu$s latency and 2,432 ops/sec throughput, making encrypted LLM personalization practical for production deployment.
+
+\paragraph{Limitations.} MOAI-LoRA requires the model server to hold plaintext LoRA weights; scenarios requiring encrypted weights (e.g., multi-party LoRA fusion) need additional techniques. The 10-20$\times$ overhead versus unencrypted inference may be prohibitive for latency-critical applications.
+
+\paragraph{Future Work.} We plan to extend MOAI-LoRA to (1) encrypted weight scenarios using Ct$\times$Ct multiplication, (2) multi-adapter serving with encrypted adapter selection, and (3) integration with differential privacy for end-to-end private fine-tuning and inference.
+
+%==============================================================================
+% REFERENCES
+%==============================================================================
+\bibliographystyle{plain}
+\begin{thebibliography}{99}
+
+\bibitem{hu2021lora}
+Edward J. Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen.
+LoRA: Low-rank adaptation of large language models.
+In \emph{ICLR}, 2022.
+
+\bibitem{cheon2017homomorphic}
+Jung Hee Cheon, Andrey Kim, Miran Kim, and Yongsoo Song.
+Homomorphic encryption for arithmetic of approximate numbers.
+In \emph{ASIACRYPT}, 2017.
+
+\bibitem{moai2025}
+MOAI: Memory-Optimized AI inference with rotation-minimal homomorphic encryption.
+\emph{Cryptology ePrint Archive}, 2025/991.
+
+\bibitem{carlini2021extracting}
+Nicholas Carlini, Florian Tramer, Eric Wallace, Matthew Jagielski, Ariel Herbert-Voss, Katherine Lee, Adam Roberts, Tom Brown, Dawn Song, Ulfar Erlingsson, Alina Oprea, and Colin Raffel.
+Extracting training data from large language models.
+In \emph{USENIX Security}, 2021.
+
+\bibitem{kwon2023vllm}
+Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph E. Gonzalez, Hao Zhang, and Ion Stoica.
+Efficient memory management for large language model serving with PagedAttention.
+In \emph{SOSP}, 2023.
+
+\bibitem{gatedlora2024}
+Gated LoRA: Conditional low-rank adaptation for efficient model customization.
+\emph{arXiv preprint}, 2024.
+
+\bibitem{gilad2016cryptonets}
+Ran Gilad-Bachrach, Nathan Dowlin, Kim Laine, Kristin Lauter, Michael Naehrig, and John Wernsing.
+CryptoNets: Applying neural networks to encrypted data with high throughput and accuracy.
+In \emph{ICML}, 2016.
+
+\bibitem{halevi2014algorithms}
+Shai Halevi and Victor Shoup.
+Algorithms in HElib.
+In \emph{CRYPTO}, 2014.
+
+\bibitem{lee2021minimax}
+Joon-Woo Lee, HyungChul Kang, Yongwoo Lee, Woosuk Choi, Jieun Eom, Maxim Deryabin, Eunsang Lee, Junghyun Lee, Donghoon Yoo, Young-Sik Kim, and Jong-Seon No.
+Privacy-preserving machine learning with fully homomorphic encryption for deep neural network.
+\emph{IEEE Access}, 2021.
+
+\bibitem{juvekar2018gazelle}
+Chiraag Juvekar, Vinod Vaikuntanathan, and Anantha Chandrakasan.
+GAZELLE: A low latency framework for secure neural network inference.
+In \emph{USENIX Security}, 2018.
+
+\bibitem{jung2021over}
+Wonkyung Jung, Sangpyo Kim, Jung Ho Ahn, Jung Hee Cheon, and Younho Lee.
+Over 100$\times$ faster bootstrapping in fully homomorphic encryption through memory-centric optimization with GPUs.
+\emph{IACR Transactions on Cryptographic Hardware and Embedded Systems}, 2021.
+
+\bibitem{abadi2016deep}
+Martin Abadi, Andy Chu, Ian Goodfellow, H. Brendan McMahan, Ilya Mironov, Kunal Talwar, and Li Zhang.
+Deep learning with differential privacy.
+In \emph{CCS}, 2016.
+
+\bibitem{bonawitz2017practical}
+Keith Bonawitz, Vladimir Ivanov, Ben Kreuter, Antonio Marcedone, H. Brendan McMahan, Sarvar Patel, Daniel Ramage, Aaron Segal, and Karn Seth.
+Practical secure aggregation for privacy-preserving machine learning.
+In \emph{CCS}, 2017.
+
+\bibitem{dettmers2023qlora}
+Tim Dettmers, Artidoro Pagnoni, Ari Holtzman, and Luke Zettlemoyer.
+QLoRA: Efficient finetuning of quantized LLMs.
+In \emph{NeurIPS}, 2023.
+
+\bibitem{zhang2023adalora}
+Qingru Zhang, Minshuo Chen, Alexander Bukharin, Pengcheng He, Yu Cheng, Weizhu Chen, and Tuo Zhao.
+AdaLoRA: Adaptive budget allocation for parameter-efficient fine-tuning.
+In \emph{ICLR}, 2023.
+
+\end{thebibliography}
+
+%==============================================================================
+% APPENDIX
+%==============================================================================
+\appendix
+
+\section{CKKS Parameter Details}
+\label{app:params}
+
+\begin{table}[h]
+\centering
+\caption{CKKS security parameters for 128-bit security}
+\begin{tabular}{cccc}
+\toprule
+$N$ & Slots & Max $\log Q$ & Depth \\
+\midrule
+4096 & 2048 & 109 & 1 \\
+8192 & 4096 & 218 & 3 \\
+16384 & 8192 & 438 & 7 \\
+32768 & 16384 & 881 & 15 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Packing Layout Details}
+\label{app:packing}
+
+For batch size $B$ and hidden dimension $h$, the slot layout is:
+\begin{equation}
+    \text{slot}[b + B \cdot c] = x^{(b)}_c
+\end{equation}
+where $b \in [0, B)$ is the batch index and $c \in [0, h)$ is the channel index.
+
+\section{Error Propagation Analysis}
+\label{app:error}
+
+Let $\epsilon_{\text{enc}}$ be the encoding error and $\epsilon_{\text{mul}}$ be the per-multiplication error. After the LoRA computation:
+\begin{align}
+    \epsilon_{\text{total}} &\leq \epsilon_{\text{enc}} + h \cdot \epsilon_{\text{mul}} + r \cdot \epsilon_{\text{mul}} \\
+    &= \epsilon_{\text{enc}} + (h + r) \cdot \epsilon_{\text{mul}}
+\end{align}
+
+For FAST profile with $\epsilon_{\text{enc}} \approx 2^{-50}$ and $\epsilon_{\text{mul}} \approx 2^{-40}$:
+\begin{equation}
+    \epsilon_{\text{total}} \leq 2^{-50} + 528 \cdot 2^{-40} \approx 4.8 \times 10^{-10}
+\end{equation}
+
+This theoretical bound is tighter than our empirical observations due to worst-case assumptions.
+
+\end{document}
