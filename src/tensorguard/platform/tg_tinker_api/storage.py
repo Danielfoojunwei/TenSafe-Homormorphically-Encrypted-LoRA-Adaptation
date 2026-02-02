@@ -257,6 +257,8 @@ class KeyManager:
     Integrates with the TenSafe KMS plugin system for production deployments.
     Supports AWS KMS, HashiCorp Vault, GCP KMS, Azure Key Vault, and local
     fallback for development.
+
+    Thread-safe: All operations are protected by an internal lock.
     """
 
     def __init__(
@@ -274,6 +276,8 @@ class KeyManager:
             kms_provider: KMS provider for production key management.
                          If provided, master_key and key_store_path are ignored.
         """
+        import threading
+        self._lock = threading.RLock()  # Thread safety for DEK operations
         self._kms_provider = kms_provider
         self._dek_cache: dict[str, Tuple[bytes, str]] = {}
 
@@ -337,31 +341,36 @@ class KeyManager:
         """
         Get or create DEK for a tenant.
 
+        Thread-safe: Uses internal lock to prevent TOCTOU race conditions
+        where multiple threads could create different DEKs for the same tenant.
+
         Args:
             tenant_id: Tenant ID
 
         Returns:
             Tuple of (DEK bytes, DEK ID)
         """
-        if tenant_id in self._dek_cache:
-            return self._dek_cache[tenant_id]
+        with self._lock:
+            # Check cache inside lock to prevent TOCTOU
+            if tenant_id in self._dek_cache:
+                return self._dek_cache[tenant_id]
 
-        # Use KMS provider if available
-        if self._kms_provider is not None:
-            return self._get_dek_from_kms(tenant_id)
+            # Use KMS provider if available
+            if self._kms_provider is not None:
+                return self._get_dek_from_kms(tenant_id)
 
-        # Legacy local mode
-        dek = secrets.token_bytes(32)
-        dek_id = f"dek-{secrets.token_hex(8)}"
+            # Legacy local mode
+            dek = secrets.token_bytes(32)
+            dek_id = f"dek-{secrets.token_hex(8)}"
 
-        # Cache it
-        self._dek_cache[tenant_id] = (dek, dek_id)
+            # Cache it
+            self._dek_cache[tenant_id] = (dek, dek_id)
 
-        # Persist if we have a store
-        if self._key_store_path:
-            self._save_keys()
+            # Persist if we have a store
+            if self._key_store_path:
+                self._save_keys()
 
-        return dek, dek_id
+            return dek, dek_id
 
     def _get_dek_from_kms(self, tenant_id: str) -> Tuple[bytes, str]:
         """Get or create DEK using KMS provider."""
@@ -423,43 +432,46 @@ class KeyManager:
         """
         Rotate DEK for a tenant.
 
+        Thread-safe: Uses internal lock to ensure atomic rotation.
+
         Args:
             tenant_id: Tenant ID
 
         Returns:
             Tuple of (new DEK bytes, new DEK ID)
         """
-        # Invalidate cache
-        if tenant_id in self._dek_cache:
-            del self._dek_cache[tenant_id]
+        with self._lock:
+            # Invalidate cache
+            if tenant_id in self._dek_cache:
+                del self._dek_cache[tenant_id]
 
-        # Use KMS provider if available
-        if self._kms_provider is not None:
-            dek_key_id = f"tenant-dek-{tenant_id}"
-            try:
-                self._kms_provider.rotate_key(dek_key_id)
-                return self._get_dek_from_kms(tenant_id)
-            except Exception as e:
-                logger.warning(f"KMS rotation failed, generating new key: {e}")
-                # Delete old key and create new
+            # Use KMS provider if available
+            if self._kms_provider is not None:
+                dek_key_id = f"tenant-dek-{tenant_id}"
                 try:
-                    self._kms_provider.delete_key(dek_key_id, schedule_days=0)
-                except Exception:
-                    pass
-                return self._get_dek_from_kms(tenant_id)
+                    self._kms_provider.rotate_key(dek_key_id)
+                    return self._get_dek_from_kms(tenant_id)
+                except Exception as e:
+                    logger.warning(f"KMS rotation failed, generating new key: {e}")
+                    # Delete old key and create new
+                    try:
+                        self._kms_provider.delete_key(dek_key_id, schedule_days=0)
+                    except Exception:
+                        pass
+                    return self._get_dek_from_kms(tenant_id)
 
-        # Legacy local mode
-        dek = secrets.token_bytes(32)
-        dek_id = f"dek-{secrets.token_hex(8)}"
+            # Legacy local mode
+            dek = secrets.token_bytes(32)
+            dek_id = f"dek-{secrets.token_hex(8)}"
 
-        # Update cache
-        self._dek_cache[tenant_id] = (dek, dek_id)
+            # Update cache
+            self._dek_cache[tenant_id] = (dek, dek_id)
 
-        # Persist
-        if self._key_store_path:
-            self._save_keys()
+            # Persist
+            if self._key_store_path:
+                self._save_keys()
 
-        return dek, dek_id
+            return dek, dek_id
 
     def _wrap_key(self, dek: bytes) -> bytes:
         """Wrap a DEK with the master KEK."""

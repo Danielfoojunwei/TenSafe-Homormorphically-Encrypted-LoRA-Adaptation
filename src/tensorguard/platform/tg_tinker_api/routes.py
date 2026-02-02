@@ -7,6 +7,7 @@ FastAPI routers for the TG-Tinker training API.
 import hashlib
 import json
 import logging
+import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -31,7 +32,11 @@ logger = logging.getLogger(__name__)
 # Initialize routers
 router = APIRouter(prefix="/v1", tags=["tg-tinker"])
 
+# Thread lock for in-memory storage access (protects against race conditions)
+_storage_lock = threading.RLock()
+
 # In-memory storage for demo (in production, use database)
+# IMPORTANT: Always acquire _storage_lock before accessing these dictionaries
 _training_clients: Dict[str, TinkerTrainingClient] = {}
 _futures: Dict[str, TinkerFuture] = {}
 _artifacts: Dict[str, TinkerArtifact] = {}
@@ -278,23 +283,25 @@ async def create_training_client(
         dp_enabled=request.dp_config is not None and request.dp_config.enabled,
     )
 
-    _training_clients[tc_id] = tc
+    # Thread-safe storage of training client
+    with _storage_lock:
+        _training_clients[tc_id] = tc
 
-    # Initialize ML backend
+        # Initialize DP trainer if needed
+        if request.dp_config and request.dp_config.enabled:
+            dp_config = DPConfig(
+                enabled=request.dp_config.enabled,
+                noise_multiplier=request.dp_config.noise_multiplier,
+                max_grad_norm=request.dp_config.max_grad_norm,
+                target_epsilon=request.dp_config.target_epsilon,
+                target_delta=request.dp_config.target_delta,
+                accountant_type=request.dp_config.accountant_type,
+            )
+            _dp_trainers[tc_id] = DPTrainer(dp_config)
+
+    # Initialize ML backend (outside lock as it may take time)
     worker = get_worker()
     worker.ml_backend.initialize_model(tc_id, request.model_ref, config_dict)
-
-    # Initialize DP trainer if needed
-    if request.dp_config and request.dp_config.enabled:
-        dp_config = DPConfig(
-            enabled=request.dp_config.enabled,
-            noise_multiplier=request.dp_config.noise_multiplier,
-            max_grad_norm=request.dp_config.max_grad_norm,
-            target_epsilon=request.dp_config.target_epsilon,
-            target_delta=request.dp_config.target_delta,
-            accountant_type=request.dp_config.accountant_type,
-        )
-        _dp_trainers[tc_id] = DPTrainer(dp_config)
 
     # Log to audit
     audit = get_audit_logger()
@@ -323,7 +330,8 @@ async def list_training_clients(
     tenant_id: str = Depends(get_tenant_id),
 ) -> List[TrainingClientResponse]:
     """List all training clients for the tenant."""
-    clients = [tc for tc in _training_clients.values() if tc.tenant_id == tenant_id]
+    with _storage_lock:
+        clients = [tc for tc in _training_clients.values() if tc.tenant_id == tenant_id]
 
     return [
         TrainingClientResponse(
@@ -345,27 +353,28 @@ async def get_training_client(
     tenant_id: str = Depends(get_tenant_id),
 ) -> TrainingClientResponse:
     """Get a training client by ID."""
-    tc = _training_clients.get(tc_id)
-    if tc is None or tc.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error": {
-                    "code": "TRAINING_CLIENT_NOT_FOUND",
-                    "message": f"Training client '{tc_id}' not found",
-                    "details": {"training_client_id": tc_id},
-                }
-            },
-        )
+    with _storage_lock:
+        tc = _training_clients.get(tc_id)
+        if tc is None or tc.tenant_id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "error": {
+                        "code": "TRAINING_CLIENT_NOT_FOUND",
+                        "message": f"Training client '{tc_id}' not found",
+                        "details": {"training_client_id": tc_id},
+                    }
+                },
+            )
 
-    dp_metrics = None
-    if tc_id in _dp_trainers:
-        eps, delta = _dp_trainers[tc_id].get_privacy_spent()
-        dp_metrics = {
-            "total_epsilon": eps,
-            "delta": delta,
-            "num_steps": _dp_trainers[tc_id].state.num_steps,
-        }
+        dp_metrics = None
+        if tc_id in _dp_trainers:
+            eps, delta = _dp_trainers[tc_id].get_privacy_spent()
+            dp_metrics = {
+                "total_epsilon": eps,
+                "delta": delta,
+                "num_steps": _dp_trainers[tc_id].state.num_steps,
+            }
 
     return TrainingClientResponse(
         training_client_id=tc.id,
@@ -395,12 +404,13 @@ async def forward_backward(
     tenant_id: str = Depends(get_tenant_id),
 ) -> FutureResponse:
     """Queue a forward-backward pass."""
-    tc = _training_clients.get(tc_id)
-    if tc is None or tc.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "TRAINING_CLIENT_NOT_FOUND", "message": f"Training client '{tc_id}' not found"}},
-        )
+    with _storage_lock:
+        tc = _training_clients.get(tc_id)
+        if tc is None or tc.tenant_id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "TRAINING_CLIENT_NOT_FOUND", "message": f"Training client '{tc_id}' not found"}},
+            )
 
     # Create future
     future_id = generate_future_id()
@@ -420,7 +430,8 @@ async def forward_backward(
         request_hash=request_hash,
         request_size_bytes=len(request_json),
     )
-    _futures[future_id] = future
+    with _storage_lock:
+        _futures[future_id] = future
 
     # Submit job to queue
     queue = get_job_queue()
@@ -452,12 +463,13 @@ async def optim_step(
     tenant_id: str = Depends(get_tenant_id),
 ) -> FutureResponse:
     """Queue an optimizer step."""
-    tc = _training_clients.get(tc_id)
-    if tc is None or tc.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "TRAINING_CLIENT_NOT_FOUND", "message": f"Training client '{tc_id}' not found"}},
-        )
+    with _storage_lock:
+        tc = _training_clients.get(tc_id)
+        if tc is None or tc.tenant_id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "TRAINING_CLIENT_NOT_FOUND", "message": f"Training client '{tc_id}' not found"}},
+            )
 
     # Create future
     future_id = generate_future_id()
@@ -477,7 +489,8 @@ async def optim_step(
         request_hash=request_hash,
         request_size_bytes=len(request_json),
     )
-    _futures[future_id] = future
+    with _storage_lock:
+        _futures[future_id] = future
 
     # Submit job to queue
     queue = get_job_queue()
@@ -508,12 +521,13 @@ async def sample(
     tenant_id: str = Depends(get_tenant_id),
 ) -> SampleResultResponse:
     """Generate samples from the model (synchronous)."""
-    tc = _training_clients.get(tc_id)
-    if tc is None or tc.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "TRAINING_CLIENT_NOT_FOUND", "message": f"Training client '{tc_id}' not found"}},
-        )
+    with _storage_lock:
+        tc = _training_clients.get(tc_id)
+        if tc is None or tc.tenant_id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "TRAINING_CLIENT_NOT_FOUND", "message": f"Training client '{tc_id}' not found"}},
+            )
 
     # Execute sampling directly (synchronous)
     worker = get_worker()
@@ -566,31 +580,32 @@ async def save_state(
     tenant_id: str = Depends(get_tenant_id),
 ) -> SaveStateResponse:
     """Save training state as encrypted checkpoint."""
-    tc = _training_clients.get(tc_id)
-    if tc is None or tc.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "TRAINING_CLIENT_NOT_FOUND", "message": f"Training client '{tc_id}' not found"}},
-        )
+    with _storage_lock:
+        tc = _training_clients.get(tc_id)
+        if tc is None or tc.tenant_id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "TRAINING_CLIENT_NOT_FOUND", "message": f"Training client '{tc_id}' not found"}},
+            )
 
-    # Get state from ML backend
+        # Add DP metrics to metadata if available
+        metadata = dict(request.metadata)
+        dp_metrics = None
+        if tc_id in _dp_trainers:
+            eps, delta = _dp_trainers[tc_id].get_privacy_spent()
+            dp_metrics = {
+                "total_epsilon": eps,
+                "delta": delta,
+                "num_steps": _dp_trainers[tc_id].state.num_steps,
+            }
+            metadata["dp_metrics"] = dp_metrics
+
+    # Get state from ML backend (outside lock as it may take time)
     worker = get_worker()
     state_bytes = worker.ml_backend.save_state(
         training_client_id=tc_id,
         include_optimizer=request.include_optimizer,
     )
-
-    # Add DP metrics to metadata if available
-    metadata = dict(request.metadata)
-    dp_metrics = None
-    if tc_id in _dp_trainers:
-        eps, delta = _dp_trainers[tc_id].get_privacy_spent()
-        dp_metrics = {
-            "total_epsilon": eps,
-            "delta": delta,
-            "num_steps": _dp_trainers[tc_id].state.num_steps,
-        }
-        metadata["dp_metrics"] = dp_metrics
 
     # Encrypt and store
     artifact = _artifact_store.save_artifact(
@@ -601,7 +616,8 @@ async def save_state(
         metadata=metadata,
     )
 
-    _artifacts[artifact.id] = artifact
+    with _storage_lock:
+        _artifacts[artifact.id] = artifact
 
     # Log to audit
     request_json = json.dumps(request.model_dump(), sort_keys=True)
@@ -642,19 +658,20 @@ async def load_state(
     tenant_id: str = Depends(get_tenant_id),
 ) -> LoadStateResponse:
     """Load training state from encrypted checkpoint."""
-    tc = _training_clients.get(tc_id)
-    if tc is None or tc.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "TRAINING_CLIENT_NOT_FOUND", "message": f"Training client '{tc_id}' not found"}},
-        )
+    with _storage_lock:
+        tc = _training_clients.get(tc_id)
+        if tc is None or tc.tenant_id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "TRAINING_CLIENT_NOT_FOUND", "message": f"Training client '{tc_id}' not found"}},
+            )
 
-    artifact = _artifacts.get(request.artifact_id)
-    if artifact is None or artifact.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "ARTIFACT_NOT_FOUND", "message": f"Artifact '{request.artifact_id}' not found"}},
-        )
+        artifact = _artifacts.get(request.artifact_id)
+        if artifact is None or artifact.tenant_id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "ARTIFACT_NOT_FOUND", "message": f"Artifact '{request.artifact_id}' not found"}},
+            )
 
     # Decrypt and load
     state_bytes = _artifact_store.load_artifact(artifact)
@@ -663,9 +680,10 @@ async def load_state(
     worker = get_worker()
     step = worker.ml_backend.load_state(tc_id, state_bytes)
 
-    # Update training client
-    tc.step = step
-    tc.updated_at = datetime.utcnow()
+    # Update training client (thread-safe)
+    with _storage_lock:
+        tc.step = step
+        tc.updated_at = datetime.utcnow()
 
     # Log to audit
     request_json = json.dumps(request.model_dump(), sort_keys=True)
@@ -699,24 +717,26 @@ async def get_future(
     tenant_id: str = Depends(get_tenant_id),
 ) -> FutureResponse:
     """Get future status."""
-    future = _futures.get(future_id)
-    if future is None or future.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "FUTURE_NOT_FOUND", "message": f"Future '{future_id}' not found"}},
-        )
+    with _storage_lock:
+        future = _futures.get(future_id)
+        if future is None or future.tenant_id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "FUTURE_NOT_FOUND", "message": f"Future '{future_id}' not found"}},
+            )
 
     # Sync status from queue
     queue = get_job_queue()
     job = queue.get_status(future_id)
     if job:
-        future.status = job.status.value
-        future.started_at = job.started_at
-        future.completed_at = job.completed_at
-        if job.result:
-            future.result_json = job.result
-        if job.error:
-            future.error_message = job.error
+        with _storage_lock:
+            future.status = job.status.value
+            future.started_at = job.started_at
+            future.completed_at = job.completed_at
+            if job.result:
+                future.result_json = job.result
+            if job.error:
+                future.error_message = job.error
 
     return FutureResponse(
         future_id=future.id,
@@ -735,24 +755,26 @@ async def get_future_result(
     tenant_id: str = Depends(get_tenant_id),
 ) -> FutureResultResponse:
     """Get future result."""
-    future = _futures.get(future_id)
-    if future is None or future.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "FUTURE_NOT_FOUND", "message": f"Future '{future_id}' not found"}},
-        )
+    with _storage_lock:
+        future = _futures.get(future_id)
+        if future is None or future.tenant_id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "FUTURE_NOT_FOUND", "message": f"Future '{future_id}' not found"}},
+            )
 
     # Sync status from queue
     queue = get_job_queue()
     job = queue.get_status(future_id)
     if job:
-        future.status = job.status.value
-        future.started_at = job.started_at
-        future.completed_at = job.completed_at
-        if job.result:
-            future.result_json = job.result
-        if job.error:
-            future.error_message = job.error
+        with _storage_lock:
+            future.status = job.status.value
+            future.started_at = job.started_at
+            future.completed_at = job.completed_at
+            if job.result:
+                future.result_json = job.result
+            if job.error:
+                future.error_message = job.error
 
     if future.status not in ("completed", "failed"):
         return FutureResultResponse(
@@ -762,12 +784,13 @@ async def get_future_result(
             error=None,
         )
 
-    # Update training client step if optim_step completed
+    # Update training client step if optim_step completed (thread-safe)
     if future.status == "completed" and future.operation == "optim_step":
-        tc = _training_clients.get(future.training_client_id)
-        if tc and future.result_json:
-            tc.step = future.result_json.get("step", tc.step)
-            tc.updated_at = datetime.utcnow()
+        with _storage_lock:
+            tc = _training_clients.get(future.training_client_id)
+            if tc and future.result_json:
+                tc.step = future.result_json.get("step", tc.step)
+                tc.updated_at = datetime.utcnow()
 
     # Log to audit
     audit = get_audit_logger()
@@ -798,19 +821,21 @@ async def cancel_future(
     tenant_id: str = Depends(get_tenant_id),
 ) -> Dict[str, Any]:
     """Cancel a pending future."""
-    future = _futures.get(future_id)
-    if future is None or future.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "FUTURE_NOT_FOUND", "message": f"Future '{future_id}' not found"}},
-        )
+    with _storage_lock:
+        future = _futures.get(future_id)
+        if future is None or future.tenant_id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "FUTURE_NOT_FOUND", "message": f"Future '{future_id}' not found"}},
+            )
 
     queue = get_job_queue()
     success = queue.cancel(future_id)
 
     if success:
-        future.status = "cancelled"
-        future.completed_at = datetime.utcnow()
+        with _storage_lock:
+            future.status = "cancelled"
+            future.completed_at = datetime.utcnow()
 
     return {"success": success}
 
@@ -873,12 +898,13 @@ async def get_artifact_content(
     tenant_id: str = Depends(get_tenant_id),
 ):
     """Download artifact content (encrypted)."""
-    artifact = _artifacts.get(artifact_id)
-    if artifact is None or artifact.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "ARTIFACT_NOT_FOUND", "message": f"Artifact '{artifact_id}' not found"}},
-        )
+    with _storage_lock:
+        artifact = _artifacts.get(artifact_id)
+        if artifact is None or artifact.tenant_id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "ARTIFACT_NOT_FOUND", "message": f"Artifact '{artifact_id}' not found"}},
+            )
 
     # Return encrypted bytes directly
     from fastapi.responses import Response
@@ -911,7 +937,9 @@ async def health_check() -> Dict[str, str]:
 # ==============================================================================
 
 # TGSP adapter registry storage (per-tenant)
+# Protected by _tgsp_lock for thread-safe access
 _tgsp_registries: Dict[str, Any] = {}
+_tgsp_lock = threading.RLock()
 
 # Request ID counter for audit correlation (SOC 2 CC4.1)
 import uuid
@@ -928,7 +956,6 @@ def generate_request_id() -> str:
 
 
 # Simple rate limiter for TGSP inference (SOC 2 CC6.1)
-import threading
 from collections import defaultdict
 import time
 
@@ -999,18 +1026,19 @@ class TGSPInferenceResponse(BaseModel):
 
 
 def _get_tenant_registry(tenant_id: str) -> Any:
-    """Get or create TGSP registry for tenant."""
-    if tenant_id not in _tgsp_registries:
-        try:
-            from tensafe.tgsp_adapter_registry import TGSPAdapterRegistry
-            _tgsp_registries[tenant_id] = TGSPAdapterRegistry(
-                enforce_tgsp=True,
-                auto_verify_signatures=True,
-            )
-        except ImportError:
-            # Fallback for testing
-            _tgsp_registries[tenant_id] = None
-    return _tgsp_registries[tenant_id]
+    """Get or create TGSP registry for tenant (thread-safe)."""
+    with _tgsp_lock:
+        if tenant_id not in _tgsp_registries:
+            try:
+                from tensafe.tgsp_adapter_registry import TGSPAdapterRegistry
+                _tgsp_registries[tenant_id] = TGSPAdapterRegistry(
+                    enforce_tgsp=True,
+                    auto_verify_signatures=True,
+                )
+            except ImportError:
+                # Fallback for testing
+                _tgsp_registries[tenant_id] = None
+        return _tgsp_registries[tenant_id]
 
 
 @router.post(

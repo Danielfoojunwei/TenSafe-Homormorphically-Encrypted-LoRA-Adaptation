@@ -278,22 +278,35 @@ class AzureKMSProvider(KMSProvider):
         except Exception as e:
             raise KMSOperationError(f"Failed to rotate key: {e}")
 
-    def delete_key(self, key_id: str, schedule_days: int = 30) -> None:
-        """Delete a key from Azure Key Vault."""
+    # Default timeout for Azure operations (seconds)
+    DEFAULT_OPERATION_TIMEOUT = 60
+
+    def delete_key(self, key_id: str, schedule_days: int = 30, timeout: int = None) -> None:
+        """Delete a key from Azure Key Vault.
+
+        Args:
+            key_id: Key to delete
+            schedule_days: Days before permanent deletion (Azure soft-delete)
+            timeout: Operation timeout in seconds (default: 60)
+        """
         from azure.core.exceptions import ResourceNotFoundError
 
         key_name = self._get_key_name(key_id)
+        timeout = timeout or self.DEFAULT_OPERATION_TIMEOUT
 
         try:
             # Azure has soft-delete by default
             poller = self._key_client.begin_delete_key(key_name)
-            poller.wait()
+            # Use timeout to prevent indefinite blocking
+            poller.wait(timeout=timeout)
 
             logger.info(f"Deleted Azure Key Vault key: {key_id}")
 
         except ResourceNotFoundError:
             raise KMSKeyNotFoundError(f"Key not found: {key_id}")
         except Exception as e:
+            if "timeout" in str(e).lower():
+                raise KMSOperationError(f"Delete key operation timed out after {timeout}s: {key_id}")
             raise KMSOperationError(f"Failed to delete key: {e}")
 
     def get_key_metadata(self, key_id: str) -> KeyMetadata:

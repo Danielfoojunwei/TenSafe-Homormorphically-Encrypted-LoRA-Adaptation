@@ -45,6 +45,10 @@ class TenSafeWandbConfig:
     # Logging frequency
     log_frequency: int = 10  # Log every N steps
 
+    # Reliability settings
+    init_timeout: int = 60  # Timeout for wandb.init() in seconds
+    retry_attempts: int = 3  # Number of retry attempts for init failures
+
     def __post_init__(self):
         if self.tags is None:
             self.tags = ["tensafe", "privacy-preserving"]
@@ -132,18 +136,59 @@ class TenSafeWandbCallback:
             safe_training_config = self._redact_config(training_config)
             run_config.update(safe_training_config)
 
-        # Initialize run
-        self.run = wandb.init(
-            project=self.config.project,
-            entity=self.config.entity,
-            name=self.config.name,
-            tags=self.config.tags,
-            notes=self.config.notes,
-            config=run_config,
-        )
+        # Initialize run with timeout and retry logic
+        last_error = None
+        for attempt in range(self.config.retry_attempts):
+            try:
+                import signal
+                import functools
 
-        self._start_time = time.time()
-        logger.info(f"W&B run initialized: {self.run.url}")
+                def _timeout_handler(signum, frame):
+                    raise TimeoutError(f"wandb.init() timed out after {self.config.init_timeout}s")
+
+                # Set up timeout (Unix only, gracefully skip on Windows)
+                old_handler = None
+                try:
+                    old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+                    signal.alarm(self.config.init_timeout)
+                except (AttributeError, ValueError):
+                    # signal.SIGALRM not available on Windows
+                    pass
+
+                try:
+                    self.run = wandb.init(
+                        project=self.config.project,
+                        entity=self.config.entity,
+                        name=self.config.name,
+                        tags=self.config.tags,
+                        notes=self.config.notes,
+                        config=run_config,
+                    )
+                    self._start_time = time.time()
+                    logger.info(f"W&B run initialized: {self.run.url}")
+                    return  # Success
+                finally:
+                    # Cancel alarm and restore handler
+                    try:
+                        signal.alarm(0)
+                        if old_handler is not None:
+                            signal.signal(signal.SIGALRM, old_handler)
+                    except (AttributeError, ValueError):
+                        pass
+
+            except TimeoutError as e:
+                last_error = e
+                logger.warning(f"W&B init timed out (attempt {attempt + 1}/{self.config.retry_attempts})")
+                time.sleep(2 ** attempt)  # Exponential backoff
+
+            except Exception as e:
+                last_error = e
+                logger.warning(f"W&B init failed (attempt {attempt + 1}/{self.config.retry_attempts}): {e}")
+                time.sleep(2 ** attempt)
+
+        # All retries exhausted
+        logger.error(f"W&B initialization failed after {self.config.retry_attempts} attempts: {last_error}")
+        self.run = None  # Mark as unavailable
 
     def on_step_end(
         self,

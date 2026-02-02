@@ -86,7 +86,12 @@ class JobQueueBackend(ABC):
 
 
 class InMemoryJobQueue(JobQueueBackend):
-    """In-memory job queue with priority support."""
+    """In-memory job queue with priority support and automatic cleanup."""
+
+    # Maximum number of completed jobs to retain for status queries
+    MAX_COMPLETED_JOBS = 1000
+    # Time in seconds to retain completed jobs before cleanup
+    COMPLETED_JOB_TTL = 3600  # 1 hour
 
     def __init__(self, max_queue_size: int = 10000):
         """
@@ -99,6 +104,7 @@ class InMemoryJobQueue(JobQueueBackend):
         self._jobs: Dict[str, Job] = {}
         self._lock = threading.RLock()
         self._condition = threading.Condition(self._lock)
+        self._cleanup_counter = 0  # Track operations for periodic cleanup
 
     def enqueue(self, job: Job) -> None:
         """Add a job to the queue."""
@@ -128,9 +134,47 @@ class InMemoryJobQueue(JobQueueBackend):
             return self._jobs.get(job_id)
 
     def update_job(self, job: Job) -> None:
-        """Update a job's status."""
+        """Update a job's status and trigger cleanup if needed."""
         with self._lock:
             self._jobs[job.job_id] = job
+            self._cleanup_counter += 1
+
+            # Trigger cleanup every 100 operations to prevent unbounded growth
+            if self._cleanup_counter >= 100:
+                self._cleanup_completed_jobs()
+                self._cleanup_counter = 0
+
+    def _cleanup_completed_jobs(self) -> None:
+        """Remove old completed jobs to prevent unbounded memory growth.
+
+        Must be called with lock held.
+        """
+        now = datetime.utcnow()
+        completed_jobs = []
+
+        for job_id, job in self._jobs.items():
+            if job.status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED):
+                if job.completed_at:
+                    age_seconds = (now - job.completed_at).total_seconds()
+                    completed_jobs.append((job_id, age_seconds))
+
+        # Sort by age (oldest first) and remove excess jobs
+        completed_jobs.sort(key=lambda x: x[1], reverse=True)
+
+        # Remove jobs that exceed TTL
+        for job_id, age in completed_jobs:
+            if age > self.COMPLETED_JOB_TTL:
+                del self._jobs[job_id]
+
+        # If still over limit, remove oldest completed jobs
+        remaining_completed = len([j for j in self._jobs.values()
+                                   if j.status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED)])
+        if remaining_completed > self.MAX_COMPLETED_JOBS:
+            # Sort again and remove excess
+            completed_jobs = [(jid, age) for jid, age in completed_jobs if jid in self._jobs]
+            for job_id, _ in completed_jobs[self.MAX_COMPLETED_JOBS:]:
+                if job_id in self._jobs:
+                    del self._jobs[job_id]
 
     def cancel_job(self, job_id: str) -> bool:
         """Cancel a pending job."""
