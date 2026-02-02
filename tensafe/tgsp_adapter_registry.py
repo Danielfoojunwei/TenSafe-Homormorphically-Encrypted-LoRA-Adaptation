@@ -693,7 +693,8 @@ class TGSPAdapterRegistry:
     def _init_he_adapter_for(self, adapter: LoadedAdapter) -> None:
         """Initialize HE adapter for a loaded adapter."""
         try:
-            from tensafe.he_lora import HELoRAAdapter, HELoRAConfig
+            # Use the new HE-LoRA microkernel (preferred)
+            from he_lora_microkernel.compat import HELoRAAdapter, HELoRAConfig
 
             config = HELoRAConfig(
                 rank=adapter.metadata.lora_rank,

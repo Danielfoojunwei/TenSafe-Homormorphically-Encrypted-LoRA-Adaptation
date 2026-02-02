@@ -59,6 +59,7 @@ class HEBackendType(Enum):
     N2HE = "n2he"  # N2HE pure Python with optional native
     HEXL = "hexl"  # N2HE-HEXL production backend (Intel HEXL - Intel CPU only)
     CKKS_MOAI = "ckks_moai"  # CKKS MOAI backend (Pyfhel, MOAI-style optimizations)
+    MICROKERNEL = "microkernel"  # HE-LoRA Microkernel (MOAI-inspired, GPU-accelerated)
     AUTO = "auto"  # Auto-select best available
 
 
@@ -580,17 +581,22 @@ class HEXLBackendWrapper(HEBackendInterface):
 
     def setup(self) -> None:
         try:
-            from tensafe.he_lora.backend import HEBackend, HEBackendNotAvailableError
+            from he_lora_microkernel.compat import HEBackend as MicrokernelHEBackend
 
             hexl_params = self.params.to_hexl_params()
-            self._backend = HEBackend(hexl_params)
+            self._backend = MicrokernelHEBackend(hexl_params)
             self._backend.setup()
 
             self._is_setup = True
             self._keys_generated = True
 
+            logger.info("HEXLBackendWrapper initialized with microkernel backend")
+
         except ImportError as e:
-            raise RuntimeError(f"HEXL backend not available: {e}")
+            raise RuntimeError(
+                f"HE-LoRA Microkernel backend not available: {e}\n"
+                "Install the he_lora_microkernel package."
+            )
 
     def generate_keys(self, generate_galois: bool = True) -> None:
         # Keys are generated in setup() for HEXL
@@ -885,6 +891,187 @@ class CKKSMOAIBackendWrapper(HEBackendInterface):
 
 
 # ==============================================================================
+# HE-LoRA Microkernel Backend Wrapper
+# ==============================================================================
+
+
+class MicrokernelBackendWrapper(HEBackendInterface):
+    """
+    Wrapper for the HE-LoRA Microkernel backend.
+
+    This backend implements the MOAI-inspired microkernel architecture for
+    homomorphic encryption in neural networks with GPU acceleration support.
+
+    Key features:
+    - CKKS encryption scheme optimized for LoRA computations
+    - Column packing for rotation-free plaintext-ciphertext matrix multiplication
+    - GPU acceleration via HEonGPU, FidesLib, or OpenFHE-GPU backends
+    - Every-token HE-LoRA execution
+    - Rotation budget enforcement (≤16 rotations/token)
+
+    This is the recommended backend for production HE-LoRA inference.
+    """
+
+    def __init__(self, params: Optional[HEParams] = None):
+        super().__init__(params)
+        self._backend = None
+        self._packed_weights: Dict[str, Any] = {}
+
+    @property
+    def backend_type(self) -> HEBackendType:
+        return HEBackendType.MICROKERNEL
+
+    @property
+    def backend_name(self) -> str:
+        return "HE-LoRA Microkernel"
+
+    @property
+    def is_production_ready(self) -> bool:
+        return True
+
+    def setup(self) -> None:
+        try:
+            from he_lora_microkernel.compat import HEBackend as MicrokernelHEBackend
+
+            # Convert params to microkernel format
+            microkernel_params = {
+                'poly_modulus_degree': self.params.poly_modulus_degree,
+                'coeff_modulus_bits': self.params.coeff_modulus_bits,
+                'scale_bits': self.params.scale_bits,
+            }
+
+            self._backend = MicrokernelHEBackend(microkernel_params)
+            self._backend.setup()
+
+            self._is_setup = True
+            self._keys_generated = True
+
+            logger.info(
+                f"HE-LoRA Microkernel backend initialized: "
+                f"N={self.params.poly_modulus_degree}, "
+                f"scale=2^{self.params.scale_bits}"
+            )
+
+        except ImportError as e:
+            raise RuntimeError(
+                f"HE-LoRA Microkernel backend not available: {e}\n"
+                "Ensure he_lora_microkernel package is installed."
+            )
+
+    def generate_keys(self, generate_galois: bool = True) -> None:
+        # Keys are generated in setup() for microkernel
+        pass
+
+    def encrypt(self, plaintext: np.ndarray) -> Any:
+        self.validate_ready()
+        self._metrics.operations_count += 1
+        return self._backend.encrypt(plaintext)
+
+    def decrypt(self, ciphertext: Any, output_size: int = 0) -> np.ndarray:
+        self.validate_ready()
+        return self._backend.decrypt(ciphertext, output_size)
+
+    def add(self, ct1: Any, ct2: Any) -> Any:
+        self.validate_ready()
+        self._metrics.operations_count += 1
+
+        # Use backend add if available
+        if hasattr(self._backend, 'add'):
+            return self._backend.add(ct1, ct2)
+
+        # Fallback simulation
+        if isinstance(ct1, dict) and isinstance(ct2, dict):
+            return {"data": ct1["data"] + ct2["data"], "is_encrypted": False}
+
+        raise RuntimeError("Add operation not supported by backend")
+
+    def multiply_plain(self, ct: Any, plaintext: np.ndarray) -> Any:
+        self.validate_ready()
+        self._metrics.operations_count += 1
+        self._metrics.multiplications_count += 1
+
+        if hasattr(self._backend, 'multiply_plain'):
+            return self._backend.multiply_plain(ct, plaintext)
+
+        # Fallback simulation
+        if isinstance(ct, dict):
+            scalar = plaintext.flatten()[0] if plaintext.size == 1 else plaintext
+            return {"data": ct["data"] * scalar, "is_encrypted": False}
+
+        raise RuntimeError("Multiply plain operation not supported by backend")
+
+    def matmul(self, ct: Any, weight: np.ndarray) -> Any:
+        self.validate_ready()
+        self._metrics.operations_count += 1
+        self._metrics.multiplications_count += 1
+
+        # Use column packing if enabled and backend supports it
+        if self.params.use_column_packing and hasattr(self._backend, 'column_packed_matmul'):
+            packed = self._get_or_create_packed(weight)
+            return self._backend.column_packed_matmul(ct, packed, rescale=True)
+
+        # Try direct matmul if available
+        if hasattr(self._backend, 'matmul'):
+            return self._backend.matmul(ct, weight)
+
+        # Fallback simulation
+        if isinstance(ct, dict):
+            result = ct["data"] @ weight.T
+            return {"data": result, "is_encrypted": False}
+
+        raise RuntimeError("Matmul operation not supported by backend")
+
+    def lora_delta(
+        self,
+        ct_x: Any,
+        lora_a: np.ndarray,
+        lora_b: np.ndarray,
+        scaling: float = 1.0,
+    ) -> Any:
+        self.validate_ready()
+
+        # Use microkernel's optimized lora_delta
+        if hasattr(self._backend, 'lora_delta'):
+            return self._backend.lora_delta(ct_x, lora_a, lora_b, scaling)
+
+        # Fallback to column-packed matmul
+        packed_a = self._get_or_create_packed(lora_a, f"lora_a_{id(lora_a)}")
+        packed_b = self._get_or_create_packed(lora_b, f"lora_b_{id(lora_b)}")
+
+        intermediate = self._backend.column_packed_matmul(ct_x, packed_a)
+        result = self._backend.column_packed_matmul(intermediate, packed_b)
+
+        if abs(scaling - 1.0) > 1e-6:
+            result = self.multiply_plain(result, np.array([scaling]))
+
+        return result
+
+    def _get_or_create_packed(self, matrix: np.ndarray, key: Optional[str] = None) -> Any:
+        """Get or create column-packed matrix."""
+        key = key or f"matrix_{id(matrix)}"
+        if key not in self._packed_weights:
+            if hasattr(self._backend, 'create_column_packed_matrix'):
+                self._packed_weights[key] = self._backend.create_column_packed_matrix(matrix)
+            else:
+                self._packed_weights[key] = matrix
+        return self._packed_weights[key]
+
+    def get_slot_count(self) -> int:
+        if self._backend and hasattr(self._backend, 'get_slot_count'):
+            return self._backend.get_slot_count()
+        return self.params.poly_modulus_degree // 2
+
+    def get_metrics(self) -> HEMetrics:
+        if self._backend and hasattr(self._backend, 'get_operation_stats'):
+            stats = self._backend.get_operation_stats()
+            self._metrics.operations_count = stats.get("operations", self._metrics.operations_count)
+            self._metrics.multiplications_count = stats.get("multiplications", self._metrics.multiplications_count)
+            self._metrics.rotations_count = stats.get("rotations", 0)
+            self._metrics.rescale_count = stats.get("rescales", 0)
+        return self._metrics
+
+
+# ==============================================================================
 # Backend Factory
 # ==============================================================================
 
@@ -923,6 +1110,8 @@ def get_backend(
         backend = HEXLBackendWrapper(params)
     elif backend_type == HEBackendType.CKKS_MOAI:
         backend = CKKSMOAIBackendWrapper(params)
+    elif backend_type == HEBackendType.MICROKERNEL:
+        backend = MicrokernelBackendWrapper(params)
     else:
         raise ValueError(f"Unknown backend type: {backend_type}")
 
@@ -938,12 +1127,22 @@ def _auto_select_backend(params: Optional[HEParams] = None) -> HEBackendInterfac
     Automatically select the best available backend.
 
     Priority:
-    1. CKKS MOAI (Pyfhel, best for neural network float arithmetic)
-    2. HEXL (Intel CPU only, production)
-    3. N2HE native
-    4. N2HE toy (if allowed)
+    1. HE-LoRA Microkernel (MOAI-inspired, GPU-accelerated, recommended)
+    2. CKKS MOAI (Pyfhel, best for neural network float arithmetic)
+    3. HEXL (Intel CPU only, production)
+    4. N2HE native
+    5. N2HE toy (if allowed)
     """
-    # Try CKKS MOAI first (best for neural network float arithmetic)
+    # Try HE-LoRA Microkernel first (recommended for production)
+    try:
+        backend = MicrokernelBackendWrapper(params)
+        # Quick availability check
+        from he_lora_microkernel.compat import HEBackend as _MKBackend
+        return backend
+    except (ImportError, RuntimeError):
+        logger.debug("HE-LoRA Microkernel backend not available")
+
+    # Try CKKS MOAI (Pyfhel, best for neural network float arithmetic)
     try:
         backend = CKKSMOAIBackendWrapper(params)
         # Quick availability check
@@ -970,10 +1169,11 @@ def _auto_select_backend(params: Optional[HEParams] = None) -> HEBackendInterfac
 
     raise RuntimeError(
         "No HE backend available. Options:\n"
-        "1. Install Pyfhel for CKKS MOAI: pip install Pyfhel (recommended, best for neural networks)\n"
-        "2. Install N2HE-HEXL: ./scripts/build_n2he_hexl.sh (Intel CPU only)\n"
-        "3. Install N2HE native library\n"
-        "4. Enable toy mode: TENSAFE_TOY_HE=1 (development only)"
+        "1. HE-LoRA Microkernel (recommended): included in he_lora_microkernel package\n"
+        "2. Install Pyfhel for CKKS MOAI: pip install Pyfhel\n"
+        "3. Install N2HE-HEXL: ./scripts/build_n2he_hexl.sh (Intel CPU only)\n"
+        "4. Install N2HE native library\n"
+        "5. Enable toy mode: TENSAFE_TOY_HE=1 (development only)"
     )
 
 
@@ -997,10 +1197,14 @@ def is_backend_available(backend_type: Union[HEBackendType, str]) -> bool:
             from tensorguard.n2he.core import N2HEContext
             return True
         elif backend_type == HEBackendType.HEXL:
-            from tensafe.he_lora.backend import HEBackend
+            # HEXL now uses the microkernel backend
+            from he_lora_microkernel.compat import HEBackend as _MKBackend
             return True
         elif backend_type == HEBackendType.CKKS_MOAI:
             from crypto_backend.ckks_moai import CKKSMOAIBackend
+            return True
+        elif backend_type == HEBackendType.MICROKERNEL:
+            from he_lora_microkernel.compat import HEBackend as _MKBackend
             return True
         elif backend_type == HEBackendType.AUTO:
             return True
