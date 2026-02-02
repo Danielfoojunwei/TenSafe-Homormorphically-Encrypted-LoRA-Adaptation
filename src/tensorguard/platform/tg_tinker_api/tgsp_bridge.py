@@ -3,8 +3,13 @@ TG-Tinker to TGSP integration module.
 
 Provides utilities to package TG-Tinker training artifacts as TGSP packages
 for secure distribution to edge devices.
+
+IMPORTANT: This module uses canonical serialization from tensorguard.evidence.canonical
+to ensure consistent evidence hashing across all TenSafe components. This addresses
+the canonical vs empirical gap in evidence creation and validation.
 """
 
+import hashlib
 import json
 import logging
 import tempfile
@@ -12,11 +17,23 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+from tensorguard.evidence.canonical import canonical_bytes, canonical_json
+
 if TYPE_CHECKING:
     from .audit import AuditLogger
     from .storage import EncryptedArtifactStore, TinkerArtifact
 
 logger = logging.getLogger(__name__)
+
+
+# Evidence schema version for backward compatibility tracking
+EVIDENCE_SCHEMA_VERSION = "2.0"
+
+# Valid epsilon/delta ranges for DP metrics validation
+DP_EPSILON_MIN = 0.0
+DP_EPSILON_MAX = 100.0  # Reasonable upper bound
+DP_DELTA_MIN = 0.0
+DP_DELTA_MAX = 1.0
 
 
 class TinkerTGSPBridge:
@@ -134,12 +151,19 @@ class TinkerTGSPBridge:
         """
         Create evidence.json from TG-Tinker artifact and audit chain.
 
+        IMPORTANT: This method now uses canonical serialization and includes
+        proper schema versioning and validation. This addresses the gap where
+        evidence created by the bridge had a different schema than EvidenceStore.
+
         Args:
             artifact: Source TinkerArtifact
             dp_certificate: Optional DP certificate data
 
         Returns:
-            Evidence dictionary for TGSP package
+            Evidence dictionary for TGSP package with canonical hash
+
+        Raises:
+            ValueError: If DP certificate contains invalid epsilon/delta values
         """
         # Get audit logs for this training client
         logs = self.audit_logger.get_logs(
@@ -147,16 +171,38 @@ class TinkerTGSPBridge:
             limit=10000,
         )
 
-        # Compute audit chain hash
+        # Compute audit chain information with full integrity data
         if logs:
             first_hash = logs[0].record_hash
             last_hash = logs[-1].record_hash
+            # Compute canonical hash of the entire audit chain for integrity verification
+            chain_data = [
+                {"seq": log.sequence, "hash": log.record_hash, "op": log.operation}
+                for log in logs
+            ]
+            chain_canonical_hash = hashlib.sha256(canonical_bytes(chain_data)).hexdigest()
         else:
             first_hash = "none"
             last_hash = "none"
+            chain_canonical_hash = "none"
 
-        # Build evidence
+        # Validate DP certificate if provided
+        if dp_certificate:
+            epsilon = dp_certificate.get("total_epsilon")
+            delta = dp_certificate.get("total_delta")
+
+            if epsilon is not None and not (DP_EPSILON_MIN <= epsilon <= DP_EPSILON_MAX):
+                raise ValueError(
+                    f"Invalid epsilon value {epsilon}: must be in range [{DP_EPSILON_MIN}, {DP_EPSILON_MAX}]"
+                )
+            if delta is not None and not (DP_DELTA_MIN <= delta <= DP_DELTA_MAX):
+                raise ValueError(
+                    f"Invalid delta value {delta}: must be in range [{DP_DELTA_MIN}, {DP_DELTA_MAX}]"
+                )
+
+        # Build evidence with schema version for backward compatibility
         evidence = {
+            "schema_version": EVIDENCE_SCHEMA_VERSION,
             "training_run_id": artifact.training_client_id,
             "artifact_id": artifact.id,
             "artifact_type": artifact.artifact_type,
@@ -168,10 +214,11 @@ class TinkerTGSPBridge:
                 "first_entry_hash": first_hash,
                 "last_entry_hash": last_hash,
                 "total_entries": len(logs),
+                "chain_canonical_hash": chain_canonical_hash,  # New: enables full chain verification
             },
         }
 
-        # Add DP metrics if available
+        # Add DP metrics if available (with validation already performed)
         if dp_certificate:
             evidence["privacy"] = {
                 "epsilon": dp_certificate.get("total_epsilon"),
@@ -184,6 +231,10 @@ class TinkerTGSPBridge:
         # Add metadata from artifact
         if artifact.metadata_json:
             evidence["training_metadata"] = artifact.metadata_json
+
+        # Compute canonical evidence hash for integrity verification
+        # This links evidence to the canonical serialization used across TenSafe
+        evidence["evidence_hash"] = f"sha256:{hashlib.sha256(canonical_bytes(evidence)).hexdigest()}"
 
         return evidence
 
