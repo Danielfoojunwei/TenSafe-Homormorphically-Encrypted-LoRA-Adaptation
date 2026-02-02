@@ -1,0 +1,218 @@
+// HE Adapter Service Protocol Buffer Definitions
+//
+// Service for managing HE-LoRA computation.
+// The HAS (HE Adapter Service) holds HE secret keys and performs
+// encryption/decryption and HE computation.
+
+syntax = "proto3";
+
+package helora;
+
+option go_package = "helora/proto";
+
+// ============================================================================
+// ADAPTER MANAGEMENT
+// ============================================================================
+
+message LoadAdapterRequest {
+    string adapter_id = 1;      // Unique identifier for this adapter
+    string model_id = 2;        // Base model identifier
+    string adapter_path = 3;    // Path to adapter weights (optional)
+    int32 rank = 4;             // LoRA rank
+    float alpha = 5;            // LoRA alpha scaling
+    string targets = 6;         // "qkv" or "qkvo"
+    repeated int32 layers = 7;  // Specific layers to load (empty = all)
+}
+
+message LoadAdapterResponse {
+    bool success = 1;
+    string error_message = 2;
+    int32 num_layers = 3;
+    repeated int32 loaded_layers = 4;
+    float memory_usage_mb = 5;
+}
+
+message UnloadAdapterRequest {
+    string adapter_id = 1;
+}
+
+message UnloadAdapterResponse {
+    bool success = 1;
+    string error_message = 2;
+}
+
+message GetAdapterInfoRequest {
+    string adapter_id = 1;
+}
+
+message AdapterInfo {
+    string adapter_id = 1;
+    string model_id = 2;
+    int32 rank = 3;
+    float alpha = 4;
+    string targets = 5;
+    int32 num_layers = 6;
+    repeated int32 loaded_layers = 7;
+    float memory_usage_mb = 8;
+}
+
+message GetAdapterInfoResponse {
+    bool success = 1;
+    string error_message = 2;
+    AdapterInfo info = 3;
+}
+
+// ============================================================================
+// REQUEST LIFECYCLE
+// ============================================================================
+
+message PrepareRequestRequest {
+    string request_id = 1;      // Unique request identifier
+    string adapter_id = 2;      // Adapter to use
+    int32 batch_size = 3;       // Batch size for this request
+    int32 seq_len = 4;          // Initial sequence length
+    string shm_region = 5;      // Shared memory region name (optional)
+}
+
+message PrepareRequestResponse {
+    bool success = 1;
+    string error_message = 2;
+    string shm_region = 3;      // Assigned shared memory region
+    int64 shm_offset = 4;       // Offset within region
+    int64 buffer_size = 5;      // Size of allocated buffer
+}
+
+message ReleaseRequestRequest {
+    string request_id = 1;
+}
+
+message ReleaseRequestResponse {
+    bool success = 1;
+    string error_message = 2;
+}
+
+// ============================================================================
+// TOKEN STEP
+// ============================================================================
+
+message ApplyTokenStepRequest {
+    string request_id = 1;
+    int32 layer_idx = 2;
+    string projection_type = 3;  // "q", "k", "v", "o"
+    int32 token_idx = 4;
+    // Hidden states passed via shared memory
+}
+
+message ApplyTokenStepResponse {
+    bool success = 1;
+    string error_message = 2;
+    bool has_delta = 3;
+    int64 shm_offset = 4;        // Where delta is written in shared memory
+    // Timing (microseconds)
+    int64 encrypt_time_us = 5;
+    int64 compute_time_us = 6;
+    int64 decrypt_time_us = 7;
+}
+
+message ApplyBatchedTokenStepRequest {
+    string request_id = 1;
+    int32 token_idx = 2;
+    repeated string layer_projections = 3;  // ["0_q", "0_k", "0_v", "1_q", ...]
+}
+
+message DeltaResult {
+    int32 layer_idx = 1;
+    string projection_type = 2;
+    bool has_delta = 3;
+    int64 shm_offset = 4;
+}
+
+message ApplyBatchedTokenStepResponse {
+    bool success = 1;
+    string error_message = 2;
+    repeated DeltaResult results = 3;
+    int64 total_time_us = 4;
+}
+
+// ============================================================================
+// HEALTH AND STATUS
+// ============================================================================
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+    bool healthy = 1;
+    string message = 2;
+    float uptime_seconds = 3;
+}
+
+message GetStatusRequest {}
+
+message GetStatusResponse {
+    bool healthy = 1;
+    int32 loaded_adapters = 2;
+    int32 active_requests = 3;
+    float memory_used_mb = 4;
+    float memory_available_mb = 5;
+    float gpu_utilization = 6;
+    // HE statistics
+    int64 total_tokens_processed = 7;
+    float avg_encrypt_time_us = 8;
+    float avg_compute_time_us = 9;
+    float avg_decrypt_time_us = 10;
+}
+
+// ============================================================================
+// TELEMETRY
+// ============================================================================
+
+message TelemetryData {
+    int64 timestamp_us = 1;
+    string request_id = 2;
+    int32 token_idx = 3;
+    int32 layer_idx = 4;
+    string projection_type = 5;
+    int64 encrypt_time_us = 6;
+    int64 compute_time_us = 7;
+    int64 decrypt_time_us = 8;
+    int32 rotations = 9;
+    int32 keyswitches = 10;
+    int32 rescales = 11;
+}
+
+message GetTelemetryRequest {
+    string request_id = 1;
+    int32 start_token = 2;
+    int32 end_token = 3;  // -1 means all
+}
+
+message GetTelemetryResponse {
+    bool success = 1;
+    repeated TelemetryData data = 2;
+}
+
+// ============================================================================
+// SERVICE DEFINITION
+// ============================================================================
+
+service HEAdapterService {
+    // Adapter management
+    rpc LoadAdapter(LoadAdapterRequest) returns (LoadAdapterResponse);
+    rpc UnloadAdapter(UnloadAdapterRequest) returns (UnloadAdapterResponse);
+    rpc GetAdapterInfo(GetAdapterInfoRequest) returns (GetAdapterInfoResponse);
+
+    // Request lifecycle
+    rpc PrepareRequest(PrepareRequestRequest) returns (PrepareRequestResponse);
+    rpc ReleaseRequest(ReleaseRequestRequest) returns (ReleaseRequestResponse);
+
+    // Token processing
+    rpc ApplyTokenStep(ApplyTokenStepRequest) returns (ApplyTokenStepResponse);
+    rpc ApplyBatchedTokenStep(ApplyBatchedTokenStepRequest) returns (ApplyBatchedTokenStepResponse);
+
+    // Health and status
+    rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+    rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+
+    // Telemetry
+    rpc GetTelemetry(GetTelemetryRequest) returns (GetTelemetryResponse);
+}
