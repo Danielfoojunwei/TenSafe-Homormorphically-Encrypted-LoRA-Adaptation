@@ -479,11 +479,6 @@ class TenSafeConfig:
         # Check HE configuration
         if self.he.mode != HEMode.DISABLED:
             resolved_mode = HEMode.resolve(self.he.mode)
-            if resolved_mode == HEMode.SIMULATION:
-                issues.append(
-                    "Warning: HE SIMULATION mode is NOT cryptographically secure. "
-                    "Use PRODUCTION mode for deployment."
-                )
             if self.he.mode.is_legacy:
                 issues.append(
                     f"Warning: HEMode.{self.he.mode.value} is deprecated. "
@@ -706,7 +701,6 @@ def create_default_config(
     model_name: str = "meta-llama/Llama-3.1-8B",
     with_dp: bool = True,
     with_he: bool = False,
-    he_simulation: bool = False,
 ) -> TenSafeConfig:
     """
     Create a default configuration for common use cases.
@@ -715,19 +709,13 @@ def create_default_config(
         mode: Training mode (SFT, RLVR)
         model_name: Model to fine-tune
         with_dp: Enable differential privacy
-        with_he: Enable homomorphic encryption
-        he_simulation: Use HE simulation mode (for testing, not secure)
+        with_he: Enable homomorphic encryption (requires production HE backend)
 
     Returns:
         Configured TenSafeConfig
     """
     # Determine HE mode
-    if not with_he:
-        he_mode = HEMode.DISABLED
-    elif he_simulation:
-        he_mode = HEMode.SIMULATION
-    else:
-        he_mode = HEMode.PRODUCTION
+    he_mode = HEMode.PRODUCTION if with_he else HEMode.DISABLED
 
     config = TenSafeConfig(
         model=ModelConfig(name=model_name),

@@ -983,7 +983,6 @@ class TenSafePipeline:
         backend_type = {
             HEMode.DISABLED: HEBackendType.DISABLED,
             HEMode.PRODUCTION: HEBackendType.PRODUCTION,
-            HEMode.SIMULATION: HEBackendType.SIMULATION,
         }.get(resolved_mode, HEBackendType.PRODUCTION)
 
         self._he_backend = get_backend(backend_type, params)

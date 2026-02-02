@@ -27,9 +27,9 @@ Usage:
         pass
 
     # Check gate status
-    status = ProductionGates.TOY_HE.check()
+    status = ProductionGates.HE_ENABLED.check()
     if status == GateStatus.DENIED:
-        raise RuntimeError("Toy HE not allowed in production")
+        raise RuntimeError("HE not allowed")
 """
 
 from __future__ import annotations
@@ -99,15 +99,15 @@ class FeatureGate:
 
     Example:
         gate = FeatureGate(
-            name="toy_he",
-            description="Allow toy/simulation HE mode",
+            name="debug_mode",
+            description="Enable debug logging",
             default_allowed=False,
-            env_var="TENSAFE_TOY_HE",
+            env_var="TENSAFE_DEBUG",
             production_allowed=False,
         )
 
         if gate.is_allowed():
-            # Use toy HE
+            # Enable debug mode
             pass
     """
 
@@ -301,15 +301,6 @@ class ProductionGates:
         description="Enable homomorphic encryption features",
         default_allowed=True,
         production_allowed=True,
-    )
-
-    TOY_HE = FeatureGate(
-        name="toy_he",
-        description="Allow toy/simulation HE mode (NOT SECURE)",
-        default_allowed=False,
-        env_var="TENSAFE_TOY_HE",
-        production_allowed=False,  # Never allow in production
-        requires_audit=True,
     )
 
     # DP Gates
@@ -666,13 +657,6 @@ class ProductionValidator:
 
         # Check HE mode
         if hasattr(config, 'he'):
-            from tensafe.core.config import HEMode
-            if config.he.mode == HEMode.TOY:
-                if is_prod:
-                    errors.append("Toy HE mode not allowed in production")
-                else:
-                    warnings.append("Toy HE mode is not cryptographically secure")
-
             # Check HE security parameters
             if config.he.security_level < 128:
                 if is_prod:
@@ -748,7 +732,6 @@ class ProductionValidator:
 
         # Security-critical environment variables that should never be set in production
         FORBIDDEN_IN_PROD = [
-            ("TENSAFE_TOY_HE", "Toy HE cannot be enabled in production"),
             ("TENSAFE_DP_BYPASS", "DP bypass cannot be enabled in production"),
             ("TENSAFE_UNSAFE_DESER", "Unsafe deserialization cannot be enabled in production"),
             ("TENSAFE_NO_RATE_LIMIT", "Rate limiting cannot be disabled in production"),
@@ -904,7 +887,6 @@ def security_audit() -> Dict[str, Any]:
 
     # Check all security-related gates
     security_gates = [
-        ProductionGates.TOY_HE,
         ProductionGates.DP_BYPASS,
         ProductionGates.UNSAFE_DESERIALIZATION,
         ProductionGates.REMOTE_CODE_EXECUTION,

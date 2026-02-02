@@ -231,9 +231,9 @@ def _add_train_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--he-mode",
         type=str,
-        choices=["disabled", "toy", "n2he", "n2he_hexl"],
+        choices=["disabled", "production"],
         default="disabled",
-        help="Homomorphic encryption mode",
+        help="Homomorphic encryption mode (production requires HE-LoRA microkernel)",
     )
     parser.add_argument(
         "--resume",
@@ -329,9 +329,9 @@ def _add_verify_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--backend",
         type=str,
-        choices=["all", "n2he", "hexl", "toy"],
+        choices=["all", "production"],
         default="all",
-        help="Backend to verify",
+        help="Backend to verify (production uses HE-LoRA microkernel)",
     )
     parser.add_argument(
         "--quick",
@@ -599,50 +599,22 @@ def _handle_verify(args: argparse.Namespace) -> int:
 
     results = {}
 
-    if args.backend in ("all", "n2he"):
-        print("\nVerifying N2HE backend...")
-        try:
-            from tensorguard.n2he.core import ToyN2HEScheme, HESchemeParams
-            os.environ["TENSAFE_TOY_HE"] = "1"  # Allow toy for testing
-            scheme = ToyN2HEScheme(HESchemeParams(), _force_enable=True)
-            sk, pk, ek = scheme.keygen()
-            print(f"  [OK] N2HE scheme operational")
-            print(f"       Keys generated: sk={len(sk)}B, pk={len(pk)}B, ek={len(ek)}B")
-            results["n2he"] = "OK"
-        except Exception as e:
-            print(f"  [FAIL] N2HE: {e}")
-            results["n2he"] = f"FAIL: {e}"
-
-    if args.backend in ("all", "hexl", "microkernel"):
-        print("\nVerifying HE-LoRA Microkernel backend...")
+    if args.backend in ("all", "production"):
+        print("\nVerifying HE-LoRA Microkernel (Production) backend...")
         try:
             from he_lora_microkernel.compat import HEBackend
             backend = HEBackend()
             backend.setup()
-            print(f"  [OK] Microkernel backend operational")
+            print(f"  [OK] Production backend operational")
             print(f"       Slot count: {backend.get_slot_count()}")
-            results["microkernel"] = "OK"
+            results["production"] = "OK"
         except ImportError as e:
-            print(f"  [SKIP] Microkernel not installed: {e}")
-            results["microkernel"] = "NOT_INSTALLED"
+            print(f"  [SKIP] Production backend not installed: {e}")
+            print("         Install with: pip install he_lora_microkernel")
+            results["production"] = "NOT_INSTALLED"
         except Exception as e:
-            print(f"  [FAIL] Microkernel: {e}")
-            results["microkernel"] = f"FAIL: {e}"
-
-    if args.backend in ("all", "toy"):
-        print("\nVerifying Toy backend...")
-        try:
-            from tensafe.core.he_interface import ToyHEBackend, HEParams
-            os.environ["TENSAFE_TOY_HE"] = "1"
-            backend = ToyHEBackend(HEParams(), _force_enable=True)
-            backend.setup()
-            ct = backend.encrypt(np.array([1.0, 2.0, 3.0]))
-            pt = backend.decrypt(ct)
-            print(f"  [OK] Toy backend operational (NOT SECURE)")
-            results["toy"] = "OK"
-        except Exception as e:
-            print(f"  [FAIL] Toy: {e}")
-            results["toy"] = f"FAIL: {e}"
+            print(f"  [FAIL] Production backend: {e}")
+            results["production"] = f"FAIL: {e}"
 
     print("\n" + "=" * 50)
     print("Summary:")

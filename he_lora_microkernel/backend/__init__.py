@@ -4,7 +4,6 @@ HE-LoRA Microkernel Backend
 This package provides GPU-accelerated CKKS backends for HE-LoRA.
 
 Supported backends:
-  - SIMULATION: CPU simulation for testing (always available)
   - HEONGPU: HEonGPU library (GPU, requires installation)
   - FIDESLIB: FIDESlib library (GPU, requires installation)
   - OPENFHE_GPU: OpenFHE-GPU fork (GPU, requires installation)
@@ -16,9 +15,9 @@ Usage:
         GPUCKKSBackend,
     )
 
-    # Create simulation backend
+    # Create GPU backend
     backend = create_backend(
-        BackendType.SIMULATION,
+        BackendType.HEONGPU,
         ckks_params,
         device_id=0,
     )
@@ -40,8 +39,6 @@ from .gpu_ckks_backend import (
     create_backend,
     get_available_backends,
     register_backend,
-    # Simulation
-    SimulationBackend,
 )
 
 __all__ = [
@@ -53,5 +50,4 @@ __all__ = [
     'create_backend',
     'get_available_backends',
     'register_backend',
-    'SimulationBackend',
 ]

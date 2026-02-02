@@ -17,7 +17,7 @@ TenSafe is a complete privacy-preserving machine learning platform that protects
 
 > **Package Names**: The installable packages are `tg_tinker` (SDK) and `tensorguard` (server).
 
-> **N2HE Warning**: Homomorphic encryption features use a **toy simulation** by default. Set `TENSAFE_TOY_HE=1` for testing. Production requires the native N2HE library.
+> **N2HE Production Mode**: Homomorphic encryption requires the native N2HE library or GPU-accelerated backends (HEonGPU, FIDESlib). For development/testing without native libraries, set `TENSAFE_TOY_HE=1` to enable the pure-Python simulation layer (not cryptographically secure).
 
 ---
 

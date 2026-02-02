@@ -6,7 +6,6 @@ Provides backend abstraction for N2HE/TFHE integration with the HE-LoRA microker
 Backend Types:
     GPU_TFHE: GPU-accelerated TFHE (primary)
     CPU_FASTERNTT: CPU fallback using FasterNTT
-    SIMULATION: Plaintext simulation for testing
 
 The backend handles:
     - LUT evaluation via programmable bootstrapping
@@ -29,7 +28,6 @@ class N2HEBackendType(Enum):
     """Available backend types."""
     GPU_TFHE = auto()      # GPU-accelerated TFHE
     CPU_FASTERNTT = auto() # CPU fallback with FasterNTT
-    SIMULATION = auto()    # Plaintext simulation
 
 
 @dataclass
@@ -246,66 +244,6 @@ class CPUFasterNTTBackend(N2HEBackend):
         return True
 
 
-@dataclass
-class SimulatedCiphertext:
-    """Simulated ciphertext for testing."""
-    plaintext: int
-    bits: int = 8
-
-
-class SimulationBackend(N2HEBackend):
-    """
-    Plaintext simulation backend for testing.
-
-    Evaluates LUTs on plaintext values without encryption.
-    Used for correctness testing and debugging.
-    """
-
-    def __init__(self, precision_bits: int = 8):
-        self.precision_bits = precision_bits
-
-    def evaluate_lut(
-        self,
-        input_ct: Any,
-        lut: List[int],
-        output_bits: int = 8,
-    ) -> Any:
-        """Evaluate LUT on plaintext."""
-        if isinstance(input_ct, SimulatedCiphertext):
-            plaintext = input_ct.plaintext
-        elif isinstance(input_ct, (int, np.integer)):
-            plaintext = int(input_ct)
-        else:
-            raise TypeError(f"Unsupported input type: {type(input_ct)}")
-
-        # Clamp to valid range
-        idx = max(0, min(len(lut) - 1, plaintext))
-        return SimulatedCiphertext(lut[idx], output_bits)
-
-    def batch_evaluate_lut(
-        self,
-        input_cts: List[Any],
-        lut: List[int],
-        output_bits: int = 8,
-    ) -> List[Any]:
-        """Batch evaluation in simulation."""
-        return [self.evaluate_lut(ct, lut, output_bits) for ct in input_cts]
-
-    def get_capabilities(self) -> BackendCapabilities:
-        """Simulation capabilities."""
-        return BackendCapabilities(
-            supports_gpu=False,
-            supports_batching=True,
-            max_batch_size=10000,
-            supported_lut_bits=[4, 6, 8, 10, 12],
-            estimated_bootstrap_ms=0.001,  # Very fast (no real crypto)
-        )
-
-    def is_available(self) -> bool:
-        """Simulation is always available."""
-        return True
-
-
 def create_n2he_backend(
     backend_type: Optional[N2HEBackendType] = None,
     params: Optional[N2HEParams] = None,
@@ -322,9 +260,6 @@ def create_n2he_backend(
     Returns:
         Configured backend instance
     """
-    if backend_type == N2HEBackendType.SIMULATION:
-        return SimulationBackend()
-
     if backend_type == N2HEBackendType.GPU_TFHE:
         backend = GPUTFHEBackend(params)
         if backend.is_available():
@@ -355,10 +290,8 @@ def is_n2he_available(backend_type: Optional[N2HEBackendType] = None) -> bool:
         True if backend is available
     """
     if backend_type is None:
-        return True  # Simulation always available
-
-    if backend_type == N2HEBackendType.SIMULATION:
-        return True
+        # Auto-select: GPU or CPU available
+        return GPUTFHEBackend().is_available() or True  # CPU always available
 
     if backend_type == N2HEBackendType.GPU_TFHE:
         return GPUTFHEBackend().is_available()
