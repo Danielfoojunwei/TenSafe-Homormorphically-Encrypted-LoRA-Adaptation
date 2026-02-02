@@ -239,6 +239,50 @@ backend = create_n2he_backend(N2HEBackendType.CPU_FASTERNTT)
 - Higher bits (10-12) for critical paths
 - Lower bits (4-6) for gates where exact threshold matters
 
+## Benchmark Results (Empirical)
+
+The following benchmarks were collected on 2026-02-02 using simulation mode.
+
+### Gated LoRA Performance
+
+| Hidden Size | LoRA Rank | Mean Latency | P95 Latency | Throughput | Max Error |
+|-------------|-----------|--------------|-------------|------------|-----------|
+| 512 | 8 | 67.4 μs | 87.1 μs | 14,842 ops/sec | 1.36e-02 |
+| 512 | 16 | 70.5 μs | 89.5 μs | 14,186 ops/sec | 2.00e-07 |
+| 512 | 32 | 88.3 μs | 148.0 μs | 11,327 ops/sec | 3.82e-02 |
+| 1024 | 8 | 69.4 μs | 83.4 μs | 14,406 ops/sec | 1.26e-07 |
+| 1024 | 16 | 75.3 μs | 89.0 μs | 13,287 ops/sec | 4.59e-02 |
+| 1024 | 32 | 96.2 μs | 129.4 μs | 10,394 ops/sec | 6.42e-02 |
+
+**Operation Profile:**
+- CKKS Operations: 10
+- TFHE LUT Evaluations: 1
+- Bridge Operations: 3
+- Bootstraps per operation: 1
+- Multiplicative Depth: 4
+- Gate ON Rate: ~50% (balanced random inputs)
+
+### Comparison with Linear LoRA
+
+| Metric | Linear LoRA | Gated LoRA | Ratio |
+|--------|-------------|------------|-------|
+| Avg Latency (sim) | 637.6 μs | 77.8 μs | 8.2x |
+| Multiplicative Depth | 2 | 4 | 2x |
+| Rotations | 0 | 0 | - |
+| Bootstraps | 0 | 1 | - |
+
+> **Note:** In simulation mode, gated LoRA appears faster because TFHE bootstrap is simulated. In production with real cryptographic backends, TFHE bootstrap adds ~10-50ms per operation.
+
+### Production Latency Estimates
+
+| Operation | Simulation | Production (Est.) |
+|-----------|------------|-------------------|
+| Linear LoRA (CKKS) | 0.6 ms | 7-14 ms |
+| Gated LoRA (Hybrid) | 0.08 ms | 20-70 ms |
+| TFHE Bootstrap | ~0 μs | 10-50 ms |
+
+**Recommendation:** Use linear LoRA for latency-critical paths. Reserve gated LoRA for applications requiring conditional adaptation.
+
 ## Future Directions
 
 1. **Multi-party computation**: Threshold schemes for distributed inference

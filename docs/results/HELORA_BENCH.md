@@ -129,8 +129,70 @@ Not recommended when:
 - Base model is also confidential
 - Full HE transformer is needed
 
+## Gated LoRA Benchmarks (Hybrid CKKS-TFHE)
+
+The hybrid CKKS-TFHE compiler enables **conditional LoRA adaptation** using discrete gates:
+
+```
+y = Wx + g(x) · Δ(x)
+```
+
+Where `g(x)` is evaluated exactly via TFHE programmable bootstrapping.
+
+### Gated LoRA Performance (Simulation Mode, 2026-02-02)
+
+| Hidden Size | LoRA Rank | Mean Latency | P95 Latency | Throughput | Bootstraps |
+|-------------|-----------|--------------|-------------|------------|------------|
+| 512 | 8 | 67.4 μs | 87.1 μs | 14,842 ops/sec | 1 |
+| 512 | 16 | 70.5 μs | 89.5 μs | 14,186 ops/sec | 1 |
+| 512 | 32 | 88.3 μs | 148.0 μs | 11,327 ops/sec | 1 |
+| 1024 | 8 | 69.4 μs | 83.4 μs | 14,406 ops/sec | 1 |
+| 1024 | 16 | 75.3 μs | 89.0 μs | 13,287 ops/sec | 1 |
+| 1024 | 32 | 96.2 μs | 129.4 μs | 10,394 ops/sec | 1 |
+
+### Gated vs Linear LoRA Comparison
+
+| Metric | Linear LoRA | Gated LoRA |
+|--------|-------------|------------|
+| Avg Latency (sim) | 637.6 μs | 77.8 μs |
+| CKKS Operations | 2-4 | 10 |
+| TFHE Bootstraps | 0 | 1 |
+| Multiplicative Depth | 2 | 4 |
+| Rotations | 0 | 0 |
+
+> **Note:** Simulation mode does not include actual TFHE bootstrap latency (~10-50ms in production).
+
+### Production Estimates for Gated LoRA
+
+| Component | Simulation | Production |
+|-----------|------------|------------|
+| CKKS LoRA Delta | 0.5 ms | 5-10 ms |
+| CKKS Gate Pre-activation | 0.1 ms | 1-2 ms |
+| Bridge CKKS→TFHE | ~0 ms | 1-5 ms |
+| TFHE Bootstrap (LUT) | ~0 ms | **10-50 ms** |
+| Bridge TFHE→CKKS | ~0 ms | 1-5 ms |
+| Gate Application | 0.1 ms | 1-2 ms |
+| **Total** | **~0.7 ms** | **20-70 ms** |
+
+### When to Use Gated LoRA
+
+**Recommended:**
+- Conditional/task-specific adaptation
+- Mixture-of-experts style routing
+- Discrete control flow over encrypted data
+
+**Not Recommended:**
+- Latency-critical applications
+- High-throughput inference
+- Simple adaptation tasks (use linear LoRA)
+
+## Full Benchmark Results
+
+See [BENCHMARK_RESULTS.md](./BENCHMARK_RESULTS.md) for complete empirical data.
+
 ## References
 
 - [MOAI Paper](https://eprint.iacr.org/2025/991)
 - [HE-LoRA Architecture](../arch/HE_LORA_ONLY.md)
 - [N2HE-HEXL Build Guide](../crypto/N2HE_HEXL_BUILD.md)
+- [Hybrid CKKS-TFHE Compiler](../../he_lora_microkernel/hybrid_compiler/ARCHITECTURE.md)
