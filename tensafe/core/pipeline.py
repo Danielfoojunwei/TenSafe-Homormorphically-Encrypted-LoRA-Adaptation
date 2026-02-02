@@ -886,11 +886,10 @@ class TenSafePipeline:
                 )
 
         except ImportError as e:
-            logger.warning(
-                f"PyTorch/Transformers not available ({e}). "
-                f"Using placeholder model for configuration testing."
+            raise RuntimeError(
+                f"PyTorch/Transformers not available: {e}\n"
+                "Install required packages: pip install torch transformers peft"
             )
-            self._model = _MockModel()
 
     def _create_optimizer(self) -> None:
         """Create the optimizer."""
@@ -908,9 +907,10 @@ class TenSafePipeline:
                 trainable_params = []
 
             if not trainable_params:
-                logger.warning("No trainable parameters found, using placeholder optimizer")
-                self._optimizer = _MockOptimizer(learning_rate=training_config.learning_rate)
-                return
+                raise RuntimeError(
+                    "No trainable parameters found. Ensure model is loaded correctly "
+                    "and LoRA adapters are attached."
+                )
 
             # Create optimizer
             if training_config.optimizer.lower() == "adamw":
@@ -938,9 +938,11 @@ class TenSafePipeline:
                 f"lr={training_config.learning_rate}"
             )
 
-        except ImportError:
-            logger.warning("PyTorch not available, using placeholder optimizer")
-            self._optimizer = _MockOptimizer(learning_rate=training_config.learning_rate)
+        except ImportError as e:
+            raise RuntimeError(
+                f"PyTorch not available: {e}\n"
+                "Install required packages: pip install torch"
+            )
 
     def _create_training_mode(self) -> None:
         """Create the training mode handler."""
@@ -1154,75 +1156,6 @@ class TenSafePipeline:
     def current_step(self) -> int:
         """Get current training step."""
         return self._current_step
-
-
-# ==============================================================================
-# Placeholder Classes (for import testing only)
-# ==============================================================================
-
-
-class _MockModel:
-    """
-    Placeholder model for configuration testing.
-
-    WARNING: This is NOT a real model. It is only used when PyTorch/Transformers
-    are not available (e.g., for configuration validation or import testing).
-
-    Production usage requires installing:
-        pip install torch transformers peft
-    """
-
-    def __init__(self):
-        logger.warning(
-            "_MockModel is a placeholder. Install PyTorch and Transformers "
-            "for production training."
-        )
-        self._training = True
-
-    def train(self):
-        self._training = True
-
-    def eval(self):
-        self._training = False
-
-    def parameters(self):
-        return []
-
-    def forward(self, **kwargs):
-        raise NotImplementedError(
-            "MockModel cannot perform forward passes. "
-            "Install PyTorch and Transformers for production training."
-        )
-
-    def __call__(self, **kwargs):
-        return self.forward(**kwargs)
-
-
-class _MockOptimizer:
-    """
-    Placeholder optimizer for configuration testing.
-
-    WARNING: This is NOT a real optimizer. It is only used when PyTorch
-    is not available.
-
-    Production usage requires installing:
-        pip install torch
-    """
-
-    def __init__(self, learning_rate: float = 1e-4):
-        logger.warning(
-            "_MockOptimizer is a placeholder. Install PyTorch for production training."
-        )
-        self.param_groups = [{"lr": learning_rate}]
-
-    def step(self):
-        raise NotImplementedError(
-            "MockOptimizer cannot perform optimization steps. "
-            "Install PyTorch for production training."
-        )
-
-    def zero_grad(self):
-        pass
 
 
 # ==============================================================================

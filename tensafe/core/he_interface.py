@@ -13,7 +13,7 @@ Key Design Principles:
     1. SINGLE BACKEND: All HE goes through the microkernel
     2. MOAI OPTIMIZATIONS: Rotation-free column packing for CKKS
     3. GPU ACCELERATION: Production mode uses GPU backends
-    4. NO FRAGMENTATION: Legacy backends (N2HE, HEXL standalone) are deprecated
+    4. NO MOCKS/SIMULATION: All operations use real cryptographic backends
 
 Usage:
     from tensafe.core.he_interface import get_backend
@@ -27,9 +27,8 @@ Usage:
     plaintext = backend.decrypt(result)
 
 Modes:
-    - PRODUCTION: Full HE with GPU acceleration (recommended)
-    - SIMULATION: Testing mode (NOT cryptographically secure)
-    - DISABLED: No HE operations
+    - PRODUCTION: Full HE with GPU acceleration (required)
+    - DISABLED: No HE operations (plaintext passthrough)
 """
 
 from __future__ import annotations
@@ -47,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 # ==============================================================================
-# Backend Types (Simplified)
+# Backend Types
 # ==============================================================================
 
 
@@ -56,14 +55,12 @@ class HEBackendType(Enum):
     Available HE backend types.
 
     The unified architecture uses the microkernel for all operations.
-    Legacy types are kept for backward compatibility but map to the same backend.
+    Legacy types map to PRODUCTION.
     """
     PRODUCTION = "production"  # Microkernel with GPU acceleration
-    SIMULATION = "simulation"  # Microkernel simulation mode (NOT SECURE)
-    DISABLED = "disabled"  # No HE
+    DISABLED = "disabled"  # No HE (plaintext passthrough)
 
-    # Legacy types (deprecated, mapped to new types)
-    TOY = "toy"  # DEPRECATED: Maps to SIMULATION
+    # Legacy types (deprecated, all map to PRODUCTION)
     N2HE = "n2he"  # DEPRECATED: Maps to PRODUCTION
     HEXL = "hexl"  # DEPRECATED: Maps to PRODUCTION
     CKKS_MOAI = "ckks_moai"  # DEPRECATED: Maps to PRODUCTION
@@ -74,7 +71,6 @@ class HEBackendType(Enum):
     def resolve(cls, backend_type: "HEBackendType") -> "HEBackendType":
         """Resolve legacy backend types to their modern equivalents."""
         legacy_mapping = {
-            cls.TOY: cls.SIMULATION,
             cls.N2HE: cls.PRODUCTION,
             cls.HEXL: cls.PRODUCTION,
             cls.CKKS_MOAI: cls.PRODUCTION,
@@ -295,34 +291,22 @@ class UnifiedHEBackend(HEBackendInterface):
     and route through this implementation.
     """
 
-    def __init__(
-        self,
-        params: Optional[HEParams] = None,
-        simulation_mode: bool = False,
-    ):
+    def __init__(self, params: Optional[HEParams] = None):
         super().__init__(params)
-        self._simulation_mode = simulation_mode
         self._backend = None
         self._packed_weights: Dict[str, Any] = {}
 
-        # Determined backend type
-        self._resolved_type = (
-            HEBackendType.SIMULATION if simulation_mode else HEBackendType.PRODUCTION
-        )
-
     @property
     def backend_type(self) -> HEBackendType:
-        return self._resolved_type
+        return HEBackendType.PRODUCTION
 
     @property
     def backend_name(self) -> str:
-        if self._simulation_mode:
-            return "HE-LoRA Microkernel (Simulation)"
         return "HE-LoRA Microkernel (Production)"
 
     @property
     def is_production_ready(self) -> bool:
-        return not self._simulation_mode
+        return True
 
     def setup(self) -> None:
         """Set up the HE context using the microkernel."""
@@ -335,72 +319,40 @@ class UnifiedHEBackend(HEBackendInterface):
 
             self._is_setup = True
 
-            mode_str = "SIMULATION" if self._simulation_mode else "PRODUCTION"
             logger.info(
-                f"Unified HE Backend initialized ({mode_str}): "
+                f"Unified HE Backend initialized (PRODUCTION): "
                 f"N={self.params.poly_modulus_degree}, "
                 f"scale=2^{self.params.scale_bits}, "
                 f"MOAI column packing={self.params.use_column_packing}"
             )
 
         except ImportError as e:
-            if self._simulation_mode:
-                # Allow pure simulation without microkernel
-                logger.warning(
-                    f"Microkernel not available ({e}). "
-                    "Using pure simulation mode (no real HE)."
-                )
-                self._backend = None
-                self._is_setup = True
-            else:
-                raise RuntimeError(
-                    f"HE-LoRA Microkernel not available: {e}\n"
-                    "For production HE, ensure he_lora_microkernel is installed.\n"
-                    "For testing, use simulation_mode=True."
-                )
+            raise RuntimeError(
+                f"HE-LoRA Microkernel not available: {e}\n"
+                "For production HE, ensure he_lora_microkernel is installed.\n"
+                "Use HEBackendType.DISABLED if HE is not required."
+            )
 
     def encrypt(self, plaintext: np.ndarray) -> Any:
         """Encrypt a plaintext vector using CKKS."""
         self.validate_ready()
         self._metrics.operations_count += 1
-
-        if self._backend is not None:
-            return self._backend.encrypt(plaintext)
-
-        # Pure simulation fallback
-        return _SimulatedCiphertext(plaintext.astype(np.float64).copy())
+        return self._backend.encrypt(plaintext)
 
     def decrypt(self, ciphertext: Any, output_size: int = 0) -> np.ndarray:
         """Decrypt a ciphertext."""
         self.validate_ready()
-
-        if self._backend is not None:
-            return self._backend.decrypt(ciphertext, output_size)
-
-        # Pure simulation fallback
-        if isinstance(ciphertext, _SimulatedCiphertext):
-            data = ciphertext.data
-        elif isinstance(ciphertext, dict):
-            data = ciphertext.get("data", ciphertext)
-        else:
-            data = ciphertext
-
-        if output_size > 0:
-            return np.asarray(data)[:output_size]
-        return np.asarray(data)
+        return self._backend.decrypt(ciphertext, output_size)
 
     def add(self, ct1: Any, ct2: Any) -> Any:
         """Add two ciphertexts."""
         self.validate_ready()
         self._metrics.operations_count += 1
 
-        if self._backend is not None and hasattr(self._backend, 'add'):
+        if hasattr(self._backend, 'add'):
             return self._backend.add(ct1, ct2)
 
-        # Pure simulation fallback
-        d1 = ct1.data if isinstance(ct1, _SimulatedCiphertext) else ct1
-        d2 = ct2.data if isinstance(ct2, _SimulatedCiphertext) else ct2
-        return _SimulatedCiphertext(np.asarray(d1) + np.asarray(d2))
+        raise NotImplementedError("Backend does not support add operation")
 
     def multiply_plain(self, ct: Any, plaintext: np.ndarray) -> Any:
         """Multiply ciphertext by plaintext."""
@@ -408,13 +360,10 @@ class UnifiedHEBackend(HEBackendInterface):
         self._metrics.operations_count += 1
         self._metrics.multiplications_count += 1
 
-        if self._backend is not None and hasattr(self._backend, 'multiply_plain'):
+        if hasattr(self._backend, 'multiply_plain'):
             return self._backend.multiply_plain(ct, plaintext)
 
-        # Pure simulation fallback
-        data = ct.data if isinstance(ct, _SimulatedCiphertext) else ct
-        scalar = plaintext.flatten()[0] if plaintext.size == 1 else plaintext
-        return _SimulatedCiphertext(np.asarray(data) * scalar)
+        raise NotImplementedError("Backend does not support multiply_plain operation")
 
     def matmul(self, ct: Any, weight: np.ndarray) -> Any:
         """
@@ -427,22 +376,15 @@ class UnifiedHEBackend(HEBackendInterface):
         self._metrics.multiplications_count += 1
 
         # Try column-packed matmul (MOAI optimization)
-        if (
-            self._backend is not None
-            and self.params.use_column_packing
-            and hasattr(self._backend, 'column_packed_matmul')
-        ):
+        if self.params.use_column_packing and hasattr(self._backend, 'column_packed_matmul'):
             packed = self._get_or_create_packed(weight)
             return self._backend.column_packed_matmul(ct, packed, rescale=True)
 
         # Fallback to standard matmul
-        if self._backend is not None and hasattr(self._backend, 'matmul'):
+        if hasattr(self._backend, 'matmul'):
             return self._backend.matmul(ct, weight)
 
-        # Pure simulation fallback
-        data = ct.data if isinstance(ct, _SimulatedCiphertext) else ct
-        result = np.asarray(data) @ weight.T
-        return _SimulatedCiphertext(result)
+        raise NotImplementedError("Backend does not support matmul operation")
 
     def lora_delta(
         self,
@@ -460,24 +402,21 @@ class UnifiedHEBackend(HEBackendInterface):
         self.validate_ready()
 
         # Use microkernel's optimized implementation
-        if self._backend is not None and hasattr(self._backend, 'lora_delta'):
+        if hasattr(self._backend, 'lora_delta'):
             return self._backend.lora_delta(ct_x, lora_a, lora_b, scaling)
 
         # Fallback to sequential matmuls with column packing
         packed_a = self._get_or_create_packed(lora_a, f"lora_a_{id(lora_a)}")
         packed_b = self._get_or_create_packed(lora_b, f"lora_b_{id(lora_b)}")
 
-        if (
-            self._backend is not None
-            and hasattr(self._backend, 'column_packed_matmul')
-        ):
+        if hasattr(self._backend, 'column_packed_matmul'):
             intermediate = self._backend.column_packed_matmul(ct_x, packed_a)
             result = self._backend.column_packed_matmul(intermediate, packed_b)
             if abs(scaling - 1.0) > 1e-6:
                 result = self.multiply_plain(result, np.array([scaling]))
             return result
 
-        # Pure simulation
+        # Final fallback
         return super().lora_delta(ct_x, lora_a, lora_b, scaling)
 
     def _get_or_create_packed(self, matrix: np.ndarray, key: Optional[str] = None) -> Any:
@@ -485,7 +424,7 @@ class UnifiedHEBackend(HEBackendInterface):
         key = key or f"matrix_{id(matrix)}"
 
         if key not in self._packed_weights:
-            if self._backend is not None and hasattr(self._backend, 'create_column_packed_matrix'):
+            if hasattr(self._backend, 'create_column_packed_matrix'):
                 self._packed_weights[key] = self._backend.create_column_packed_matrix(matrix)
             else:
                 # Store unpacked if packing not available
@@ -495,35 +434,19 @@ class UnifiedHEBackend(HEBackendInterface):
 
     def get_slot_count(self) -> int:
         """Get number of SIMD slots."""
-        if self._backend is not None and hasattr(self._backend, 'get_slot_count'):
+        if hasattr(self._backend, 'get_slot_count'):
             return self._backend.get_slot_count()
         return self.params.poly_modulus_degree // 2
 
     def get_metrics(self) -> HEMetrics:
         """Get accumulated metrics from the microkernel."""
-        if self._backend is not None and hasattr(self._backend, 'get_operation_stats'):
+        if hasattr(self._backend, 'get_operation_stats'):
             stats = self._backend.get_operation_stats()
             self._metrics.rotations_count = stats.get("rotations", 0)
             self._metrics.multiplications_count = stats.get("multiplications", self._metrics.multiplications_count)
             self._metrics.rescale_count = stats.get("rescales", 0)
             self._metrics.keyswitches_count = stats.get("keyswitches", 0)
         return self._metrics
-
-
-@dataclass
-class _SimulatedCiphertext:
-    """
-    Simulated ciphertext for testing (NOT SECURE).
-
-    This is only used when the microkernel is not available
-    and simulation mode is enabled.
-    """
-    data: np.ndarray
-    noise_budget: float = 100.0
-    level: int = 0
-
-    def to_bytes(self) -> bytes:
-        return self.data.tobytes()
 
 
 # ==============================================================================
@@ -548,7 +471,7 @@ class DisabledHEBackend(HEBackendInterface):
 
     @property
     def is_production_ready(self) -> bool:
-        return False  # Not applicable
+        return False  # Not applicable - HE is disabled
 
     def setup(self) -> None:
         self._is_setup = True
@@ -590,7 +513,7 @@ def get_backend(
     which routes through the microkernel with MOAI optimizations.
 
     Args:
-        backend_type: Type of backend (PRODUCTION, SIMULATION, or DISABLED)
+        backend_type: Type of backend (PRODUCTION or DISABLED)
         params: HE parameters
         setup: Automatically call setup()
 
@@ -598,13 +521,10 @@ def get_backend(
         Configured HEBackendInterface
 
     Example:
-        # Production mode (recommended)
+        # Production mode (required for HE)
         backend = get_backend(HEBackendType.PRODUCTION)
 
-        # Simulation mode (for testing)
-        backend = get_backend(HEBackendType.SIMULATION)
-
-        # No HE
+        # No HE (plaintext passthrough)
         backend = get_backend(HEBackendType.DISABLED)
     """
     # Convert string to enum
@@ -621,10 +541,8 @@ def get_backend(
     # Create appropriate backend
     if resolved_type == HEBackendType.DISABLED:
         backend = DisabledHEBackend(params)
-    elif resolved_type == HEBackendType.SIMULATION:
-        backend = UnifiedHEBackend(params, simulation_mode=True)
     else:  # PRODUCTION
-        backend = UnifiedHEBackend(params, simulation_mode=False)
+        backend = UnifiedHEBackend(params)
 
     # Setup if requested
     if setup:
@@ -654,8 +572,6 @@ def is_backend_available(backend_type: Union[HEBackendType, str] = HEBackendType
 
     if resolved == HEBackendType.DISABLED:
         return True
-    elif resolved == HEBackendType.SIMULATION:
-        return True  # Always available (can fall back to pure simulation)
     else:  # PRODUCTION
         try:
             from he_lora_microkernel.compat import HEBackend as _
@@ -671,7 +587,7 @@ def list_available_backends() -> List[str]:
     Returns:
         List of available backend type names
     """
-    available = ["disabled", "simulation"]  # Always available
+    available = ["disabled"]  # Always available
 
     if is_backend_available(HEBackendType.PRODUCTION):
         available.append("production")
@@ -683,14 +599,11 @@ def list_available_backends() -> List[str]:
 # Backward Compatibility Exports
 # ==============================================================================
 
-# These are kept for backward compatibility but use the unified backend internally
-
 # Legacy backend wrappers (all route to UnifiedHEBackend)
-ToyHEBackend = lambda params=None: UnifiedHEBackend(params, simulation_mode=True)
-N2HEBackendWrapper = lambda params=None: UnifiedHEBackend(params, simulation_mode=False)
-HEXLBackendWrapper = lambda params=None: UnifiedHEBackend(params, simulation_mode=False)
-CKKSMOAIBackendWrapper = lambda params=None: UnifiedHEBackend(params, simulation_mode=False)
-MicrokernelBackendWrapper = lambda params=None: UnifiedHEBackend(params, simulation_mode=False)
+N2HEBackendWrapper = lambda params=None: UnifiedHEBackend(params)
+HEXLBackendWrapper = lambda params=None: UnifiedHEBackend(params)
+CKKSMOAIBackendWrapper = lambda params=None: UnifiedHEBackend(params)
+MicrokernelBackendWrapper = lambda params=None: UnifiedHEBackend(params)
 
 
 # Export for type checking
@@ -710,7 +623,6 @@ __all__ = [
     "is_backend_available",
     "list_available_backends",
     # Backward compatibility (deprecated)
-    "ToyHEBackend",
     "N2HEBackendWrapper",
     "HEXLBackendWrapper",
     "CKKSMOAIBackendWrapper",

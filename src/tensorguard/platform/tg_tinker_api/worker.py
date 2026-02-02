@@ -6,7 +6,6 @@ Uses the unified TenSafeOrchestrator for production ML operations.
 """
 
 import logging
-import os
 import threading
 import time
 from datetime import datetime
@@ -27,20 +26,13 @@ class ProductionMLBackend:
     Production ML backend using TenSafeOrchestrator.
 
     This backend integrates with PyTorch/Transformers for real training
-    operations. For testing without GPU, set TENSAFE_USE_MOCK=1.
+    operations. Requires proper GPU and model setup.
     """
 
     def __init__(self):
         """Initialize production backend."""
         self._orchestrators: Dict[str, Any] = {}
         self._configs: Dict[str, Dict[str, Any]] = {}
-        self._use_mock = os.environ.get("TENSAFE_USE_MOCK", "0") == "1"
-
-        if self._use_mock:
-            logger.warning(
-                "TENSAFE_USE_MOCK=1: Using mock backend for testing. "
-                "Set TENSAFE_USE_MOCK=0 for production."
-            )
 
     def initialize_model(
         self,
@@ -54,15 +46,6 @@ class ProductionMLBackend:
             "config": config,
         }
 
-        if self._use_mock:
-            # For testing without GPU
-            self._orchestrators[training_client_id] = _MockOrchestrator(
-                model_ref, config
-            )
-            logger.info(f"Initialized MOCK model for {training_client_id}: {model_ref}")
-            return
-
-        # Production: use real orchestrator
         try:
             from tensafe.core.orchestrator import (
                 TenSafeOrchestrator,
@@ -93,10 +76,10 @@ class ProductionMLBackend:
 
         except Exception as e:
             logger.error(f"Failed to initialize model: {e}")
-            # Fallback to mock if production init fails
-            logger.warning("Falling back to mock orchestrator")
-            self._orchestrators[training_client_id] = _MockOrchestrator(
-                model_ref, config
+            raise RuntimeError(
+                f"Failed to initialize model '{model_ref}': {e}\n"
+                "Ensure PyTorch and Transformers are properly installed "
+                "and GPU resources are available."
             )
 
     def forward_backward(
@@ -108,10 +91,6 @@ class ProductionMLBackend:
         """Execute forward-backward pass."""
         orch = self._get_orchestrator(training_client_id)
 
-        if isinstance(orch, _MockOrchestrator):
-            return orch.forward_backward(batch, dp_config)
-
-        # Production path
         sample_rate = dp_config.get("sample_rate", 0.01) if dp_config else 0.01
         metrics = orch.forward_backward(batch, sample_rate)
 
@@ -135,10 +114,6 @@ class ProductionMLBackend:
         """Execute optimizer step."""
         orch = self._get_orchestrator(training_client_id)
 
-        if isinstance(orch, _MockOrchestrator):
-            return orch.optim_step(apply_dp_noise, dp_config)
-
-        # Production path
         sample_rate = dp_config.get("sample_rate", 0.01) if dp_config else 0.01
         metrics = orch.optim_step(apply_dp_noise, sample_rate)
 
@@ -166,10 +141,6 @@ class ProductionMLBackend:
         """Generate samples from the model."""
         orch = self._get_orchestrator(training_client_id)
 
-        if isinstance(orch, _MockOrchestrator):
-            return orch.sample(prompts, config)
-
-        # Production path
         samples = orch.sample(
             prompts=prompts,
             max_tokens=config.get("max_tokens", 128),
@@ -191,10 +162,6 @@ class ProductionMLBackend:
     ) -> bytes:
         """Serialize model state."""
         orch = self._get_orchestrator(training_client_id)
-
-        if isinstance(orch, _MockOrchestrator):
-            return orch.save_state(include_optimizer)
-
         return orch.save_state(include_optimizer)
 
     def load_state(
@@ -204,10 +171,6 @@ class ProductionMLBackend:
     ) -> int:
         """Load model state from bytes."""
         orch = self._get_orchestrator(training_client_id)
-
-        if isinstance(orch, _MockOrchestrator):
-            return orch.load_state(state_bytes)
-
         return orch.load_state(state_bytes)
 
     def _get_orchestrator(self, training_client_id: str):
@@ -216,139 +179,6 @@ class ProductionMLBackend:
         if orch is None:
             raise ValueError(f"Model not found: {training_client_id}")
         return orch
-
-
-# ==============================================================================
-# Mock Orchestrator (for testing only)
-# ==============================================================================
-
-
-class _MockOrchestrator:
-    """
-    Mock orchestrator for testing without GPU.
-
-    This is ONLY used when TENSAFE_USE_MOCK=1 or when production
-    initialization fails.
-    """
-
-    def __init__(self, model_ref: str, config: Dict[str, Any]):
-        import secrets
-
-        self.model_ref = model_ref
-        self.config = config
-        self.step = 0
-        self.total_epsilon = 0.0
-        self._weights = secrets.token_bytes(1024)
-
-    def forward_backward(
-        self,
-        batch: Dict[str, Any],
-        dp_config: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        import secrets
-
-        time.sleep(0.05)  # Simulate computation
-
-        batch_size = len(batch.get("input_ids", [[]])) if batch.get("input_ids") else 4
-        seq_len = (
-            len(batch.get("input_ids", [[]])[0])
-            if batch.get("input_ids") and batch["input_ids"]
-            else 128
-        )
-
-        loss = max(0.1, 2.5 - (self.step * 0.01))
-        grad_norm = 1.5 + secrets.randbelow(100) / 1000
-
-        result = {
-            "loss": loss,
-            "grad_norm": grad_norm,
-            "tokens_processed": batch_size * seq_len,
-        }
-
-        if dp_config and dp_config.get("enabled"):
-            max_grad_norm = dp_config.get("max_grad_norm", 1.0)
-            result["dp_metrics"] = {
-                "noise_applied": False,
-                "grad_norm_before_clip": grad_norm,
-                "grad_norm_after_clip": min(grad_norm, max_grad_norm),
-                "num_clipped": 1 if grad_norm > max_grad_norm else 0,
-            }
-
-        return result
-
-    def optim_step(
-        self,
-        apply_dp_noise: bool = True,
-        dp_config: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        import math
-
-        time.sleep(0.02)
-
-        self.step += 1
-        lr = self.config.get("optimizer", {}).get("learning_rate", 1e-4)
-
-        result = {"step": self.step, "learning_rate": lr}
-
-        if dp_config and dp_config.get("enabled") and apply_dp_noise:
-            noise_mult = dp_config.get("noise_multiplier", 1.0)
-            delta = dp_config.get("target_delta", 1e-5)
-            eps = math.sqrt(2 * math.log(1.25 / delta)) / noise_mult
-            self.total_epsilon += eps
-
-            result["dp_metrics"] = {
-                "noise_applied": True,
-                "epsilon_spent": eps,
-                "total_epsilon": self.total_epsilon,
-                "delta": delta,
-            }
-
-        return result
-
-    def sample(self, prompts: list, config: Dict[str, Any]) -> Dict[str, Any]:
-        time.sleep(0.05 * len(prompts))
-
-        samples = []
-        for prompt in prompts:
-            samples.append({
-                "prompt": prompt,
-                "completion": f" [Generated response at step {self.step}]",
-                "tokens_generated": 10,
-                "finish_reason": "stop",
-            })
-
-        return {
-            "samples": samples,
-            "model_step": self.step,
-            "sampling_config": config,
-        }
-
-    def save_state(self, include_optimizer: bool = True) -> bytes:
-        import json
-        import secrets
-
-        state = {
-            "model_ref": self.model_ref,
-            "step": self.step,
-            "weights_hash": secrets.token_hex(32),
-        }
-        return json.dumps(state).encode() + self._weights
-
-    def load_state(self, state_bytes: bytes) -> int:
-        import json
-
-        try:
-            json_end = state_bytes.find(b"}")
-            if json_end > 0:
-                state = json.loads(state_bytes[: json_end + 1].decode())
-                self.step = state.get("step", 0)
-        except Exception:
-            pass
-        return self.step
-
-    @property
-    def current_step(self) -> int:
-        return self.step
 
 
 class Worker:

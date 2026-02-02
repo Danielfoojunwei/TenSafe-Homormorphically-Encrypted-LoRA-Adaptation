@@ -64,20 +64,16 @@ class HEMode(str, Enum):
 
     Modes:
         DISABLED: No homomorphic encryption
-        PRODUCTION: Full HE with GPU acceleration (recommended for deployment)
-        SIMULATION: Microkernel simulation mode (for testing, NOT cryptographically secure)
+        PRODUCTION: Full HE with GPU acceleration (required for deployment)
 
-    Legacy modes (deprecated, mapped to new modes):
-        TOY -> SIMULATION (with deprecation warning)
+    Legacy modes (deprecated, all map to PRODUCTION):
         N2HE -> PRODUCTION (N2HE path removed, uses microkernel)
         N2HE_HEXL -> PRODUCTION (HEXL now integrated into microkernel)
     """
     DISABLED = "disabled"  # No HE
-    PRODUCTION = "production"  # Microkernel with GPU acceleration (recommended)
-    SIMULATION = "simulation"  # Microkernel simulation mode (testing only, NOT SECURE)
+    PRODUCTION = "production"  # Microkernel with GPU acceleration (required)
 
     # Legacy modes - kept for backward compatibility but deprecated
-    TOY = "toy"  # DEPRECATED: Maps to SIMULATION
     N2HE = "n2he"  # DEPRECATED: Maps to PRODUCTION
     N2HE_HEXL = "n2he_hexl"  # DEPRECATED: Maps to PRODUCTION
 
@@ -90,18 +86,12 @@ class HEMode(str, Enum):
             mode: Any HEMode value
 
         Returns:
-            Resolved mode (DISABLED, PRODUCTION, or SIMULATION)
+            Resolved mode (DISABLED or PRODUCTION)
         """
         import logging
         logger = logging.getLogger(__name__)
 
-        if mode == cls.TOY:
-            logger.warning(
-                "HEMode.TOY is deprecated. Use HEMode.SIMULATION instead. "
-                "Note: SIMULATION mode is NOT cryptographically secure."
-            )
-            return cls.SIMULATION
-        elif mode == cls.N2HE:
+        if mode == cls.N2HE:
             logger.warning(
                 "HEMode.N2HE is deprecated. The N2HE standalone path has been removed. "
                 "All HE now uses the unified microkernel with MOAI optimizations. "
@@ -120,7 +110,7 @@ class HEMode(str, Enum):
     @property
     def is_legacy(self) -> bool:
         """Check if this is a legacy/deprecated mode."""
-        return self in (HEMode.TOY, HEMode.N2HE, HEMode.N2HE_HEXL)
+        return self in (HEMode.N2HE, HEMode.N2HE_HEXL)
 
     @property
     def is_secure(self) -> bool:
