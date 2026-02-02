@@ -613,20 +613,21 @@ def _handle_verify(args: argparse.Namespace) -> int:
             print(f"  [FAIL] N2HE: {e}")
             results["n2he"] = f"FAIL: {e}"
 
-    if args.backend in ("all", "hexl"):
-        print("\nVerifying N2HE-HEXL backend...")
+    if args.backend in ("all", "hexl", "microkernel"):
+        print("\nVerifying HE-LoRA Microkernel backend...")
         try:
-            from tensafe.he_lora.backend import verify_backend
-            verify_result = verify_backend()
-            print(f"  [OK] HEXL backend operational")
-            print(f"       Backend: {verify_result.get('backend_name', 'unknown')}")
-            results["hexl"] = "OK"
+            from he_lora_microkernel.compat import HEBackend
+            backend = HEBackend()
+            backend.setup()
+            print(f"  [OK] Microkernel backend operational")
+            print(f"       Slot count: {backend.get_slot_count()}")
+            results["microkernel"] = "OK"
         except ImportError as e:
-            print(f"  [SKIP] HEXL not installed: {e}")
-            results["hexl"] = "NOT_INSTALLED"
+            print(f"  [SKIP] Microkernel not installed: {e}")
+            results["microkernel"] = "NOT_INSTALLED"
         except Exception as e:
-            print(f"  [FAIL] HEXL: {e}")
-            results["hexl"] = f"FAIL: {e}"
+            print(f"  [FAIL] Microkernel: {e}")
+            results["microkernel"] = f"FAIL: {e}"
 
     if args.backend in ("all", "toy"):
         print("\nVerifying Toy backend...")

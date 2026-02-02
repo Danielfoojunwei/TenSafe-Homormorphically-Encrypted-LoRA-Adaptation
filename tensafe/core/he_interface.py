@@ -581,25 +581,22 @@ class HEXLBackendWrapper(HEBackendInterface):
 
     def setup(self) -> None:
         try:
-            # Try the new microkernel backend first (preferred)
-            try:
-                from he_lora_microkernel.compat import HEBackend as MicrokernelHEBackend
-                hexl_params = self.params.to_hexl_params()
-                self._backend = MicrokernelHEBackend(hexl_params)
-                self._backend.setup()
-                logger.info("HEXLBackendWrapper using microkernel backend")
-            except ImportError:
-                # Fall back to old tensafe.he_lora if available
-                from tensafe.he_lora.backend import HEBackend
-                hexl_params = self.params.to_hexl_params()
-                self._backend = HEBackend(hexl_params)
-                self._backend.setup()
+            from he_lora_microkernel.compat import HEBackend as MicrokernelHEBackend
+
+            hexl_params = self.params.to_hexl_params()
+            self._backend = MicrokernelHEBackend(hexl_params)
+            self._backend.setup()
 
             self._is_setup = True
             self._keys_generated = True
 
+            logger.info("HEXLBackendWrapper initialized with microkernel backend")
+
         except ImportError as e:
-            raise RuntimeError(f"HEXL backend not available: {e}")
+            raise RuntimeError(
+                f"HE-LoRA Microkernel backend not available: {e}\n"
+                "Install the he_lora_microkernel package."
+            )
 
     def generate_keys(self, generate_galois: bool = True) -> None:
         # Keys are generated in setup() for HEXL
@@ -1200,7 +1197,8 @@ def is_backend_available(backend_type: Union[HEBackendType, str]) -> bool:
             from tensorguard.n2he.core import N2HEContext
             return True
         elif backend_type == HEBackendType.HEXL:
-            from tensafe.he_lora.backend import HEBackend
+            # HEXL now uses the microkernel backend
+            from he_lora_microkernel.compat import HEBackend as _MKBackend
             return True
         elif backend_type == HEBackendType.CKKS_MOAI:
             from crypto_backend.ckks_moai import CKKSMOAIBackend
