@@ -23,7 +23,16 @@ from ..security.rate_limiter import RateLimitMiddleware, RateLimitConfig
 from ..security.csp import CSPMiddleware, ContentSecurityPolicy
 from ..security.sanitization import ValidationMiddleware
 
+# Reliability modules
+from ..reliability.health import HealthAggregator, HealthStatus
+from ..reliability.shutdown import GracefulShutdown, ShutdownPhase
+from ..reliability.circuit_breaker import get_all_circuit_breakers
+
 logger = logging.getLogger(__name__)
+
+# Initialize reliability components
+health_aggregator = HealthAggregator(cache_ttl=5.0, default_timeout=5.0)
+shutdown_manager = GracefulShutdown(default_timeout=30.0, drain_timeout=10.0)
 
 # Environment configuration
 TG_ENVIRONMENT = os.getenv("TG_ENVIRONMENT", "development")
@@ -62,7 +71,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifecycle management."""
+    """Application lifecycle management with reliability features."""
     logger.info("Starting TG-Tinker Platform...")
 
     # Initialize database in development/demo mode
@@ -70,8 +79,35 @@ async def lifespan(app: FastAPI):
         SQLModel.metadata.create_all(engine)
         logger.info("Database tables initialized.")
 
+    # Register health checks
+    health_aggregator.register(
+        "database",
+        check_db_health,
+        timeout=5.0,
+        critical=True,
+        interval=30.0,
+    )
+
+    # Start background health checks
+    await health_aggregator.start_background_checks()
+    logger.info("Health check monitoring started")
+
+    # Setup signal handlers for graceful shutdown
+    shutdown_manager.setup_signals()
+
+    # Register shutdown handlers
+    shutdown_manager.register(
+        "health_checks",
+        health_aggregator.stop_background_checks,
+        priority=1,
+        phase=ShutdownPhase.DRAINING,
+    )
+
     yield
-    logger.info("Shutting down TG-Tinker Platform...")
+
+    # Graceful shutdown
+    logger.info("Initiating graceful shutdown...")
+    await shutdown_manager.shutdown(reason="application_shutdown")
 
 
 app = FastAPI(
@@ -126,32 +162,72 @@ if TG_ENABLE_INPUT_VALIDATION:
 # Health endpoints
 @app.get("/health", tags=["health"])
 async def health_check():
-    """Health check endpoint."""
-    db_health = check_db_health()
-    return {
-        "status": "healthy" if db_health["status"] == "healthy" else "degraded",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "3.0.0",
-        "environment": TG_ENVIRONMENT,
-        "checks": {"database": db_health},
-    }
+    """Comprehensive health check endpoint with aggregated component status."""
+    system_health = await health_aggregator.check_all()
+
+    status_code = 200
+    if system_health.status == HealthStatus.UNHEALTHY:
+        status_code = 503
+    elif system_health.status == HealthStatus.DEGRADED:
+        status_code = 200  # Still serve, but indicate degradation
+
+    return Response(
+        content=str({
+            "status": system_health.status.value,
+            "summary": system_health.summary,
+            "timestamp": system_health.timestamp.isoformat(),
+            "version": "4.1.0",
+            "environment": TG_ENVIRONMENT,
+            "components": {
+                name: comp.to_dict()
+                for name, comp in system_health.components.items()
+            },
+        }).replace("'", '"'),
+        status_code=status_code,
+        media_type="application/json",
+    )
 
 
 @app.get("/ready", tags=["health"])
 async def readiness_check():
-    """Kubernetes readiness probe."""
-    db_health = check_db_health()
-    if db_health["status"] != "healthy":
+    """Kubernetes readiness probe - checks all critical components."""
+    if shutdown_manager.is_shutting_down:
         return Response(
-            content='{"ready": false, "reason": "database unavailable"}', status_code=503, media_type="application/json"
+            content='{"ready": false, "reason": "shutting_down"}',
+            status_code=503,
+            media_type="application/json",
+        )
+
+    if not health_aggregator.is_ready():
+        return Response(
+            content='{"ready": false, "reason": "critical_components_unhealthy"}',
+            status_code=503,
+            media_type="application/json",
         )
     return {"ready": True}
 
 
 @app.get("/live", tags=["health"])
 async def liveness_check():
-    """Kubernetes liveness probe."""
+    """Kubernetes liveness probe - checks if service is alive."""
+    if not health_aggregator.is_live():
+        return Response(
+            content='{"alive": false, "reason": "all_critical_components_failed"}',
+            status_code=503,
+            media_type="application/json",
+        )
     return {"alive": True}
+
+
+@app.get("/reliability", tags=["health"])
+async def reliability_status():
+    """Reliability status endpoint showing circuit breakers and health metrics."""
+    return {
+        "shutdown_phase": shutdown_manager.phase.name,
+        "is_shutting_down": shutdown_manager.is_shutting_down,
+        "health_status": health_aggregator.get_cached_status().to_dict(),
+        "circuit_breakers": get_all_circuit_breakers(),
+    }
 
 
 @app.get("/version", tags=["health"])
@@ -159,7 +235,7 @@ async def version_info():
     """Version information endpoint."""
     return {
         "service": "TG-Tinker",
-        "version": "4.0.0",
+        "version": "4.1.0",
         "api_version": "v1",
         "python_version": "3.9+",
         "environment": TG_ENVIRONMENT,
@@ -168,6 +244,12 @@ async def version_info():
             "csp": TG_ENABLE_CSP,
             "input_validation": TG_ENABLE_INPUT_VALIDATION,
             "security_headers": TG_ENABLE_SECURITY_HEADERS,
+        },
+        "reliability_features": {
+            "health_aggregation": True,
+            "graceful_shutdown": True,
+            "circuit_breakers": True,
+            "background_health_checks": True,
         },
     }
 
@@ -182,10 +264,11 @@ async def root():
     """API root - service information."""
     return {
         "service": "TG-Tinker",
-        "version": "3.0.0",
-        "description": "Privacy-First ML Training API",
+        "version": "4.1.0",
+        "description": "Privacy-First ML Training API with Enterprise Reliability",
         "docs": "/docs",
         "health": "/health",
+        "reliability": "/reliability",
         "api": "/api/v1/training_clients",
     }
 
