@@ -1,0 +1,354 @@
+# TenSafe Kubernetes Deployment Manifests
+# Phase 0: Foundation Infrastructure
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tensafe
+  labels:
+    app.kubernetes.io/name: tensafe
+    app.kubernetes.io/component: namespace
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tensafe
+  namespace: tensafe
+  labels:
+    app.kubernetes.io/name: tensafe
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tensafe-config
+  namespace: tensafe
+  labels:
+    app.kubernetes.io/name: tensafe
+data:
+  TG_ENVIRONMENT: "production"
+  TG_LOG_LEVEL: "info"
+  TG_ENABLE_SECURITY_HEADERS: "true"
+  TG_ENABLE_RATE_LIMITING: "true"
+  TG_TOKEN_EXPIRE_MINUTES: "30"
+  TG_MIN_PASSWORD_LENGTH: "12"
+  WORKERS: "4"
+  TIMEOUT: "120"
+  KEEPALIVE: "5"
+  MAX_REQUESTS: "10000"
+  MAX_REQUESTS_JITTER: "1000"
+  # Observability
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.monitoring:4317"
+  METRICS_PORT: "9090"
+  # HE Configuration
+  TENSAFE_TOY_HE: "0"  # Disable toy mode in production
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tensafe-secrets
+  namespace: tensafe
+  labels:
+    app.kubernetes.io/name: tensafe
+type: Opaque
+stringData:
+  # These should be overridden in production
+  database-url: "postgresql://tensafe:tensafe@tensafe-postgresql:5432/tensafe"
+  jwt-secret: "CHANGE_ME_IN_PRODUCTION_USE_32_BYTES_MIN"
+  api-key: "ts_CHANGE_ME_IN_PRODUCTION"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tensafe-server
+  namespace: tensafe
+  labels:
+    app.kubernetes.io/name: tensafe
+    app.kubernetes.io/component: server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tensafe
+      app.kubernetes.io/component: server
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tensafe
+        app.kubernetes.io/component: server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: tensafe
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: tensafe
+        image: tensafe/server:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: tensafe-config
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: tensafe-secrets
+              key: database-url
+        - name: TG_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: tensafe-secrets
+              key: jwt-secret
+        - name: TS_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: tensafe-secrets
+              key: api-key
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 30
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/.cache
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: tensafe
+                  app.kubernetes.io/component: server
+              topologyKey: kubernetes.io/hostname
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tensafe-server
+  namespace: tensafe
+  labels:
+    app.kubernetes.io/name: tensafe
+    app.kubernetes.io/component: server
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app.kubernetes.io/name: tensafe
+    app.kubernetes.io/component: server
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tensafe-ingress
+  namespace: tensafe
+  labels:
+    app.kubernetes.io/name: tensafe
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.tensafe.dev
+    secretName: tensafe-tls
+  rules:
+  - host: api.tensafe.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: tensafe-server
+            port:
+              number: 80
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: tensafe-pdb
+  namespace: tensafe
+  labels:
+    app.kubernetes.io/name: tensafe
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tensafe
+      app.kubernetes.io/component: server
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: tensafe-hpa
+  namespace: tensafe
+  labels:
+    app.kubernetes.io/name: tensafe
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tensafe-server
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+      selectPolicy: Max
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tensafe-network-policy
+  namespace: tensafe
+  labels:
+    app.kubernetes.io/name: tensafe
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tensafe
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: TCP
+      port: 4317  # OTLP
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: tensafe
