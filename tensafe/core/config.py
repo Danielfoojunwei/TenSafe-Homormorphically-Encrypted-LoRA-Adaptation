@@ -55,11 +55,78 @@ class TrainingMode(str, Enum):
 
 
 class HEMode(str, Enum):
-    """Homomorphic encryption modes."""
+    """
+    Homomorphic encryption modes.
+
+    The HE system uses a unified microkernel architecture with MOAI optimizations
+    (rotation-free column packing for CKKS). All production HE goes through this
+    single pipeline.
+
+    Modes:
+        DISABLED: No homomorphic encryption
+        PRODUCTION: Full HE with GPU acceleration (recommended for deployment)
+        SIMULATION: Microkernel simulation mode (for testing, NOT cryptographically secure)
+
+    Legacy modes (deprecated, mapped to new modes):
+        TOY -> SIMULATION (with deprecation warning)
+        N2HE -> PRODUCTION (N2HE path removed, uses microkernel)
+        N2HE_HEXL -> PRODUCTION (HEXL now integrated into microkernel)
+    """
     DISABLED = "disabled"  # No HE
-    TOY = "toy"  # Toy/simulation mode (not secure, for testing)
-    N2HE = "n2he"  # N2HE pure Python backend
-    N2HE_HEXL = "n2he_hexl"  # N2HE with HEXL acceleration (production)
+    PRODUCTION = "production"  # Microkernel with GPU acceleration (recommended)
+    SIMULATION = "simulation"  # Microkernel simulation mode (testing only, NOT SECURE)
+
+    # Legacy modes - kept for backward compatibility but deprecated
+    TOY = "toy"  # DEPRECATED: Maps to SIMULATION
+    N2HE = "n2he"  # DEPRECATED: Maps to PRODUCTION
+    N2HE_HEXL = "n2he_hexl"  # DEPRECATED: Maps to PRODUCTION
+
+    @classmethod
+    def resolve(cls, mode: "HEMode") -> "HEMode":
+        """
+        Resolve legacy modes to their modern equivalents.
+
+        Args:
+            mode: Any HEMode value
+
+        Returns:
+            Resolved mode (DISABLED, PRODUCTION, or SIMULATION)
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        if mode == cls.TOY:
+            logger.warning(
+                "HEMode.TOY is deprecated. Use HEMode.SIMULATION instead. "
+                "Note: SIMULATION mode is NOT cryptographically secure."
+            )
+            return cls.SIMULATION
+        elif mode == cls.N2HE:
+            logger.warning(
+                "HEMode.N2HE is deprecated. The N2HE standalone path has been removed. "
+                "All HE now uses the unified microkernel with MOAI optimizations. "
+                "Mapping to HEMode.PRODUCTION."
+            )
+            return cls.PRODUCTION
+        elif mode == cls.N2HE_HEXL:
+            logger.warning(
+                "HEMode.N2HE_HEXL is deprecated. HEXL acceleration is now integrated "
+                "into the unified microkernel. Mapping to HEMode.PRODUCTION."
+            )
+            return cls.PRODUCTION
+
+        return mode
+
+    @property
+    def is_legacy(self) -> bool:
+        """Check if this is a legacy/deprecated mode."""
+        return self in (HEMode.TOY, HEMode.N2HE, HEMode.N2HE_HEXL)
+
+    @property
+    def is_secure(self) -> bool:
+        """Check if this mode provides cryptographic security."""
+        resolved = HEMode.resolve(self)
+        return resolved == HEMode.PRODUCTION
 
 
 class LoRATarget(str, Enum):
@@ -421,8 +488,17 @@ class TenSafeConfig:
 
         # Check HE configuration
         if self.he.mode != HEMode.DISABLED:
-            if self.he.mode == HEMode.TOY:
-                issues.append("Warning: HE toy mode is NOT cryptographically secure")
+            resolved_mode = HEMode.resolve(self.he.mode)
+            if resolved_mode == HEMode.SIMULATION:
+                issues.append(
+                    "Warning: HE SIMULATION mode is NOT cryptographically secure. "
+                    "Use PRODUCTION mode for deployment."
+                )
+            if self.he.mode.is_legacy:
+                issues.append(
+                    f"Warning: HEMode.{self.he.mode.value} is deprecated. "
+                    f"Use HEMode.{resolved_mode.value} instead."
+                )
             if self.he.security_level < 128:
                 issues.append(f"Warning: HE security level {self.he.security_level} is below recommended 128-bit")
 
@@ -640,6 +716,7 @@ def create_default_config(
     model_name: str = "meta-llama/Llama-3.1-8B",
     with_dp: bool = True,
     with_he: bool = False,
+    he_simulation: bool = False,
 ) -> TenSafeConfig:
     """
     Create a default configuration for common use cases.
@@ -649,10 +726,19 @@ def create_default_config(
         model_name: Model to fine-tune
         with_dp: Enable differential privacy
         with_he: Enable homomorphic encryption
+        he_simulation: Use HE simulation mode (for testing, not secure)
 
     Returns:
         Configured TenSafeConfig
     """
+    # Determine HE mode
+    if not with_he:
+        he_mode = HEMode.DISABLED
+    elif he_simulation:
+        he_mode = HEMode.SIMULATION
+    else:
+        he_mode = HEMode.PRODUCTION
+
     config = TenSafeConfig(
         model=ModelConfig(name=model_name),
         lora=LoRAConfig(enabled=True, rank=16, alpha=32),
@@ -667,7 +753,7 @@ def create_default_config(
             noise_multiplier=1.0 if with_dp else 0.0,
         ),
         he=HEConfig(
-            mode=HEMode.N2HE_HEXL if with_he else HEMode.DISABLED,
+            mode=he_mode,
         ),
     )
 
