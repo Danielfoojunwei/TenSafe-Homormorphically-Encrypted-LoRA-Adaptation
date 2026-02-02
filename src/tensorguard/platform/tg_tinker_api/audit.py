@@ -7,14 +7,18 @@ Integration Points:
 - Hash chaining for tamper detection
 - Optional PQC signatures (Ed25519 + Dilithium3) for non-repudiation
 - Compatible with tensorguard.identity.audit for enterprise audit trails
+
+IMPORTANT: This module uses the canonical serialization from tensorguard.evidence.canonical
+to ensure consistent hash computation across all TenSafe components.
 """
 
 import hashlib
-import json
 import logging
 import threading
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+from tensorguard.evidence.canonical import canonical_json
 
 from .models import TinkerAuditLog, generate_audit_id
 
@@ -97,7 +101,8 @@ class AuditLogger:
             artifact_ids_produced = artifact_ids_produced or []
             artifact_ids_consumed = artifact_ids_consumed or []
 
-            # Compute record hash
+            # Compute record hash with ALL security-relevant fields
+            # This ensures the audit chain includes artifact lineage, request size, and DP metrics
             record_hash = self._compute_hash(
                 entry_id=entry_id,
                 tenant_id=tenant_id,
@@ -109,6 +114,9 @@ class AuditLogger:
                 completed_at=completed_at,
                 success=success,
                 prev_hash=self._prev_hash,
+                artifact_ids_consumed=artifact_ids_consumed,
+                request_size_bytes=request_size_bytes,
+                dp_metrics=dp_metrics,
             )
 
             # Create log entry
@@ -212,7 +220,7 @@ class AuditLogger:
                     )
                     return False
 
-                # Recompute and verify record hash
+                # Recompute and verify record hash with ALL security-relevant fields
                 computed_hash = self._compute_hash(
                     entry_id=entry.id,
                     tenant_id=entry.tenant_id,
@@ -224,6 +232,9 @@ class AuditLogger:
                     completed_at=entry.completed_at,
                     success=entry.success,
                     prev_hash=entry.prev_hash,
+                    artifact_ids_consumed=entry.artifact_ids_consumed,
+                    request_size_bytes=entry.request_size_bytes,
+                    dp_metrics=entry.dp_metrics_json,
                 )
 
                 if computed_hash != entry.record_hash:
@@ -248,26 +259,49 @@ class AuditLogger:
         completed_at: Optional[datetime],
         success: bool,
         prev_hash: str,
+        artifact_ids_consumed: Optional[List[str]] = None,
+        request_size_bytes: Optional[int] = None,
+        dp_metrics: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Compute the hash for an audit log entry."""
-        # Create deterministic string representation
-        data = json.dumps(
-            {
-                "entry_id": entry_id,
-                "tenant_id": tenant_id,
-                "training_client_id": training_client_id,
-                "operation": operation,
-                "request_hash": request_hash,
-                "artifact_ids_produced": sorted(artifact_ids_produced),
-                "started_at": started_at.isoformat(),
-                "completed_at": completed_at.isoformat() if completed_at else None,
-                "success": success,
-                "prev_hash": prev_hash,
-            },
-            sort_keys=True,
-        )
+        """
+        Compute the hash for an audit log entry.
 
-        hash_bytes = hashlib.sha256(data.encode("utf-8")).hexdigest()
+        IMPORTANT: Uses canonical_json from tensorguard.evidence.canonical to ensure
+        consistent hash computation across all TenSafe components. This fixes the
+        canonical vs empirical gap where different serialization methods were used.
+
+        All security-relevant fields are now included in the hash:
+        - artifact_ids_consumed: Critical for tracking data lineage
+        - request_size_bytes: For detecting payload tampering
+        - dp_metrics: Privacy-sensitive metrics must be immutable
+        """
+        # Normalize artifact lists to ensure deterministic ordering
+        artifact_ids_consumed = artifact_ids_consumed or []
+
+        # Build the canonical data structure with ALL security-relevant fields
+        data = {
+            "entry_id": entry_id,
+            "tenant_id": tenant_id,
+            "training_client_id": training_client_id,
+            "operation": operation,
+            "request_hash": request_hash,
+            "request_size_bytes": request_size_bytes,
+            "artifact_ids_produced": sorted(artifact_ids_produced),
+            "artifact_ids_consumed": sorted(artifact_ids_consumed),
+            "started_at": started_at.isoformat(),
+            "completed_at": completed_at.isoformat() if completed_at else None,
+            "success": success,
+            "prev_hash": prev_hash,
+        }
+
+        # Include DP metrics in hash if present - these are privacy-critical
+        # and must not be modifiable post-hoc
+        if dp_metrics:
+            data["dp_metrics"] = dp_metrics
+
+        # Use canonical JSON serialization for consistent cross-module hashing
+        canonical_data = canonical_json(data)
+        hash_bytes = hashlib.sha256(canonical_data.encode("utf-8")).hexdigest()
         return f"sha256:{hash_bytes}"
 
 

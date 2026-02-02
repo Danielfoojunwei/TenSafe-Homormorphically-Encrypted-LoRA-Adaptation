@@ -381,6 +381,38 @@ class EncryptedLoRARuntime:
             key_bundle_id=bundle_id,
         )
 
+    def _check_noise_budget(
+        self,
+        ciphertext: Ciphertext,
+        operation: str = "computation",
+    ) -> None:
+        """
+        Check if ciphertext noise budget is above threshold.
+
+        IMPORTANT: This addresses the gap where noise_budget_threshold was defined
+        in AdapterEncryptionConfig but never validated during operations. Insufficient
+        noise budget can lead to decryption failures or incorrect results.
+
+        Args:
+            ciphertext: Ciphertext to check
+            operation: Description of the operation for error messages
+
+        Raises:
+            ValueError: If noise budget is below threshold
+        """
+        noise_budget = getattr(ciphertext, "noise_budget", None)
+        if noise_budget is not None and noise_budget < self.config.noise_budget_threshold:
+            logger.warning(
+                f"Low noise budget ({noise_budget}) before {operation}. "
+                f"Threshold is {self.config.noise_budget_threshold}. "
+                "Consider re-encrypting the data."
+            )
+            raise ValueError(
+                f"Noise budget ({noise_budget}) below threshold "
+                f"({self.config.noise_budget_threshold}) for {operation}. "
+                "Re-encryption required."
+            )
+
     def compute_delta(
         self,
         encrypted_activation: EncryptedActivation,
@@ -391,12 +423,18 @@ class EncryptedLoRARuntime:
 
         This is the core HE operation: delta = scaling * enc(x) @ A^T @ B^T
 
+        IMPORTANT: Now validates noise budget before and after computation to ensure
+        HE operations don't produce invalid results due to noise overflow.
+
         Args:
             encrypted_activation: Encrypted hidden state
             adapter_id: Adapter to apply
 
         Returns:
             EncryptedDelta with encrypted result
+
+        Raises:
+            ValueError: If adapter not found, context not available, or noise budget insufficient
         """
         start_time = time.time()
 
@@ -409,6 +447,12 @@ class EncryptedLoRARuntime:
             bundle_id = encrypted_activation.key_bundle_id
             self._load_context(bundle_id)
 
+        # Validate noise budget before computation
+        self._check_noise_budget(
+            encrypted_activation.ciphertext,
+            operation=f"LoRA computation for {adapter_id}"
+        )
+
         # Compute encrypted LoRA delta
         try:
             result_ct = self._context.encrypted_lora_delta(
@@ -416,6 +460,12 @@ class EncryptedLoRARuntime:
                 lora_a=adapter.lora_a,
                 lora_b=adapter.lora_b,
                 scaling=adapter.scaling,
+            )
+
+            # Validate noise budget after computation
+            self._check_noise_budget(
+                result_ct,
+                operation=f"LoRA output for {adapter_id}"
             )
 
             computation_time_ms = (time.time() - start_time) * 1000
