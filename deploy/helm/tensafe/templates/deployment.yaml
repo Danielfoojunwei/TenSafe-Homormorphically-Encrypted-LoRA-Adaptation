@@ -1,0 +1,153 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tensafe.fullname" . }}
+  labels:
+    {{- include "tensafe.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "tensafe.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "tensafe.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: server
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "tensafe.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+            - name: metrics
+              containerPort: {{ .Values.tensafe.observability.metrics.port }}
+              protocol: TCP
+          env:
+            - name: TG_ENVIRONMENT
+              value: {{ .Values.tensafe.environment | quote }}
+            - name: TG_LOG_LEVEL
+              value: {{ .Values.tensafe.logLevel | quote }}
+            - name: WORKERS
+              value: {{ .Values.tensafe.workers | quote }}
+            - name: TIMEOUT
+              value: {{ .Values.tensafe.timeout | quote }}
+            - name: KEEPALIVE
+              value: {{ .Values.tensafe.keepalive | quote }}
+            - name: MAX_REQUESTS
+              value: {{ .Values.tensafe.maxRequests | quote }}
+            - name: TG_ENABLE_SECURITY_HEADERS
+              value: {{ .Values.tensafe.security.enableSecurityHeaders | quote }}
+            - name: TG_ENABLE_RATE_LIMITING
+              value: {{ .Values.tensafe.security.rateLimiting.enabled | quote }}
+            - name: TG_TOKEN_EXPIRE_MINUTES
+              value: {{ .Values.tensafe.security.jwtExpireMinutes | quote }}
+            - name: TG_MIN_PASSWORD_LENGTH
+              value: {{ .Values.tensafe.security.minPasswordLength | quote }}
+            - name: TENSAFE_TOY_HE
+              value: {{ ternary "1" "0" .Values.tensafe.he.toyMode | quote }}
+            - name: METRICS_PORT
+              value: {{ .Values.tensafe.observability.metrics.port | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.tensafe.observability.tracing.endpoint | quote }}
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- if .Values.postgresql.enabled }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tensafe.fullname" . }}-postgresql
+                  key: password
+            {{- end }}
+            {{- if .Values.redis.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tensafe.fullname" . }}-redis
+                  key: redis-password
+            {{- end }}
+            - name: DATABASE_URL
+              value: {{ include "tensafe.databaseUrl" . | quote }}
+            - name: TG_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tensafe.fullname" . }}-secrets
+                  key: jwt-secret
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /app/.cache
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

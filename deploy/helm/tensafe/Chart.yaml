@@ -1,0 +1,42 @@
+apiVersion: v2
+name: tensafe
+description: Privacy-preserving ML training platform with Homomorphic Encryption
+type: application
+version: 0.1.0
+appVersion: "3.0.0"
+
+keywords:
+  - machine-learning
+  - privacy
+  - homomorphic-encryption
+  - lora
+  - differential-privacy
+  - post-quantum-cryptography
+
+home: https://github.com/tensafe/tensafe
+sources:
+  - https://github.com/tensafe/tensafe
+
+maintainers:
+  - name: TenSafe Team
+    email: team@tensafe.dev
+
+icon: https://tensafe.dev/logo.png
+
+annotations:
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/category: machine-learning
+
+dependencies:
+  - name: postgresql
+    version: "12.12.10"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "17.15.6"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: keda
+    version: "2.12.0"
+    repository: https://kedacore.github.io/charts
+    condition: keda.enabled

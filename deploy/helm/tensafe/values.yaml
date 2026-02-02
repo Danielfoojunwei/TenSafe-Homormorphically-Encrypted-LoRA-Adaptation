@@ -1,0 +1,287 @@
+# Default values for TenSafe Helm chart
+# This is a YAML-formatted file.
+
+# Number of replicas for the server deployment
+replicaCount: 3
+
+image:
+  repository: tensafe/server
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 80
+  metricsPort: 9090
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: api.tensafe.dev
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: tensafe-tls
+      hosts:
+        - api.tensafe.dev
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 2Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# KEDA-based auto-scaling (advanced)
+keda:
+  enabled: true
+  pollingInterval: 15
+  cooldownPeriod: 60
+  minReplicaCount: 3
+  maxReplicaCount: 50
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.monitoring:9090
+        metricName: tensafe_inference_latency_p95
+        threshold: '0.1'
+        query: |
+          histogram_quantile(0.95,
+            sum(rate(tensafe_inference_latency_seconds_bucket{job="tensafe"}[5m]))
+            by (le)
+          )
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: tensafe
+          topologyKey: kubernetes.io/hostname
+
+# TenSafe-specific configuration
+tensafe:
+  environment: production
+  logLevel: info
+  workers: 4
+  timeout: 120
+  keepalive: 5
+  maxRequests: 10000
+
+  # Security settings
+  security:
+    jwtExpireMinutes: 30
+    minPasswordLength: 12
+    enableSecurityHeaders: true
+    rateLimiting:
+      enabled: true
+      maxRequests: 100
+      windowMinutes: 1
+
+  # Homomorphic Encryption settings
+  he:
+    toyMode: false  # NEVER enable in production
+    scheme: ckks
+    profile: fast  # fast or safe
+
+  # Differential Privacy settings
+  dp:
+    enabled: true
+    noiseMultiplier: 1.0
+    maxGradNorm: 1.0
+    targetEpsilon: 8.0
+    targetDelta: 1e-5
+
+  # Observability
+  observability:
+    metrics:
+      enabled: true
+      port: 9090
+      path: /metrics
+    tracing:
+      enabled: true
+      samplingRate: 0.1
+      endpoint: "http://otel-collector.monitoring:4317"
+    logging:
+      format: json  # json or text
+      level: info
+
+  # External integrations
+  integrations:
+    wandb:
+      enabled: false
+      project: tensafe
+      entity: ""
+    mlflow:
+      enabled: false
+      trackingUri: ""
+    huggingfaceHub:
+      enabled: false
+      private: true
+
+# Database configuration
+database:
+  # Use external database or enable bundled PostgreSQL
+  external: false
+  host: ""
+  port: 5432
+  name: tensafe
+  sslMode: require
+  # Credentials stored in secret
+  existingSecret: ""
+  secretKeys:
+    username: username
+    password: password
+
+# PostgreSQL subchart configuration
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: ""  # Set via --set or values override
+    username: tensafe
+    password: ""  # Set via --set or values override
+    database: tensafe
+  primary:
+    persistence:
+      enabled: true
+      size: 50Gi
+    resources:
+      requests:
+        memory: 1Gi
+        cpu: 500m
+      limits:
+        memory: 2Gi
+        cpu: 1000m
+
+# Redis subchart configuration (for rate limiting and caching)
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: true
+    password: ""  # Set via --set or values override
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 100m
+      limits:
+        memory: 512Mi
+        cpu: 200m
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+
+# GPU Worker configuration (for inference)
+gpuWorker:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: tensafe/gpu-worker
+    tag: ""
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+      memory: 16Gi
+      cpu: 8000m
+    requests:
+      nvidia.com/gpu: 1
+      memory: 8Gi
+      cpu: 4000m
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+
+# Training Worker configuration (for distributed training)
+trainingWorker:
+  enabled: false
+  image:
+    repository: tensafe/training-worker
+    tag: ""
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+      memory: 32Gi
+      cpu: 16000m
+    requests:
+      nvidia.com/gpu: 1
+      memory: 16Gi
+      cpu: 8000m

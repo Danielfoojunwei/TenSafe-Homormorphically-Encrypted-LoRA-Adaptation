@@ -1,0 +1,173 @@
+# TenSafe KEDA ScaledObject for Advanced Auto-scaling
+# Phase 1: SLI-based auto-scaling
+
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: tensafe-scaledobject
+  namespace: tensafe
+  labels:
+    app.kubernetes.io/name: tensafe
+    app.kubernetes.io/component: autoscaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tensafe-server
+  pollingInterval: 15
+  cooldownPeriod: 60
+  minReplicaCount: 3
+  maxReplicaCount: 50
+  fallback:
+    failureThreshold: 3
+    replicas: 5
+  advanced:
+    restoreToOriginalReplicaCount: true
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+          - type: Percent
+            value: 10
+            periodSeconds: 60
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+          - type: Pods
+            value: 4
+            periodSeconds: 15
+          selectPolicy: Max
+
+  triggers:
+  # Scale based on inference latency (p95)
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring:9090
+      metricName: tensafe_inference_latency_p95
+      threshold: '0.1'  # Scale up when p95 latency > 100ms
+      query: |
+        histogram_quantile(0.95,
+          sum(rate(tensafe_inference_latency_seconds_bucket{job="tensafe"}[5m]))
+          by (le)
+        )
+
+  # Scale based on time to first token (TTFT)
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring:9090
+      metricName: tensafe_ttft_p95
+      threshold: '0.2'  # Scale up when TTFT > 200ms
+      query: |
+        histogram_quantile(0.95,
+          sum(rate(tensafe_time_to_first_token_seconds_bucket{job="tensafe"}[5m]))
+          by (le)
+        )
+
+  # Scale based on request queue depth
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring:9090
+      metricName: tensafe_queue_depth
+      threshold: '50'  # Scale up when queue depth > 50
+      query: |
+        sum(tensafe_request_queue_depth{job="tensafe"})
+
+  # Scale based on active requests
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring:9090
+      metricName: tensafe_active_requests
+      threshold: '100'  # Scale up when active requests > 100 per pod
+      query: |
+        sum(tensafe_active_requests{job="tensafe"}) /
+        count(up{job="tensafe"} == 1)
+
+  # Scale based on GPU utilization (if using GPU workers)
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring:9090
+      metricName: tensafe_gpu_utilization
+      threshold: '0.8'  # Scale up when GPU > 80%
+      query: |
+        avg(DCGM_FI_DEV_GPU_UTIL{job="tensafe"}) / 100
+
+  # Scale based on HE-LoRA computation queue
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring:9090
+      metricName: tensafe_he_lora_queue_depth
+      threshold: '20'  # Scale up when HE queue > 20
+      query: |
+        sum(tensafe_he_lora_pending_operations{job="tensafe"})
+
+---
+# TriggerAuthentication for secure Prometheus access
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: tensafe-prometheus-auth
+  namespace: tensafe
+spec:
+  secretTargetRef:
+  - parameter: bearerToken
+    name: prometheus-token
+    key: token
+
+---
+# ScaledJob for batch training workloads
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: tensafe-training-job
+  namespace: tensafe
+  labels:
+    app.kubernetes.io/name: tensafe
+    app.kubernetes.io/component: training
+spec:
+  jobTargetRef:
+    parallelism: 1
+    completions: 1
+    backoffLimit: 3
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/name: tensafe
+          app.kubernetes.io/component: training-worker
+      spec:
+        restartPolicy: Never
+        containers:
+        - name: training-worker
+          image: tensafe/training-worker:latest
+          resources:
+            requests:
+              memory: "8Gi"
+              cpu: "4000m"
+              nvidia.com/gpu: 1
+            limits:
+              memory: "16Gi"
+              cpu: "8000m"
+              nvidia.com/gpu: 1
+          envFrom:
+          - configMapRef:
+              name: tensafe-config
+          env:
+          - name: DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: tensafe-secrets
+                key: database-url
+  pollingInterval: 30
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring:9090
+      metricName: tensafe_pending_training_jobs
+      threshold: '1'
+      query: |
+        sum(tensafe_pending_training_jobs{job="tensafe"})
