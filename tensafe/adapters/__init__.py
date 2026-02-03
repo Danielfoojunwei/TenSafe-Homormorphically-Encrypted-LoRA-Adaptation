@@ -107,6 +107,22 @@ from .hooks import (
     create_hooks_for_model,
 )
 
+# HE Integration
+from .he_integration import (
+    HECompatibility,
+    ADAPTER_HE_COMPATIBILITY,
+    get_he_compatibility,
+    is_he_compatible,
+    HEForwardConfig,
+    HEForwardMetrics,
+    HEAdapterForward,
+    CKKSLoRAForward,
+    HybridTFHEGatedForward,
+    PlaintextFallbackForward,
+    create_he_forward,
+    HEAwareHotSwapForward,
+)
+
 
 __all__ = [
     # === Adapter Types ===
@@ -171,4 +187,18 @@ __all__ = [
     "FusedQKVHook",
     "HookManager",
     "create_hooks_for_model",
+
+    # === HE Integration ===
+    "HECompatibility",
+    "ADAPTER_HE_COMPATIBILITY",
+    "get_he_compatibility",
+    "is_he_compatible",
+    "HEForwardConfig",
+    "HEForwardMetrics",
+    "HEAdapterForward",
+    "CKKSLoRAForward",
+    "HybridTFHEGatedForward",
+    "PlaintextFallbackForward",
+    "create_he_forward",
+    "HEAwareHotSwapForward",
 ]
