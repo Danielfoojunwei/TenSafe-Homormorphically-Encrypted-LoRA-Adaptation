@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TenSafe API Playground</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --accent-hover: #79b8ff;
+            --success: #3fb950;
+            --warning: #d29922;
+            --error: #f85149;
+            --border: #30363d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .logo span {
+            color: var(--text-primary);
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin-left: 2rem;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent);
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 300px 1fr 1fr;
+            height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .sidebar h3 {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 1rem 0 0.5rem;
+        }
+
+        .endpoint-list {
+            list-style: none;
+        }
+
+        .endpoint-item {
+            padding: 0.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background 0.2s;
+        }
+
+        .endpoint-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .endpoint-item.active {
+            background: var(--bg-tertiary);
+            border-left: 2px solid var(--accent);
+        }
+
+        .method {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .method.get { background: #238636; color: white; }
+        .method.post { background: #1f6feb; color: white; }
+        .method.put { background: #d29922; color: white; }
+        .method.delete { background: #da3633; color: white; }
+        .method.patch { background: #8957e5; color: white; }
+
+        .endpoint-path {
+            font-size: 0.85rem;
+            color: var(--text-primary);
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+        }
+
+        .panel-header {
+            background: var(--bg-secondary);
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-title {
+            font-weight: 600;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.5rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+        }
+
+        .form-group textarea {
+            min-height: 200px;
+            resize: vertical;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .response-status {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .response-status.success {
+            background: rgba(63, 185, 80, 0.2);
+            color: var(--success);
+        }
+
+        .response-status.error {
+            background: rgba(248, 81, 73, 0.2);
+            color: var(--error);
+        }
+
+        .code-block {
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-secondary);
+        }
+
+        .tab {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .api-key-input {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .api-key-input input {
+            flex: 1;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-radius: 50%;
+            border-top-color: var(--accent);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .endpoint-description {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+        }
+
+        .response-meta {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .response-time {
+            color: var(--success);
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">Ten<span>Safe</span> Playground</div>
+        <nav class="nav-links">
+            <a href="/docs">API Docs</a>
+            <a href="/redoc">ReDoc</a>
+            <a href="https://github.com/tensafe/tensafe" target="_blank">GitHub</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <aside class="sidebar">
+            <div class="form-group">
+                <label>API Key</label>
+                <div class="api-key-input">
+                    <input type="password" id="apiKey" placeholder="Enter your API key">
+                </div>
+            </div>
+
+            <h3>Training</h3>
+            <ul class="endpoint-list">
+                <li class="endpoint-item" data-endpoint="createTrainingClient">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/training_clients</span>
+                </li>
+                <li class="endpoint-item" data-endpoint="listTrainingClients">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/training_clients</span>
+                </li>
+                <li class="endpoint-item" data-endpoint="getTrainingClient">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/training_clients/{id}</span>
+                </li>
+                <li class="endpoint-item" data-endpoint="forwardBackward">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/.../forward_backward</span>
+                </li>
+                <li class="endpoint-item" data-endpoint="optimStep">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/.../optim_step</span>
+                </li>
+            </ul>
+
+            <h3>Inference</h3>
+            <ul class="endpoint-list">
+                <li class="endpoint-item" data-endpoint="sample">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/.../sample</span>
+                </li>
+            </ul>
+
+            <h3>TGSP Adapters</h3>
+            <ul class="endpoint-list">
+                <li class="endpoint-item" data-endpoint="listAdapters">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/tgsp/adapters</span>
+                </li>
+                <li class="endpoint-item" data-endpoint="loadAdapter">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/tgsp/adapters</span>
+                </li>
+                <li class="endpoint-item" data-endpoint="tgspInference">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/tgsp/inference</span>
+                </li>
+            </ul>
+
+            <h3>Checkpoints</h3>
+            <ul class="endpoint-list">
+                <li class="endpoint-item" data-endpoint="saveState">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/.../save_state</span>
+                </li>
+                <li class="endpoint-item" data-endpoint="loadState">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/.../load_state</span>
+                </li>
+            </ul>
+
+            <h3>Audit & Compliance</h3>
+            <ul class="endpoint-list">
+                <li class="endpoint-item" data-endpoint="getAuditLogs">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/audit_logs</span>
+                </li>
+            </ul>
+
+            <h3>Health</h3>
+            <ul class="endpoint-list">
+                <li class="endpoint-item active" data-endpoint="health">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/health</span>
+                </li>
+                <li class="endpoint-item" data-endpoint="version">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/version</span>
+                </li>
+            </ul>
+        </aside>
+
+        <section class="panel">
+            <div class="panel-header">
+                <span class="panel-title">Request</span>
+                <button class="btn btn-primary" id="sendRequest">Send Request</button>
+            </div>
+            <div class="panel-content">
+                <div class="endpoint-description" id="endpointDescription">
+                    Check the health status of the TenSafe API.
+                </div>
+
+                <div class="form-group">
+                    <label>Method</label>
+                    <select id="requestMethod">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="PATCH">PATCH</option>
+                        <option value="DELETE">DELETE</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>URL</label>
+                    <input type="text" id="requestUrl" value="/health">
+                </div>
+
+                <div class="form-group" id="requestBodyGroup">
+                    <label>Request Body (JSON)</label>
+                    <textarea id="requestBody" placeholder='{"key": "value"}'></textarea>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-header">
+                <span class="panel-title">Response</span>
+                <span id="loadingIndicator" class="loading hidden"></span>
+            </div>
+            <div class="panel-content">
+                <div id="responseStatus" class="response-status hidden"></div>
+                <div id="responseMeta" class="response-meta hidden">
+                    <span>Status: <strong id="statusCode"></strong></span>
+                    <span class="response-time">Time: <strong id="responseTime"></strong></span>
+                </div>
+                <div class="code-block" id="responseBody">
+// Response will appear here
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const endpoints = {
+            health: {
+                method: 'GET',
+                url: '/health',
+                description: 'Check the health status of the TenSafe API.',
+                body: null
+            },
+            version: {
+                method: 'GET',
+                url: '/version',
+                description: 'Get version information about the TenSafe API.',
+                body: null
+            },
+            createTrainingClient: {
+                method: 'POST',
+                url: '/api/v1/training_clients',
+                description: 'Create a new training client with optional LoRA and differential privacy configuration.',
+                body: JSON.stringify({
+                    model_ref: "meta-llama/Llama-3-8B",
+                    lora_config: {
+                        rank: 16,
+                        alpha: 32.0,
+                        dropout: 0.05,
+                        target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+                    },
+                    dp_config: {
+                        enabled: true,
+                        noise_multiplier: 1.0,
+                        max_grad_norm: 1.0,
+                        target_epsilon: 8.0,
+                        target_delta: 1e-5
+                    },
+                    batch_size: 8
+                }, null, 2)
+            },
+            listTrainingClients: {
+                method: 'GET',
+                url: '/api/v1/training_clients',
+                description: 'List all training clients for your tenant.',
+                body: null
+            },
+            getTrainingClient: {
+                method: 'GET',
+                url: '/api/v1/training_clients/{tc_id}',
+                description: 'Get details of a specific training client. Replace {tc_id} with the actual ID.',
+                body: null
+            },
+            forwardBackward: {
+                method: 'POST',
+                url: '/api/v1/training_clients/{tc_id}/forward_backward',
+                description: 'Execute a forward-backward pass. Replace {tc_id} with your training client ID.',
+                body: JSON.stringify({
+                    batch: {
+                        input_ids: [[1, 2, 3, 4, 5]],
+                        attention_mask: [[1, 1, 1, 1, 1]],
+                        labels: [[2, 3, 4, 5, 6]]
+                    }
+                }, null, 2)
+            },
+            optimStep: {
+                method: 'POST',
+                url: '/api/v1/training_clients/{tc_id}/optim_step',
+                description: 'Execute an optimizer step with optional DP noise. Replace {tc_id} with your training client ID.',
+                body: JSON.stringify({
+                    apply_dp_noise: true
+                }, null, 2)
+            },
+            sample: {
+                method: 'POST',
+                url: '/api/v1/training_clients/{tc_id}/sample',
+                description: 'Generate text samples from the model. Replace {tc_id} with your training client ID.',
+                body: JSON.stringify({
+                    prompts: ["Once upon a time"],
+                    max_tokens: 128,
+                    temperature: 0.7,
+                    top_p: 0.9
+                }, null, 2)
+            },
+            listAdapters: {
+                method: 'GET',
+                url: '/api/v1/tgsp/adapters',
+                description: 'List all loaded TGSP adapters.',
+                body: null
+            },
+            loadAdapter: {
+                method: 'POST',
+                url: '/api/v1/tgsp/adapters',
+                description: 'Load a TGSP adapter for encrypted inference.',
+                body: JSON.stringify({
+                    tgsp_path: "/path/to/adapter.tgsp"
+                }, null, 2)
+            },
+            tgspInference: {
+                method: 'POST',
+                url: '/api/v1/tgsp/inference',
+                description: 'Run encrypted inference using the active TGSP adapter.',
+                body: JSON.stringify({
+                    inputs: [[0.1, 0.2, 0.3, 0.4, 0.5]]
+                }, null, 2)
+            },
+            saveState: {
+                method: 'POST',
+                url: '/api/v1/training_clients/{tc_id}/save_state',
+                description: 'Save training state as an encrypted checkpoint. Replace {tc_id} with your training client ID.',
+                body: JSON.stringify({
+                    include_optimizer: true,
+                    metadata: {
+                        description: "Checkpoint after 100 steps"
+                    }
+                }, null, 2)
+            },
+            loadState: {
+                method: 'POST',
+                url: '/api/v1/training_clients/{tc_id}/load_state',
+                description: 'Load training state from an encrypted checkpoint. Replace {tc_id} with your training client ID.',
+                body: JSON.stringify({
+                    artifact_id: "art_xxxxx"
+                }, null, 2)
+            },
+            getAuditLogs: {
+                method: 'GET',
+                url: '/api/v1/audit_logs?limit=10',
+                description: 'Retrieve audit logs for compliance and debugging.',
+                body: null
+            }
+        };
+
+        // DOM elements
+        const methodSelect = document.getElementById('requestMethod');
+        const urlInput = document.getElementById('requestUrl');
+        const bodyTextarea = document.getElementById('requestBody');
+        const bodyGroup = document.getElementById('requestBodyGroup');
+        const sendButton = document.getElementById('sendRequest');
+        const responseStatus = document.getElementById('responseStatus');
+        const responseMeta = document.getElementById('responseMeta');
+        const statusCode = document.getElementById('statusCode');
+        const responseTime = document.getElementById('responseTime');
+        const responseBody = document.getElementById('responseBody');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const endpointDescription = document.getElementById('endpointDescription');
+        const apiKeyInput = document.getElementById('apiKey');
+
+        // Handle endpoint selection
+        document.querySelectorAll('.endpoint-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.endpoint-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+
+                const endpoint = endpoints[item.dataset.endpoint];
+                if (endpoint) {
+                    methodSelect.value = endpoint.method;
+                    urlInput.value = endpoint.url;
+                    bodyTextarea.value = endpoint.body || '';
+                    endpointDescription.textContent = endpoint.description;
+                    updateBodyVisibility();
+                }
+            });
+        });
+
+        // Update body visibility based on method
+        function updateBodyVisibility() {
+            const method = methodSelect.value;
+            bodyGroup.style.display = ['POST', 'PUT', 'PATCH'].includes(method) ? 'block' : 'none';
+        }
+
+        methodSelect.addEventListener('change', updateBodyVisibility);
+        updateBodyVisibility();
+
+        // Send request
+        sendButton.addEventListener('click', async () => {
+            const method = methodSelect.value;
+            const url = urlInput.value;
+            const body = bodyTextarea.value;
+            const apiKey = apiKeyInput.value;
+
+            loadingIndicator.classList.remove('hidden');
+            responseStatus.classList.add('hidden');
+            responseMeta.classList.add('hidden');
+
+            const startTime = performance.now();
+
+            try {
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+
+                if (apiKey) {
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                }
+
+                const options = {
+                    method,
+                    headers
+                };
+
+                if (['POST', 'PUT', 'PATCH'].includes(method) && body) {
+                    options.body = body;
+                }
+
+                const response = await fetch(url, options);
+                const endTime = performance.now();
+                const duration = Math.round(endTime - startTime);
+
+                let data;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    data = await response.text();
+                }
+
+                // Update UI
+                responseStatus.classList.remove('hidden', 'success', 'error');
+                responseStatus.classList.add(response.ok ? 'success' : 'error');
+                responseStatus.textContent = response.ok ? 'Success' : 'Error';
+
+                responseMeta.classList.remove('hidden');
+                statusCode.textContent = response.status;
+                responseTime.textContent = `${duration}ms`;
+
+                responseBody.textContent = typeof data === 'string'
+                    ? data
+                    : JSON.stringify(data, null, 2);
+
+            } catch (error) {
+                responseStatus.classList.remove('hidden', 'success');
+                responseStatus.classList.add('error');
+                responseStatus.textContent = 'Error';
+                responseBody.textContent = `Request failed: ${error.message}`;
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+
+        // Initialize
+        updateBodyVisibility();
+    </script>
+</body>
+</html>

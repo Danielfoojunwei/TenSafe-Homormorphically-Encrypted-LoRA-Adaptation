@@ -17,6 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from .database import check_db_health, engine
 from .tg_tinker_api import router as tinker_router
+from .playground import router as playground_router
 
 # Security modules
 from ..security.rate_limiter import RateLimitMiddleware, RateLimitConfig
@@ -74,13 +75,109 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down TG-Tinker Platform...")
 
 
+API_VERSION = "4.0.0"
+API_TITLE = "TenSafe API"
+API_DESCRIPTION = """
+# TenSafe - Privacy-Preserving ML Platform
+
+TenSafe is the only ML platform combining:
+- **Homomorphic Encryption (HE-LoRA)** for encrypted inference
+- **Differential Privacy (DP-SGD)** for training data protection
+- **Post-Quantum Cryptography** for quantum-resistant security
+
+## Quick Start
+
+```python
+from tensafe import TenSafeClient
+
+client = TenSafeClient(api_key="your-api-key")
+
+# Create a training client with differential privacy
+tc = client.create_training_client(
+    model_ref="meta-llama/Llama-3-8B",
+    dp_config={"epsilon": 8.0, "delta": 1e-5}
+)
+
+# Train with privacy guarantees
+tc.train(dataset="your-dataset")
+```
+
+## Authentication
+
+All API requests require a Bearer token in the Authorization header:
+
+```
+Authorization: Bearer <your-api-key>
+```
+
+## Rate Limits
+
+| Tier | Requests/min | Requests/hour |
+|------|-------------|---------------|
+| Free | 60 | 1,000 |
+| Pro | 300 | 10,000 |
+| Business | 1,000 | 50,000 |
+| Enterprise | Custom | Custom |
+
+## Support
+
+- **Documentation**: https://docs.tensafe.io
+- **Status**: https://status.tensafe.io
+- **Support**: support@tensafe.io
+"""
+
 app = FastAPI(
-    title="TG-Tinker",
-    description="Privacy-First ML Training API",
-    version="3.0.0",
+    title=API_TITLE,
+    description=API_DESCRIPTION,
+    version=API_VERSION,
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    openapi_tags=[
+        {
+            "name": "training",
+            "description": "Training client management and operations",
+        },
+        {
+            "name": "inference",
+            "description": "Model inference endpoints",
+        },
+        {
+            "name": "privacy",
+            "description": "Differential privacy and HE operations",
+        },
+        {
+            "name": "tgsp",
+            "description": "TenSafe Secure Package (TGSP) adapter management",
+        },
+        {
+            "name": "audit",
+            "description": "Audit logging and compliance",
+        },
+        {
+            "name": "health",
+            "description": "Health check and system status",
+        },
+        {
+            "name": "admin",
+            "description": "Administrative operations (requires admin role)",
+        },
+    ],
+    license_info={
+        "name": "Apache 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0",
+    },
+    contact={
+        "name": "TenSafe Support",
+        "url": "https://tensafe.io/support",
+        "email": "support@tensafe.io",
+    },
+    servers=[
+        {"url": "https://api.tensafe.io", "description": "Production"},
+        {"url": "https://api.staging.tensafe.io", "description": "Staging"},
+        {"url": "http://localhost:8000", "description": "Local development"},
+    ],
 )
 
 # Security headers middleware
@@ -175,18 +272,40 @@ async def version_info():
 # TG-Tinker API routes
 app.include_router(tinker_router, prefix="/api")
 
+# Playground routes
+app.include_router(playground_router)
+
 
 # Root endpoint
-@app.get("/", tags=["root"])
+@app.get("/", tags=["health"])
 async def root():
-    """API root - service information."""
+    """
+    API root - service information.
+
+    Returns basic information about the TenSafe API including version,
+    available endpoints, and links to documentation.
+    """
     return {
-        "service": "TG-Tinker",
-        "version": "3.0.0",
-        "description": "Privacy-First ML Training API",
-        "docs": "/docs",
-        "health": "/health",
-        "api": "/api/v1/training_clients",
+        "service": "TenSafe",
+        "version": API_VERSION,
+        "description": "Privacy-Preserving ML Platform with HE-LoRA, DP-SGD, and PQC",
+        "links": {
+            "documentation": "/docs",
+            "openapi_spec": "/openapi.json",
+            "health": "/health",
+            "status": "/status",
+        },
+        "api_versions": {
+            "current": "v1",
+            "supported": ["v1"],
+            "deprecated": [],
+        },
+        "endpoints": {
+            "training": "/api/v1/training_clients",
+            "inference": "/api/v1/inference",
+            "tgsp": "/api/v1/tgsp",
+            "audit": "/api/v1/audit_logs",
+        },
     }
 
 
