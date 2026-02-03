@@ -13,18 +13,21 @@ The scheduler outputs a deterministic execution plan that can be
 directly executed by the runtime.
 """
 
+import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Dict, Optional, Any, Tuple
-import math
+from typing import Any, Dict, List, Tuple
 
 from .ckks_params import CKKSParams, verify_schedule_fits
-from .packer import PackingLayout, compute_packing_layout
 from .lora_ir import (
-    LoRAConfig, LoRAIRModule, IRBuilder, IRBasicBlock,
-    IROperand, IROp, IROpType, CostPrediction, predict_costs,
+    CostPrediction,
+    IRBuilder,
+    IROpType,
+    LoRAConfig,
+    LoRAIRModule,
+    predict_costs,
 )
-
+from .packer import PackingLayout, compute_packing_layout
 
 # =============================================================================
 # SCHEDULE TYPES

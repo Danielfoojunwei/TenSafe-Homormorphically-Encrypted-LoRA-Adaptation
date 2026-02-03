@@ -24,9 +24,10 @@ Uses Pyfhel (Python wrapper for Microsoft SEAL) for CKKS operations.
 """
 
 import logging
-import numpy as np
-from typing import Any, Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ _Pyfhel = None
 _PyCtxt = None
 
 try:
-    from Pyfhel import Pyfhel, PyCtxt
+    from Pyfhel import PyCtxt, Pyfhel
     _Pyfhel = Pyfhel
     _PyCtxt = PyCtxt
     _PYFHEL_AVAILABLE = True

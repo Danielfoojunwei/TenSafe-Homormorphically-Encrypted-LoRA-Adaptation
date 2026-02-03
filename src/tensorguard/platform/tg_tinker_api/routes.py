@@ -7,6 +7,10 @@ FastAPI routers for the TG-Tinker training API.
 import hashlib
 import json
 import logging
+import threading
+import time
+import uuid
+from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -914,7 +918,6 @@ async def health_check() -> Dict[str, str]:
 _tgsp_registries: Dict[str, Any] = {}
 
 # Request ID counter for audit correlation (SOC 2 CC4.1)
-import uuid
 _request_id_counter = 0
 _request_id_lock = threading.Lock()
 
@@ -928,10 +931,6 @@ def generate_request_id() -> str:
 
 
 # Simple rate limiter for TGSP inference (SOC 2 CC6.1)
-import threading
-from collections import defaultdict
-import time
-
 _rate_limit_buckets: Dict[str, List[float]] = defaultdict(list)
 _rate_limit_lock = threading.Lock()
 TGSP_RATE_LIMIT_REQUESTS = 100  # Max requests per window
@@ -1286,6 +1285,7 @@ async def tgsp_encrypted_inference(
         Decrypted LoRA deltas for each input in the batch
     """
     import time
+
     import numpy as np
 
     # Generate request ID for audit correlation (SOC 2 CC4.1)
@@ -1490,11 +1490,11 @@ async def convert_lora_to_tgsp(
     for encrypted inference.
     """
     try:
-        from tensafe.lora_to_tgsp_converter import LoRAToTGSPConverter
-
         # Determine output path
         import os
         from pathlib import Path
+
+        from tensafe.lora_to_tgsp_converter import LoRAToTGSPConverter
 
         if request.output_path:
             output_path = request.output_path

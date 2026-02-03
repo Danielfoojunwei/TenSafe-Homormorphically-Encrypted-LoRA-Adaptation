@@ -25,10 +25,10 @@ References:
     - Programmable Bootstrapping surveys
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import List, Optional, Tuple, Dict, Any
 import math
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Dict, List, Tuple
 
 
 class N2HEProfile(Enum):
@@ -262,7 +262,7 @@ class N2HEParams:
         rgsw_noise_factor = self.rlwe.decomposition_base ** self.rlwe.decomposition_levels
         if rgsw_noise_factor > self.rlwe.coeff_modulus / 1000:
             raise ValueError(
-                f"RGSW decomposition may cause excessive noise growth"
+                "RGSW decomposition may cause excessive noise growth"
             )
 
     @property

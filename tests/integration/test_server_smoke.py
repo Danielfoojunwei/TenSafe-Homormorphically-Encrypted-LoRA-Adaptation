@@ -8,7 +8,6 @@ configuration is read at module load time. We use importlib.reload
 to ensure the test environment is used.
 """
 
-import importlib
 import os
 import sys
 import tempfile

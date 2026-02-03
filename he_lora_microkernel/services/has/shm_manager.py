@@ -17,15 +17,13 @@ Data plane protocol:
 6. MSS reads delta and applies
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
 import logging
 import mmap
 import os
-import ctypes
-import struct
 import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -277,7 +275,7 @@ class SharedMemoryManager:
     def _create_mmap_region(self, name: str, layout: BufferLayout) -> ShmRegion:
         """Create region using memory-mapped file."""
         import tempfile
-        import numpy as np
+
 
         # Create temporary file
         tmp_path = os.path.join(tempfile.gettempdir(), f"{name}.shm")

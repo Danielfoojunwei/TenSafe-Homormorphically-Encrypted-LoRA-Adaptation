@@ -47,7 +47,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -356,7 +356,7 @@ class LoRAToTGSPConverter:
         config_path = os.path.join(dir_path, "adapter_config.json")
 
         if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
+            with open(config_path) as f:
                 data = json.load(f)
 
             return LoRAConfig(
@@ -525,8 +525,8 @@ class LoRAToTGSPConverter:
 
         except ImportError:
             # Fallback: generate Ed25519 keys only
-            from cryptography.hazmat.primitives.asymmetric import ed25519
             from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.primitives.asymmetric import ed25519
 
             private_key = ed25519.Ed25519PrivateKey.generate()
             public_key = private_key.public_key()
@@ -644,7 +644,6 @@ class LoRAToTGSPConverter:
 
         except ImportError:
             # Fallback: save as JSON-serializable format
-            import numpy as np
 
             weights_path = os.path.join(payload_dir, "adapter_weights.json")
             serializable = {}
@@ -724,7 +723,7 @@ class LoRAToTGSPConverter:
             input_format = self.detect_format(input_path)
             if input_format == LoRAFormat.UNKNOWN:
                 raise ConversionError(
-                    f"Unknown input format. Supported formats: safetensors, .bin, .pt"
+                    "Unknown input format. Supported formats: safetensors, .bin, .pt"
                 )
 
             logger.info(f"Detected format: {input_format.value}")
@@ -855,8 +854,9 @@ class LoRAToTGSPConverter:
             Dictionary with package metadata
         """
         try:
-            from src.tensorguard.tgsp.cli import run_build
             from argparse import Namespace
+
+            from src.tensorguard.tgsp.cli import run_build
 
             args = Namespace(
                 input_dir=payload_dir,

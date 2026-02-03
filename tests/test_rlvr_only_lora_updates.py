@@ -13,7 +13,7 @@ import random
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import pytest
 
@@ -38,7 +38,7 @@ class MockParameter:
         data = json.dumps(self.values, sort_keys=True)
         return hashlib.md5(data.encode()).hexdigest()
 
-    def clone(self) -> "MockParameter":
+    def clone(self) -> MockParameter:
         """Create a deep copy of the parameter."""
         return MockParameter(
             name=self.name,

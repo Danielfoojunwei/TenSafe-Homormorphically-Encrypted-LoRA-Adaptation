@@ -1,7 +1,8 @@
 """Tests for cookbook evaluation metrics."""
 
-import pytest
 import math
+
+import pytest
 
 
 class TestAccuracyMetric:

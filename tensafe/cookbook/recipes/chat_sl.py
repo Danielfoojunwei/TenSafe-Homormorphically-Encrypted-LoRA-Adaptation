@@ -19,12 +19,11 @@ Example usage:
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterator, List, Optional, Protocol, Union
+from dataclasses import dataclass
+from typing import Any, Dict, Iterator, List, Optional, Protocol
 
-from ..hyperparam_utils import LoRAConfig, calculate_warmup_steps, get_lora_lr
+from ..hyperparam_utils import LoRAConfig, calculate_warmup_steps
 from ..model_info import get_recommended_renderer_name
 from ..renderers import get_renderer
 

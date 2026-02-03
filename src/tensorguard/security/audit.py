@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional
 from uuid import uuid4
 
 from fastapi import Request, Response
@@ -248,7 +248,7 @@ class SecurityAuditLog:
         try:
             log_files = sorted(self.log_path.glob("audit-*.jsonl"), reverse=True)
             if log_files:
-                with open(log_files[0], "r") as f:
+                with open(log_files[0]) as f:
                     lines = f.readlines()
                     if lines:
                         last_event = json.loads(lines[-1])
@@ -433,7 +433,7 @@ class SecurityAuditLog:
             log_file = log_files[0]
 
         try:
-            with open(log_file, "r") as f:
+            with open(log_file) as f:
                 previous_hash = None
 
                 for line_num, line in enumerate(f, 1):

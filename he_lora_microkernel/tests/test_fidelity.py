@@ -9,26 +9,26 @@ Error bounds:
   - rel error ≤ 1e-2
 """
 
-import pytest
-import numpy as np
+import os
+import sys
 from typing import Tuple
 
-import sys
-import os
+import numpy as np
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+from he_lora_microkernel.backend.gpu_ckks_backend import BackendType
 from he_lora_microkernel.compiler import (
+    CKKSProfile,
     LoRAConfig,
     LoRATargets,
-    CKKSProfile,
-    get_profile,
     compile_schedule,
+    get_profile,
     pack_activations,
     unpack_activations,
 )
 from he_lora_microkernel.runtime import HELoRAExecutor
-from he_lora_microkernel.backend.gpu_ckks_backend import BackendType
-
 
 # =============================================================================
 # REFERENCE IMPLEMENTATION

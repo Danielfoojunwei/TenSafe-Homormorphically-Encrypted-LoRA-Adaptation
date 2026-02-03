@@ -18,7 +18,7 @@ import hashlib
 import json
 import logging
 import random
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 

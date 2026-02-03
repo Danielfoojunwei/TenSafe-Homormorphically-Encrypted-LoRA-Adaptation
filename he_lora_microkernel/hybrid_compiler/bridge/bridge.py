@@ -12,10 +12,11 @@ Security Model:
 - All operations verifiable
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, Tuple, List, Dict, Any
-import numpy as np
 import logging
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

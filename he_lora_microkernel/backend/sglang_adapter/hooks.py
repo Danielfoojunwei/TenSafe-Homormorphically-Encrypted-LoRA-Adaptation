@@ -6,10 +6,10 @@ hooks that intercept hidden states before QKV projections and apply
 encrypted deltas from the HE Adapter Service.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 import logging
 import weakref
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 if TYPE_CHECKING:
     import torch
@@ -210,7 +210,7 @@ class HookRegistry:
 
     def get_hooked_layers(self) -> List[int]:
         """Get list of layer indices with active hooks."""
-        return list(sorted(set(k[0] for k in self._hooks.keys())))
+        return sorted(set(k[0] for k in self._hooks.keys()))
 
     def get_layer_projections(self, layer_idx: int) -> List[str]:
         """Get list of hooked projections for a layer."""

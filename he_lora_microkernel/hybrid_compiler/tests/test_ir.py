@@ -8,17 +8,22 @@ Tests for the scheme-aware IR system including:
 4. Bootstrap budget enforcement
 """
 
-import pytest
-import numpy as np
-from typing import List
 
 from ..ir import (
-    IRProgram, IRValue, Shape, Scheme, ValueType,
-    CKKSMetadata, TFHEMetadata,
-    create_ckks_value, create_tfhe_value,
-    CKKSMatMul, CKKSAdd, CKKSMul, CKKSRescale, CKKSPackMOAI, CKKSApplyMask,
-    TFHELUT, CKKSQuantizeToInt, CKKSToTFHE, TFHEToCKKS,
-    validate_program, ValidationResult,
+    TFHELUT,
+    CKKSAdd,
+    CKKSMatMul,
+    CKKSQuantizeToInt,
+    CKKSRescale,
+    CKKSToTFHE,
+    IRProgram,
+    Scheme,
+    Shape,
+    TFHEToCKKS,
+    ValueType,
+    create_ckks_value,
+    create_tfhe_value,
+    validate_program,
 )
 
 
@@ -449,7 +454,6 @@ class TestBridgeNodes:
 
 def run_ir_tests():
     """Run all IR tests and report results."""
-    import sys
 
     test_classes = [
         TestShape,

@@ -33,7 +33,7 @@ import os
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -214,8 +214,8 @@ def load_model_and_tokenizer(
 ):
     """Load the base model and tokenizer with optional quantization."""
     import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
     logger.info(f"Loading model: {config.model_name}")
 
@@ -312,10 +312,10 @@ def prepare_dataset(
 ):
     """Prepare the training and evaluation datasets."""
     from dataset_loader import (
-        OASST1Loader,
-        DatasetConfig,
-        create_synthetic_dataset,
         ChatExample,
+        DatasetConfig,
+        OASST1Loader,
+        create_synthetic_dataset,
     )
     from datasets import Dataset
 
@@ -409,7 +409,7 @@ def train(
         Dictionary with training results and artifact paths
     """
     import torch
-    from trl import SFTTrainer, SFTConfig
+    from trl import SFTConfig, SFTTrainer
 
     # Create run directory
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")

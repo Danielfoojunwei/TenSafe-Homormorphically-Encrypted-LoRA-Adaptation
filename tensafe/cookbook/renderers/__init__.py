@@ -41,9 +41,9 @@ Usage:
 from .base import (
     Message,
     MessageChunk,
-    Renderer,
     RenderContext,
     RenderedMessage,
+    Renderer,
     StopCondition,
     SupervisedWeightMode,
 )

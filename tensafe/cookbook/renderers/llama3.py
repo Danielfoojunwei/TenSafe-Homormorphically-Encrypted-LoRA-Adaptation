@@ -16,14 +16,14 @@ standard JSON responses.
 
 from __future__ import annotations
 
-from typing import Any, List
+from typing import List
 
 from .base import (
     Message,
     MessageChunk,
+    RenderContext,
     RenderedMessage,
     Renderer,
-    RenderContext,
     StopCondition,
     Tokenizer,
 )

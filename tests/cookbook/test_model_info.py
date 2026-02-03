@@ -1,6 +1,5 @@
 """Tests for cookbook model info utilities."""
 
-import pytest
 
 
 class TestModelAttributes:

@@ -4,14 +4,14 @@ Security Audit Logging
 Provides audit logging for security-relevant events in MSS and HAS.
 """
 
+import json
+import logging
+import os
+import threading
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
-import logging
-import json
-import time
-import threading
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +152,7 @@ class SecurityAuditLog:
                 # Ensure directory exists
                 os.makedirs(os.path.dirname(self._log_file), exist_ok=True)
                 self._file_handle = open(self._log_file, 'a')
-            except (OSError, IOError) as e:
+            except OSError as e:
                 logger.warning(f"Failed to open audit log file: {e}")
                 self._enable_file = False
 
@@ -203,7 +203,7 @@ class SecurityAuditLog:
             try:
                 self._file_handle.write(event_json + '\n')
                 self._file_handle.flush()
-            except (OSError, IOError) as e:
+            except OSError as e:
                 logger.warning(f"Failed to write audit event: {e}")
 
         # Trigger callbacks

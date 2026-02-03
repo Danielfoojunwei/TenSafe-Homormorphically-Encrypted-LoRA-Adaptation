@@ -28,13 +28,12 @@ import argparse
 import gc
 import json
 import logging
-import os
 import resource
 import statistics
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -263,7 +262,7 @@ def benchmark_generation(
         generated_tokens = output.shape[1] - prompt_tokens
         total_time_ms = (end_time - start_time) * 1000
         ttft_ms = (first_token_time - start_time) * 1000 if first_token_time else total_time_ms / 2
-        tokens_per_second = generated_tokens / ((end_time - start_time)) if (end_time - start_time) > 0 else 0
+        tokens_per_second = generated_tokens / (end_time - start_time) if (end_time - start_time) > 0 else 0
 
         metrics = InferenceMetrics(
             prompt_tokens=prompt_tokens,

@@ -11,7 +11,6 @@ For production, generate from has.proto:
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-
 # ============================================================================
 # ADAPTER MANAGEMENT MESSAGES
 # ============================================================================

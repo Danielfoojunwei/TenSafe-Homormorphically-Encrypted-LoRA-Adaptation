@@ -22,14 +22,14 @@ Mock/Simulation Mode:
 - Must explicitly enable with allow_mock=True or TENSAFE_ALLOW_MOCK_HE=1
 """
 
+import hashlib
+import logging
+import os
+import secrets
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
-import logging
-import os
-import time
-import hashlib
-import secrets
 
 logger = logging.getLogger(__name__)
 
@@ -375,7 +375,7 @@ class KeyManager:
         """Get list of available Galois key steps."""
         if self._keyset is None:
             return []
-        return list(sorted(self._keyset.galois_keys.keys()))
+        return sorted(self._keyset.galois_keys.keys())
 
     def clear_keys(self) -> None:
         """

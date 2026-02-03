@@ -30,11 +30,10 @@ import argparse
 import gc
 import json
 import logging
-import os
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -194,7 +193,7 @@ def run_lm_eval_task(
         logger.warning("lm-evaluation-harness not installed. Install with: pip install lm-eval")
         return None
 
-    from lm_eval import evaluator, tasks
+    from lm_eval import evaluator
     from lm_eval.models.huggingface import HFLM
 
     logger.info(f"Running lm-eval task: {task}")

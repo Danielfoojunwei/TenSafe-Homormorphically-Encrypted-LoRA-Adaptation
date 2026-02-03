@@ -31,7 +31,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
@@ -108,7 +108,7 @@ class BenchmarkSuite:
         """Benchmark Training API operations."""
         print("\n[1/8] Benchmarking Training API...")
 
-        from tensorguard.platform.tg_tinker_api.dp import DPConfig, DPTrainer
+        from tensorguard.platform.tg_tinker_api.dp import DPConfig
 
         # Mock training operations
         config = DPConfig(
@@ -198,9 +198,8 @@ class BenchmarkSuite:
         print("\n[3/8] Benchmarking DP-SGD (realistic simulation)...")
 
         import numpy as np
-        from tensorguard.platform.tg_tinker_api.dp import (
-            clip_gradients, add_noise, RDPAccountant
-        )
+
+        from tensorguard.platform.tg_tinker_api.dp import RDPAccountant, add_noise, clip_gradients
 
         clip_metrics = self._get_metrics("dp_sgd", "gradient_clipping")
         noise_metrics = self._get_metrics("dp_sgd", "noise_injection")
@@ -290,9 +289,7 @@ class BenchmarkSuite:
         """Benchmark encrypted storage operations."""
         print("\n[4/8] Benchmarking Encrypted Storage...")
 
-        from tensorguard.platform.tg_tinker_api.storage import (
-            EncryptedArtifactStore, KeyManager, LocalStorageBackend
-        )
+        from tensorguard.platform.tg_tinker_api.storage import EncryptedArtifactStore, KeyManager, LocalStorageBackend
 
         key_manager = KeyManager()
         storage = LocalStorageBackend(base_path="/tmp/bench_storage")

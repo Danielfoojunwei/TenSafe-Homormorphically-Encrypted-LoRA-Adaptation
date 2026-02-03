@@ -13,17 +13,13 @@ All tampering attempts MUST result in:
 - No undefined behavior
 """
 
-import json
 import os
 import secrets
-import struct
-import tempfile
-from pathlib import Path
 
 import pytest
-from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305, AESGCM
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM, ChaCha20Poly1305
 
-from tensorguard.crypto.payload import PayloadEncryptor, PayloadDecryptor
+from tensorguard.crypto.payload import PayloadDecryptor, PayloadEncryptor
 
 
 class TestPayloadTamperResistance:

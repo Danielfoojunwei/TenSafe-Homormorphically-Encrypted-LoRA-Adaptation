@@ -5,12 +5,12 @@ Ensures MSS cannot access HE secret keys, which are isolated in HAS.
 Provides defense-in-depth through process boundaries and sandboxing.
 """
 
-from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Dict, List, Optional
 import logging
 import os
 import sys
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +154,7 @@ class ProcessIsolation:
             mem_bytes = self._config.memory_limit_mb * 1024 * 1024
             try:
                 resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
-            except (ValueError, resource.error):
+            except (OSError, ValueError):
                 pass  # May not be available on all platforms
 
             logger.debug("Resource limits configured")
@@ -223,7 +223,7 @@ class ProcessIsolation:
             # Allow some tolerance
             return soft <= expected * 1.1
 
-        except (ImportError, resource.error):
+        except (OSError, ImportError):
             return True  # Can't verify on this platform
 
     def _check_clean_environment(self) -> bool:
@@ -289,7 +289,7 @@ class SecureCommunication:
         if hasattr(request, '__dict__'):
             for key, value in request.__dict__.items():
                 if self._contains_key_material(key, value):
-                    logger.error(f"Blocked request containing potential key material")
+                    logger.error("Blocked request containing potential key material")
                     return False
 
         return True

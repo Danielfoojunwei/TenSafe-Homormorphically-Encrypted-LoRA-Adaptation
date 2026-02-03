@@ -9,9 +9,6 @@ import json
 import os
 import struct
 import tempfile
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -176,8 +173,8 @@ class TestTGSPAdapterRegistry:
     def test_no_active_adapter_error(self):
         """Test error when no adapter is activated."""
         from tensafe.tgsp_adapter_registry import (
-            TGSPAdapterRegistry,
             NoActiveAdapterError,
+            TGSPAdapterRegistry,
         )
 
         registry = TGSPAdapterRegistry(enforce_tgsp=True)
@@ -207,9 +204,9 @@ class TestTGSPInferenceEnforcement:
     def test_inference_rejects_non_tgsp_in_he_mode(self):
         """Test inference rejects non-TGSP adapters in HE mode."""
         from tensafe.inference import (
-            TenSafeInference,
             InferenceConfig,
             LoRAMode,
+            TenSafeInference,
             TGSPEnforcementError,
         )
 
@@ -234,9 +231,9 @@ class TestTGSPInferenceEnforcement:
     def test_inference_allows_non_tgsp_in_plaintext_mode(self):
         """Test inference allows non-TGSP adapters in plaintext mode."""
         from tensafe.inference import (
-            TenSafeInference,
             InferenceConfig,
             LoRAMode,
+            TenSafeInference,
         )
 
         # Create config with plaintext mode
@@ -261,9 +258,9 @@ class TestTGSPInferenceEnforcement:
     def test_inference_allows_bypass_when_disabled(self):
         """Test inference allows non-TGSP when enforcement disabled."""
         from tensafe.inference import (
-            TenSafeInference,
             InferenceConfig,
             LoRAMode,
+            TenSafeInference,
         )
 
         # Create config with HE mode but enforcement disabled
@@ -292,9 +289,9 @@ class TestTGSPInferenceEnforcement:
     def test_register_weights_enforces_tgsp(self):
         """Test register_lora_weights enforces TGSP format."""
         from tensafe.inference import (
-            TenSafeInference,
             InferenceConfig,
             LoRAMode,
+            TenSafeInference,
             TGSPEnforcementError,
         )
 
@@ -319,9 +316,9 @@ class TestTGSPInferenceEnforcement:
     def test_register_weights_allows_tgsp_flag(self):
         """Test register_lora_weights accepts weights marked as from TGSP."""
         from tensafe.inference import (
-            TenSafeInference,
             InferenceConfig,
             LoRAMode,
+            TenSafeInference,
         )
 
         config = InferenceConfig(
@@ -342,9 +339,9 @@ class TestTGSPInferenceEnforcement:
     def test_metrics_include_tgsp_status(self):
         """Test inference metrics include TGSP compliance status."""
         from tensafe.inference import (
-            TenSafeInference,
             InferenceConfig,
             LoRAMode,
+            TenSafeInference,
         )
 
         config = InferenceConfig(
@@ -365,21 +362,21 @@ class TestProductionGates:
 
     def test_tgsp_enforcement_gate_default(self):
         """Test TGSP enforcement gate is enabled by default."""
-        from tensafe.core.gates import ProductionGates, GateStatus
+        from tensafe.core.gates import GateStatus, ProductionGates
 
         status = ProductionGates.TGSP_ENFORCEMENT.check()
         assert status in (GateStatus.ALLOWED, GateStatus.AUDIT)
 
     def test_tgsp_bypass_gate_denied_by_default(self):
         """Test TGSP bypass gate is denied by default."""
-        from tensafe.core.gates import ProductionGates, GateStatus
+        from tensafe.core.gates import GateStatus, ProductionGates
 
         status = ProductionGates.TGSP_BYPASS.check()
         assert status == GateStatus.DENIED
 
     def test_tgsp_signature_skip_denied_by_default(self):
         """Test TGSP signature skip gate is denied by default."""
-        from tensafe.core.gates import ProductionGates, GateStatus
+        from tensafe.core.gates import GateStatus, ProductionGates
 
         status = ProductionGates.TGSP_SIGNATURE_SKIP.check()
         assert status == GateStatus.DENIED

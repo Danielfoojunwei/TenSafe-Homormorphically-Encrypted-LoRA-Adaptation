@@ -12,6 +12,6 @@ Each backend preserves TenSafe's privacy guarantees (HE-LoRA, audit trails, TSSP
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .vllm import TenSafeVLLMEngine, TenSafeVLLMConfig
+    from .vllm import TenSafeVLLMConfig, TenSafeVLLMEngine
 
 __all__ = ["TenSafeVLLMEngine", "TenSafeVLLMConfig"]

@@ -27,12 +27,13 @@ References:
     - Harvey's NTT optimizations
 """
 
+import logging
+import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Tuple, Dict, Any
+from typing import Any, Dict, List, Optional
+
 import numpy as np
-import time
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -317,7 +318,6 @@ class FasterNTTBackend:
         Args:
             params: N2HE parameters including LWE and RLWE config
         """
-        from .n2he_params import N2HEParams
         self.params = params
 
         # Initialize NTT for RLWE operations

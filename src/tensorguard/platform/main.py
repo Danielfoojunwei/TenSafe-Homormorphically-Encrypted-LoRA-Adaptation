@@ -15,13 +15,13 @@ from fastapi.middleware.gzip import GZipMiddleware
 from sqlmodel import SQLModel
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from .database import check_db_health, engine
-from .tg_tinker_api import router as tinker_router
+from ..security.csp import ContentSecurityPolicy, CSPMiddleware
 
 # Security modules
-from ..security.rate_limiter import RateLimitMiddleware, RateLimitConfig
-from ..security.csp import CSPMiddleware, ContentSecurityPolicy
+from ..security.rate_limiter import RateLimitConfig, RateLimitMiddleware
 from ..security.sanitization import ValidationMiddleware
+from .database import check_db_health, engine
+from .tg_tinker_api import router as tinker_router
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +159,7 @@ async def version_info():
     """Version information endpoint."""
     return {
         "service": "TG-Tinker",
-        "version": "4.0.0",
+        "version": "3.0.0",
         "api_version": "v1",
         "python_version": "3.9+",
         "environment": TG_ENVIRONMENT,

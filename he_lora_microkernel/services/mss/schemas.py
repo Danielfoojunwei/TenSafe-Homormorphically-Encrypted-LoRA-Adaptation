@@ -8,7 +8,6 @@ for insertion point configuration.
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
-import json
 
 
 class LoRATargetType(str, Enum):

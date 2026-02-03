@@ -8,9 +8,8 @@ SGLang uses RadixAttention for efficient prefix caching and batch
 management. The adapter hooks into model execution to inject deltas.
 """
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 import logging
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 if TYPE_CHECKING:
     import torch
@@ -18,14 +17,14 @@ if TYPE_CHECKING:
 from ..base_adapter import (
     BaseRuntimeAdapter,
     BatchConfig,
-    ModelMetadata,
-    InsertionConfig,
-    LoRATargets,
-    LayerDeltas,
     DeltaCallback,
+    InsertionConfig,
+    LayerDeltas,
+    LoRATargets,
+    ModelMetadata,
     register_adapter,
 )
-from .hooks import HookRegistry, SGLangModelHook, RadixAttentionHook
+from .hooks import HookRegistry, RadixAttentionHook
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +115,6 @@ class SGLangAdapter(BaseRuntimeAdapter):
     def _init_sglang_runtime(self) -> None:
         """Initialize actual SGLang runtime."""
         try:
-            from sglang import RuntimeEndpoint
             from sglang.srt.server import Runtime
 
             # Create runtime with configuration
@@ -328,7 +326,6 @@ class SGLangAdapter(BaseRuntimeAdapter):
         attention_mask: Optional['torch.Tensor'] = None,
     ) -> Any:
         """Run prefill phase."""
-        import torch
 
         batch_size = input_ids.shape[0]
         seq_len = input_ids.shape[1]
@@ -353,7 +350,6 @@ class SGLangAdapter(BaseRuntimeAdapter):
         attention_mask: Optional['torch.Tensor'],
     ) -> Any:
         """Run actual SGLang prefill."""
-        import torch
 
         # Convert to list of sequences
         batch_size = input_ids.shape[0]

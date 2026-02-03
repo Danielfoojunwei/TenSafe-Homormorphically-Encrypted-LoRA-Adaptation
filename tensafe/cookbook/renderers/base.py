@@ -66,7 +66,7 @@ class Message:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Message":
+    def from_dict(cls, data: Dict[str, Any]) -> Message:
         """Create from dictionary representation."""
         return cls(
             role=data["role"],

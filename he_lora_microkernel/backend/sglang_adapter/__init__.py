@@ -6,7 +6,7 @@ This adapter hooks into the model execution step to inject HE-LoRA deltas.
 """
 
 from .adapter import SGLangAdapter
-from .hooks import SGLangModelHook, HookRegistry
+from .hooks import HookRegistry, SGLangModelHook
 
 __all__ = [
     'SGLangAdapter',

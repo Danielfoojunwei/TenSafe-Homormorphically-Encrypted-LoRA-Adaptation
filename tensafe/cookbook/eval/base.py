@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -151,9 +151,9 @@ class Evaluator:
         self.client = client
 
         # Load renderers
-        from ..tokenizer_utils import get_tokenizer
-        from ..renderers import get_renderer
         from ..model_info import get_recommended_renderer_name
+        from ..renderers import get_renderer
+        from ..tokenizer_utils import get_tokenizer
 
         self.tokenizer = get_tokenizer(config.model_name)
         renderer_name = get_recommended_renderer_name(config.model_name)
@@ -164,7 +164,7 @@ class Evaluator:
         """Register a benchmark evaluator."""
         cls.BENCHMARK_REGISTRY[name.lower()] = evaluator_class
 
-    def _get_benchmark_evaluator(self, name: str) -> "BenchmarkEvaluator":
+    def _get_benchmark_evaluator(self, name: str) -> BenchmarkEvaluator:
         """Get evaluator for a benchmark."""
         name_lower = name.lower()
 

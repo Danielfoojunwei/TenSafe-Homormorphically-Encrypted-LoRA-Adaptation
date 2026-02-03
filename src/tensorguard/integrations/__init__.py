@@ -6,9 +6,9 @@ Provides integrations with popular MLOps tools while maintaining privacy guarant
 - Hugging Face Hub: Model hosting with TSSP integration
 """
 
-from .wandb_callback import TenSafeWandbCallback
-from .mlflow_callback import TenSafeMLflowCallback
 from .hf_hub import TenSafeHFHubIntegration
+from .mlflow_callback import TenSafeMLflowCallback
+from .wandb_callback import TenSafeWandbCallback
 
 __all__ = [
     "TenSafeWandbCallback",

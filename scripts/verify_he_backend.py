@@ -29,7 +29,7 @@ def main():
     print()
 
     try:
-        from crypto_backend.n2he_hexl import verify_backend, HEBackendNotAvailableError
+        from crypto_backend.n2he_hexl import HEBackendNotAvailableError, verify_backend
 
         result = verify_backend()
 

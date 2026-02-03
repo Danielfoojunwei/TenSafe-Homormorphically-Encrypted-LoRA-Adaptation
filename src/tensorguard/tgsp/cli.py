@@ -333,7 +333,7 @@ def run_convert(args):
         )
 
         if result.success:
-            print(f"Conversion successful!")
+            print("Conversion successful!")
             print(f"  Output: {result.output_path}")
             print(f"  Adapter ID: {result.adapter_id}")
             print(f"  Model: {result.model_name} v{result.model_version}")
@@ -343,7 +343,7 @@ def run_convert(args):
             print(f"  Input size: {result.input_size_bytes:,} bytes")
             print(f"  Output size: {result.output_size_bytes:,} bytes")
             print(f"  Time: {result.conversion_time_ms:.2f}ms")
-            print(f"\nCryptographic info:")
+            print("\nCryptographic info:")
             print(f"  Manifest hash: {result.manifest_hash[:16]}...")
             print(f"  Payload hash: {result.payload_hash[:16]}...")
             print(f"  Signature key: {result.signature_key_id}")

@@ -10,15 +10,15 @@ Supported attestation methods:
 - Software attestation (development only)
 """
 
+from .factory import AttestationConfig, create_attestation_provider
 from .provider import (
-    AttestationProvider,
     AttestationError,
+    AttestationProvider,
     AttestationQuote,
     AttestationResult,
     VerificationPolicy,
 )
 from .tpm import TPMAttestationProvider
-from .factory import create_attestation_provider, AttestationConfig
 
 __all__ = [
     "AttestationProvider",

@@ -22,11 +22,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import secrets
 import sys
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -404,14 +403,14 @@ def run_smoke_test(
     loss_decreased = metrics.final_loss < metrics.initial_loss
 
     if verbose:
-        print(f"\nTraining complete!")
+        print("\nTraining complete!")
         print(f"  Initial loss: {metrics.initial_loss:.4f}")
         print(f"  Final loss: {metrics.final_loss:.4f}")
         print(f"  Loss decreased: {loss_decreased}")
 
     # Test sampling
     if verbose:
-        print(f"\nSampling from trained model...")
+        print("\nSampling from trained model...")
 
     sample_result = tc.sample(
         prompts=["Once upon a time"],
@@ -427,7 +426,7 @@ def run_smoke_test(
 
     # Test checkpointing
     if verbose:
-        print(f"\nCheckpoint test...")
+        print("\nCheckpoint test...")
 
     save_result = tc.save_state()
     metrics.checkpoint_saved = "artifact_id" in save_result

@@ -9,10 +9,10 @@ Two profiles are provided:
 NO BOOTSTRAPPING is supported - schedules must fit within the modulus chain.
 """
 
+import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Tuple
-import math
+from typing import Optional, Tuple
 
 
 class CKKSProfile(Enum):

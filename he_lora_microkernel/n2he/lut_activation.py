@@ -27,13 +27,13 @@ References:
     - GPU acceleration for TFHE (cuFHE, Concrete, etc.)
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import List, Optional, Dict, Any, Callable, Tuple
-import numpy as np
-import time
 import logging
 import math
+import time
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -307,7 +307,6 @@ class LUTActivationEngine:
             params: N2HE/TFHE parameters
             use_gpu: Whether to use GPU acceleration
         """
-        from .n2he_params import N2HEParams
         self.params = params
         self.use_gpu = use_gpu and params.use_gpu
 

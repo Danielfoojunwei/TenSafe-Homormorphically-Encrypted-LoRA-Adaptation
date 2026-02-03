@@ -11,10 +11,9 @@ Verifies that:
 from __future__ import annotations
 
 import json
-import random
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import pytest
 
@@ -22,9 +21,9 @@ import pytest
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from tensafe.rlvr.algorithms.base import MockRLAlgorithm
 from tensafe.rlvr.algorithms.ppo import PPO, PPOConfig
 from tensafe.rlvr.algorithms.reinforce import REINFORCE, REINFORCEConfig
-from tensafe.rlvr.algorithms.base import AlgorithmConfig, MockRLAlgorithm
 from tensafe.rlvr.rollout import MockRolloutSampler, Trajectory, TrajectoryBatch
 
 

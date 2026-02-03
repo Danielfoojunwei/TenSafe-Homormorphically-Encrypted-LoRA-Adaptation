@@ -10,17 +10,15 @@ Provides JWT token invalidation capabilities:
 """
 
 import asyncio
-import hashlib
 import logging
 import os
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, Optional
 
 from fastapi import HTTPException, Request, Response, status
-from jose import jwt, JWTError
+from jose import JWTError, jwt
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)

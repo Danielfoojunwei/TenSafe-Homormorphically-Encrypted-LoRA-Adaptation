@@ -7,8 +7,8 @@ for development without protoc.
 For production, generate from has.proto.
 """
 
-from typing import Any, Optional
 import logging
+from typing import Any, Optional
 
 from . import has_pb2
 

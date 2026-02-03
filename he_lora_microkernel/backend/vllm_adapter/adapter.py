@@ -11,9 +11,8 @@ The adapter:
   4. Runs prefill and decode with delta injection
 """
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 import logging
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 if TYPE_CHECKING:
     import torch
@@ -21,21 +20,21 @@ if TYPE_CHECKING:
 from ..base_adapter import (
     BaseRuntimeAdapter,
     BatchConfig,
-    ModelMetadata,
-    InsertionConfig,
-    LoRATargets,
-    LayerDeltas,
     DeltaCallback,
+    InsertionConfig,
+    LayerDeltas,
+    LoRATargets,
+    ModelMetadata,
     register_adapter,
 )
 from .hooks import (
     AttentionProjectionHook,
     create_projection_hooks,
+    get_hook_statistics,
     install_hooks,
     remove_hooks,
-    set_delta_callback,
-    get_hook_statistics,
     reset_hook_statistics,
+    set_delta_callback,
 )
 
 logger = logging.getLogger(__name__)
@@ -130,7 +129,6 @@ class VLLMAdapter(BaseRuntimeAdapter):
 
     def _init_mock(self) -> ModelMetadata:
         """Initialize mock for testing without vLLM."""
-        import torch
         import torch.nn as nn
 
         # Create a minimal mock model
@@ -256,7 +254,6 @@ class VLLMAdapter(BaseRuntimeAdapter):
         Note: In vLLM, this is typically handled by the generate() method.
         For fine-grained control, we use lower-level APIs.
         """
-        import torch
 
         if self._engine is None:
             # Mock implementation

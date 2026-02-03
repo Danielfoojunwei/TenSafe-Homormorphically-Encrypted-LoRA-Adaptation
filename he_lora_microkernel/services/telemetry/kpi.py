@@ -5,11 +5,11 @@ Defines and enforces Key Performance Indicators for HE-LoRA services.
 Includes rotation budgets, latency SLAs, and operational limits.
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
 import logging
 import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
 from .collector import ServiceTelemetryCollector, TelemetryEvent, TelemetryEventType
 

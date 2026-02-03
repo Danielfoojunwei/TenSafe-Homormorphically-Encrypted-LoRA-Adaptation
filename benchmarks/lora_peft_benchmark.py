@@ -17,14 +17,14 @@ Usage:
 import gc
 import json
 import os
+import statistics
 import sys
 import time
-import statistics
 import warnings
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 import numpy as np
 
@@ -93,15 +93,15 @@ class LoRATrainingBenchmark:
 
         try:
             import torch
+            from datasets import Dataset
+            from peft import LoraConfig, TaskType, get_peft_model
             from transformers import (
                 AutoModelForCausalLM,
                 AutoTokenizer,
-                TrainingArguments,
-                Trainer,
                 DataCollatorForLanguageModeling,
+                Trainer,
+                TrainingArguments,
             )
-            from peft import LoraConfig, get_peft_model, TaskType
-            from datasets import Dataset
         except ImportError as e:
             print(f"  [ERROR] Missing dependencies: {e}")
             print("  Install with: pip install torch transformers peft datasets")
@@ -219,7 +219,7 @@ class LoRATrainingBenchmark:
         }
 
         # Print summary
-        print(f"\n  Results:")
+        print("\n  Results:")
         print(f"    Model: {self.config.model_name}")
         print(f"    Dataset: {self.config.num_train_samples} synthetic examples ({self.config.num_eval_samples} for eval)")
         print(f"    LoRA Parameters: {trainable_params:,} trainable ({param_percent:.2f}% of {total_params:,} total)")
@@ -252,10 +252,10 @@ class EvaluationBenchmark:
             "mmlu": self._eval_mmlu_smoke(),
         }
 
-        print(f"\n  Results:")
+        print("\n  Results:")
         print(f"    GSM8K (smoke): {results['gsm8k']['accuracy']:.2f} accuracy (synthetic mode)")
         print(f"    MMLU (smoke): {results['mmlu']['accuracy']:.2f} accuracy (synthetic mode)")
-        print(f"    Generated mock metrics for CI validation")
+        print("    Generated mock metrics for CI validation")
 
         return results
 
@@ -395,7 +395,7 @@ class PerformanceBenchmark:
             "avg_tokens_per_run": avg_tokens,
         }
 
-        print(f"\n  Results:")
+        print("\n  Results:")
         print(f"    Time to First Token (TTFT): {results['ttft_ms']:.2f} ms")
         print(f"    Latency P50: {results['latency_p50_ms']:.2f} ms")
         print(f"    Latency P95: {results['latency_p95_ms']:.2f} ms")
@@ -587,7 +587,7 @@ class LoRAPEFTBenchmark:
         # Step 1: Training
         t = self.results.get("training", {})
         if t.get("status") == "success":
-            print(f"\nStep 1: LoRA Training")
+            print("\nStep 1: LoRA Training")
             print(f"  Model: {t.get('model', 'N/A')}")
             print(f"  Dataset: {t.get('dataset_train_samples', 0)} synthetic examples ({t.get('dataset_eval_samples', 0)} for eval)")
             print(f"  LoRA Parameters: {t.get('lora_trainable_params', 0):,} trainable ({t.get('lora_param_percent', 0):.2f}% of {t.get('lora_total_params', 0):,} total)")
@@ -597,15 +597,15 @@ class LoRAPEFTBenchmark:
 
         # Step 2: Evaluation
         e = self.results.get("evaluation", {})
-        print(f"\nStep 2: Evaluation Suite")
+        print("\nStep 2: Evaluation Suite")
         print(f"  GSM8K (smoke): {e.get('gsm8k', {}).get('accuracy', 0):.2f} accuracy (synthetic mode)")
         print(f"  MMLU (smoke): {e.get('mmlu', {}).get('accuracy', 0):.2f} accuracy (synthetic mode)")
-        print(f"  Generated mock metrics for CI validation")
+        print("  Generated mock metrics for CI validation")
 
         # Step 3: Performance
         p = self.results.get("performance", {})
         if p.get("status") == "success":
-            print(f"\nStep 3: Performance Benchmark")
+            print("\nStep 3: Performance Benchmark")
             print(f"  Time to First Token (TTFT): {p.get('ttft_ms', 0):.2f} ms")
             print(f"  Latency P50: {p.get('latency_p50_ms', 0):.2f} ms")
             print(f"  Latency P95: {p.get('latency_p95_ms', 0):.2f} ms")
@@ -616,13 +616,13 @@ class LoRAPEFTBenchmark:
         n2he = enc.get("n2he", {})
         moai = enc.get("moai", {})
 
-        print(f"\nStep 4: Encryption Pipeline")
+        print("\nStep 4: Encryption Pipeline")
         if n2he.get("status") == "success":
-            print(f"  N2HE Gradient Encryption:")
+            print("  N2HE Gradient Encryption:")
             for k, v in n2he.get("benchmarks", {}).items():
                 print(f"    {k}: {v.get('encrypt_ms', 0):.2f}ms")
         if moai.get("status") == "success":
-            print(f"  MOAI CKKS Inference:")
+            print("  MOAI CKKS Inference:")
             for k, v in moai.get("benchmarks", {}).items():
                 print(f"    {k}: {v.get('encrypt_ms', 0):.2f}ms")
 
