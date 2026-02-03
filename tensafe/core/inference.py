@@ -42,15 +42,15 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
-from tensafe.core.config import TenSafeConfig, InferenceConfig, LoRAConfig, load_config
-from tensafe.core.he_interface import HEBackendInterface, get_backend, HEParams, HEBackendType
+from tensafe.core.config import InferenceConfig, LoRAConfig, TenSafeConfig, load_config
+from tensafe.core.he_interface import HEBackendInterface, HEBackendType, HEParams, get_backend
 
 logger = logging.getLogger(__name__)
 
@@ -215,7 +215,7 @@ class TenSafeInference:
         checkpoint_path: Union[str, Path],
         mode: InferenceMode = InferenceMode.PLAINTEXT,
         device: str = "auto",
-    ) -> "TenSafeInference":
+    ) -> TenSafeInference:
         """
         Create inference engine from checkpoint.
 
@@ -343,7 +343,7 @@ class TenSafeInference:
         cls,
         config: TenSafeConfig,
         mode: Optional[InferenceMode] = None,
-    ) -> "TenSafeInference":
+    ) -> TenSafeInference:
         """
         Create inference engine from configuration.
 
@@ -367,7 +367,7 @@ class TenSafeInference:
         tokenizer: Optional[Any] = None,
         config: Optional[Union[TenSafeConfig, InferenceConfig]] = None,
         mode: InferenceMode = InferenceMode.HE_ONLY,
-    ) -> "TenSafeInference":
+    ) -> TenSafeInference:
         """
         Create TenSafeInference from a TGSP adapter registry.
 

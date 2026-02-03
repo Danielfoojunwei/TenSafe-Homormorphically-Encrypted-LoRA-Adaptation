@@ -26,7 +26,6 @@ from tensafe.training.losses.registry import (
     LOSS_REGISTRY,
     _bind_kwargs,
     _import_from_path,
-    _wrap_callable,
     get_registered_losses,
     register_loss,
     resolve_loss,

@@ -23,8 +23,8 @@ Usage:
 """
 
 from .adapter import TensorRTLLMAdapter
-from .plugin import HELoRAProjectionPlugin
 from .engine_builder import TRTEngineBuilder
+from .plugin import HELoRAProjectionPlugin
 
 __all__ = [
     'TensorRTLLMAdapter',

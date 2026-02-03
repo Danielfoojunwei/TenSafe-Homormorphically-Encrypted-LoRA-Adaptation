@@ -8,6 +8,6 @@ Test Categories:
 4. Performance: Compare latency with baseline
 """
 
-from .test_ir import *
 from .test_gated_lora import *
+from .test_ir import *
 from .test_precision import *

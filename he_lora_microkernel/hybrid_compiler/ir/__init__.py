@@ -16,47 +16,45 @@ Each IR node carries:
 - bootstrap_cost: estimate (TFHE only)
 """
 
+from .nodes import (
+    # TFHE ops
+    TFHELUT,
+    TFHEMUX,
+    CKKSAdd,
+    CKKSApplyMask,
+    # CKKS ops
+    CKKSMatMul,
+    CKKSMul,
+    CKKSPackMOAI,
+    # Bridge ops (MANDATORY for scheme switching)
+    CKKSQuantizeToInt,
+    CKKSRescale,
+    CKKSRotate,
+    CKKSToTFHE,
+    IRNode,
+    IRProgram,
+    TFHEBootstrap,
+    TFHECompare,
+    TFHEToCKKS,
+)
 from .types import (
-    Scheme,
-    ValueType,
-    Shape,
-    IRValue,
     CKKSMetadata,
+    IRValue,
+    Scheme,
+    Shape,
     TFHEMetadata,
+    ValueType,
     create_ckks_value,
     create_tfhe_value,
 )
-
-from .nodes import (
-    IRNode,
-    IRProgram,
-    # CKKS ops
-    CKKSMatMul,
-    CKKSAdd,
-    CKKSMul,
-    CKKSRescale,
-    CKKSRotate,
-    CKKSPackMOAI,
-    # TFHE ops
-    TFHELUT,
-    TFHECompare,
-    TFHEMUX,
-    TFHEBootstrap,
-    # Bridge ops (MANDATORY for scheme switching)
-    CKKSQuantizeToInt,
-    CKKSToTFHE,
-    TFHEToCKKS,
-    CKKSApplyMask,
-)
-
 from .validation import (
-    validate_program,
-    validate_node,
-    ValidationResult,
-    SchemeViolationError,
-    TypeMismatchError,
-    ShapeError,
     BridgeRequiredError,
+    SchemeViolationError,
+    ShapeError,
+    TypeMismatchError,
+    ValidationResult,
+    validate_node,
+    validate_program,
 )
 
 __all__ = [

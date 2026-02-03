@@ -7,10 +7,10 @@ The HAS server:
 - Communicates with MSS via gRPC (control plane) and shared memory (data plane)
 """
 
-from concurrent import futures
-from typing import Any, Dict, List, Optional
 import logging
 import time
+from concurrent import futures
+from typing import Any, Dict, List, Optional
 
 from .executor import HASExecutor
 from .key_manager import KeyManager
@@ -175,8 +175,9 @@ class HASServicer:
 
     def ApplyTokenStep(self, request: Any, context: Any) -> Any:
         """Apply HE-LoRA delta for a token step."""
-        from ..proto import has_pb2
         import numpy as np
+
+        from ..proto import has_pb2
 
         try:
             # Get hidden states from shared memory
@@ -241,8 +242,9 @@ class HASServicer:
 
     def ApplyBatchedTokenStep(self, request: Any, context: Any) -> Any:
         """Apply batched HE-LoRA deltas."""
-        from ..proto import has_pb2
         import numpy as np
+
+        from ..proto import has_pb2
 
         try:
             req_state = self._executor.get_request(request.request_id)
@@ -460,6 +462,7 @@ class HASServer:
         # Create and start gRPC server
         try:
             import grpc
+
             from ..proto.has_pb2_grpc import add_HEAdapterServiceServicer_to_server
 
             self._server = grpc.server(

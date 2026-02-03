@@ -7,15 +7,14 @@ Provides distributed training with:
 - Integration with DeepSpeed/FSDP
 """
 
-from typing import Optional, Dict, Any, Callable, List, Union
-from dataclasses import dataclass, field
 import logging
-import time
 import os
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional
 
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader, DistributedSampler
+from torch.utils.data import DataLoader, Dataset, DistributedSampler
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +23,15 @@ RAY_AVAILABLE = False
 try:
     import ray
     from ray import train
-    from ray.train.torch import TorchTrainer, TorchConfig
-    from ray.train import ScalingConfig, RunConfig, CheckpointConfig
+    from ray.train import CheckpointConfig, RunConfig, ScalingConfig
+    from ray.train.torch import TorchConfig, TorchTrainer
     RAY_AVAILABLE = True
 except ImportError:
     logger.warning("Ray not installed. Install with: pip install ray[train]")
 
 # TenSafe imports
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 try:
@@ -199,8 +199,7 @@ class TenSafeRayTrainer:
         def train_func_per_worker(train_loop_config: Dict[str, Any]):
             """Training function executed on each worker."""
             import torch
-            import torch.distributed as dist
-            from torch.utils.data import DataLoader, DistributedSampler
+            from torch.utils.data import DataLoader
 
             # Get worker context
             worker_rank = train.get_context().get_world_rank()

@@ -11,14 +11,13 @@ No plaintext exposure during scheme switching.
 """
 
 from .bridge import (
-    CKKSTFHEBridge,
     BridgeConfig,
+    CKKSTFHEBridge,
     QuantizationParams,
 )
-
 from .quantizer import (
-    Quantizer,
     QuantizationError,
+    Quantizer,
     dequantize,
 )
 

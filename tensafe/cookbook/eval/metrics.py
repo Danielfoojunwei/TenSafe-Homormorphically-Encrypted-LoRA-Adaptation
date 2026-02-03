@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import math
 from collections import Counter
-from typing import List, Optional, Sequence
+from typing import List, Optional
 
 from .base import Metric, MetricResult
 

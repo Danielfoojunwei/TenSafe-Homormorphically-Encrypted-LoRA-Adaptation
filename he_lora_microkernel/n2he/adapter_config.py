@@ -19,10 +19,10 @@ Key Design Principle:
     plaintexts, enabling precise non-linear function evaluation via LUTs.
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import List, Optional, Dict, Any, Callable
 import math
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
 
 class AdapterType(Enum):
@@ -66,7 +66,6 @@ class NonLinearActivation(Enum):
 
     def get_function(self) -> Callable[[float], float]:
         """Get the underlying mathematical function."""
-        import math
 
         functions = {
             NonLinearActivation.RELU: lambda x: max(0.0, x),

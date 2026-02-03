@@ -5,14 +5,12 @@ Tests vLLM, TensorRT-LLM, and SGLang adapters with mock mode.
 """
 
 import pytest
-import numpy as np
 
 from he_lora_microkernel.backend.base_adapter import (
     BatchConfig,
     InsertionConfig,
-    LoRATargets,
     InsertionPoint,
-    LayerDeltas,
+    LoRATargets,
     get_adapter,
 )
 

@@ -36,7 +36,6 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 # Configure logging early
 logging.basicConfig(
@@ -343,14 +342,14 @@ def _add_verify_args(parser: argparse.ArgumentParser) -> None:
 def _handle_train(args: argparse.Namespace) -> int:
     """Handle train command."""
     from tensafe.core.config import (
-        TenSafeConfig,
-        TrainingConfig,
-        ModelConfig,
-        LoRAConfig,
         DPConfig,
         HEConfig,
-        TrainingMode,
         HEMode,
+        LoRAConfig,
+        ModelConfig,
+        TenSafeConfig,
+        TrainingConfig,
+        TrainingMode,
         load_config,
     )
     from tensafe.core.pipeline import TenSafePipeline
@@ -412,9 +411,9 @@ def _handle_train(args: argparse.Namespace) -> int:
 def _handle_inference(args: argparse.Namespace) -> int:
     """Handle inference command."""
     from tensafe.core.inference import (
-        TenSafeInference,
-        InferenceMode,
         GenerationConfig,
+        InferenceMode,
+        TenSafeInference,
     )
 
     logger.info(f"Loading model: {args.model}")
@@ -518,7 +517,6 @@ def _handle_config(args: argparse.Namespace) -> int:
 def _handle_config_create(args: argparse.Namespace) -> int:
     """Handle config create command."""
     from tensafe.core.config import (
-        TenSafeConfig,
         TrainingMode,
         create_default_config,
         save_config,
@@ -602,11 +600,11 @@ def _handle_verify(args: argparse.Namespace) -> int:
     if args.backend in ("all", "n2he"):
         print("\nVerifying N2HE backend...")
         try:
-            from tensorguard.n2he.core import ToyN2HEScheme, HESchemeParams
+            from tensorguard.n2he.core import HESchemeParams, ToyN2HEScheme
             os.environ["TENSAFE_TOY_HE"] = "1"  # Allow toy for testing
             scheme = ToyN2HEScheme(HESchemeParams(), _force_enable=True)
             sk, pk, ek = scheme.keygen()
-            print(f"  [OK] N2HE scheme operational")
+            print("  [OK] N2HE scheme operational")
             print(f"       Keys generated: sk={len(sk)}B, pk={len(pk)}B, ek={len(ek)}B")
             results["n2he"] = "OK"
         except Exception as e:
@@ -619,7 +617,7 @@ def _handle_verify(args: argparse.Namespace) -> int:
             from he_lora_microkernel.compat import HEBackend
             backend = HEBackend()
             backend.setup()
-            print(f"  [OK] Microkernel backend operational")
+            print("  [OK] Microkernel backend operational")
             print(f"       Slot count: {backend.get_slot_count()}")
             results["microkernel"] = "OK"
         except ImportError as e:
@@ -632,13 +630,13 @@ def _handle_verify(args: argparse.Namespace) -> int:
     if args.backend in ("all", "toy"):
         print("\nVerifying Toy backend...")
         try:
-            from tensafe.core.he_interface import ToyHEBackend, HEParams
+            from tensafe.core.he_interface import HEParams, ToyHEBackend
             os.environ["TENSAFE_TOY_HE"] = "1"
             backend = ToyHEBackend(HEParams(), _force_enable=True)
             backend.setup()
             ct = backend.encrypt(np.array([1.0, 2.0, 3.0]))
             pt = backend.decrypt(ct)
-            print(f"  [OK] Toy backend operational (NOT SECURE)")
+            print("  [OK] Toy backend operational (NOT SECURE)")
             results["toy"] = "OK"
         except Exception as e:
             print(f"  [FAIL] Toy: {e}")
@@ -655,7 +653,7 @@ def _handle_verify(args: argparse.Namespace) -> int:
 
 def _handle_production_check(args: argparse.Namespace) -> int:
     """Handle production check command."""
-    from tensafe.core.gates import production_check, ProductionGates
+    from tensafe.core.gates import ProductionGates, production_check
 
     print("TenSafe Production Readiness Check")
     print("=" * 50)

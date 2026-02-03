@@ -5,12 +5,11 @@ Client for communicating with the HE Adapter Service from MSS.
 Uses gRPC for control plane and shared memory for data plane.
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
 import logging
 import time
-import uuid
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +128,7 @@ class HASClient:
         try:
             # Try to import gRPC
             import grpc
+
             from ..proto import has_pb2_grpc
 
             # Create channel
@@ -392,8 +392,6 @@ class HASClient:
             return None
 
         try:
-            import mmap
-            import os
 
             # Calculate size needed
             # Assuming FP16 activations: batch_size * hidden_size * 2 bytes

@@ -14,7 +14,7 @@ import json
 import os
 import subprocess
 import sys
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -204,8 +204,8 @@ def run_test_matrix(
 
     git_sha, git_branch = get_git_info()
 
-    print(f"\nTest Matrix Runner")
-    print(f"==================")
+    print("\nTest Matrix Runner")
+    print("==================")
     print(f"Timestamp: {timestamp}")
     print(f"Git SHA: {git_sha}")
     print(f"Git Branch: {git_branch}")
@@ -252,7 +252,7 @@ def run_test_matrix(
     # Write markdown summary
     summary_file = output_dir / "matrix_summary.md"
     with open(summary_file, "w") as f:
-        f.write(f"# Test Matrix Results\n\n")
+        f.write("# Test Matrix Results\n\n")
         f.write(f"**Timestamp**: {timestamp}\n")
         f.write(f"**Git SHA**: {git_sha}\n")
         f.write(f"**Git Branch**: {git_branch}\n")
@@ -270,7 +270,7 @@ def run_test_matrix(
         f.write(f"**Total Failures**: {total_failures}\n")
 
     print(f"\n{'='*60}")
-    print(f"Test Matrix Complete")
+    print("Test Matrix Complete")
     print(f"{'='*60}")
     print(f"Overall: {'PASS' if all_passed else 'FAIL'}")
     print(f"Total Tests: {total_tests}")

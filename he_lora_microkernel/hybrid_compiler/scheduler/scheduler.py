@@ -10,17 +10,23 @@ The scheduler produces an ExecutionPlan that can be directly executed.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
 from enum import Enum, auto
-import json
+from typing import Dict, List, Optional, Tuple
 
 from ..ir import (
-    IRProgram, IRNode, IRValue, Scheme,
-    CKKSMatMul, CKKSAdd, CKKSMul, CKKSRescale, CKKSPackMOAI,
-    TFHELUT, TFHECompare,
-    CKKSQuantizeToInt, CKKSToTFHE, TFHEToCKKS, CKKSApplyMask,
+    TFHELUT,
+    CKKSAdd,
+    CKKSApplyMask,
+    CKKSMatMul,
+    CKKSQuantizeToInt,
+    CKKSRescale,
+    CKKSToTFHE,
+    IRNode,
+    IRProgram,
+    Scheme,
+    TFHEToCKKS,
 )
-from .cost_model import CostModel, OpCost, estimate_program_cost
+from .cost_model import CostModel, OpCost
 
 
 class SchedulePhase(Enum):
@@ -293,7 +299,10 @@ def schedule_gated_lora(
         Tuple of (IR program, execution plan)
     """
     from ..ir import (
-        IRProgram, Shape, create_ckks_value, create_tfhe_value, ValueType,
+        IRProgram,
+        Shape,
+        ValueType,
+        create_ckks_value,
         validate_program,
     )
 

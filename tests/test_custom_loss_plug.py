@@ -16,8 +16,9 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
-from tensafe.training.losses import resolve_loss, LossReturn, register_loss
 from baseline_sft_smoke import MinimalTrainingClient, create_synthetic_batch
+
+from tensafe.training.losses import LossReturn, register_loss, resolve_loss
 
 
 class TestCustomLossIntegration:

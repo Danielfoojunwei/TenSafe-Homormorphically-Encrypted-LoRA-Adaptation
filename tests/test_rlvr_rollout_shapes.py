@@ -17,7 +17,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from tensafe.rlvr.rollout import (
     MockRolloutSampler,
-    RolloutSampler,
     Trajectory,
     TrajectoryBatch,
 )

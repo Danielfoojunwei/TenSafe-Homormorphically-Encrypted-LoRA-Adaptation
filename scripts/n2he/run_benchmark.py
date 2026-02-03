@@ -10,7 +10,6 @@ Usage:
 
 import argparse
 import json
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -18,15 +17,14 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
+from tensorguard.n2he._native import get_native_version, is_native_available
 from tensorguard.n2he.benchmark import (
     N2HEBenchmark,
-    run_quick_benchmark,
-    run_full_benchmark,
     generate_benchmark_report,
     generate_compliance_evidence,
+    run_full_benchmark,
+    run_quick_benchmark,
 )
-from tensorguard.n2he._native import is_native_available, get_native_version
-from tensorguard.n2he.core import HESchemeParams
 
 
 def main():

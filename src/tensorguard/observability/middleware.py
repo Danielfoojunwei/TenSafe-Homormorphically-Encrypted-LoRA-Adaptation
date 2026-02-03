@@ -3,10 +3,10 @@
 Provides automatic request tracing with privacy-aware attribute handling.
 """
 
-from typing import Optional, Callable, Dict, Any
-import time
 import logging
 import re
+import time
+from typing import Any, Callable, Dict, Optional
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request

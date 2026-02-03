@@ -39,15 +39,13 @@ Usage:
 from __future__ import annotations
 
 import functools
-import hashlib
 import logging
-import os
 import re
 import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from typing import (
     Any,
@@ -55,7 +53,6 @@ from typing import (
     Dict,
     List,
     Optional,
-    Pattern,
     Set,
     Tuple,
     TypeVar,
@@ -212,7 +209,7 @@ def _validate_string(
     if constraints.pattern:
         pattern = PATTERNS.get(constraints.pattern) or re.compile(constraints.pattern)
         if not pattern.match(value):
-            raise ValidationError(field_name, f"Does not match required pattern")
+            raise ValidationError(field_name, "Does not match required pattern")
 
     # Allowed characters
     if constraints.allowed_chars:

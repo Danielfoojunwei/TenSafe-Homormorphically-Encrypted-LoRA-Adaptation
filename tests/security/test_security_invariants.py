@@ -18,7 +18,6 @@ import re
 import secrets
 import sys
 from io import StringIO
-from typing import List
 
 import pytest
 
@@ -123,10 +122,10 @@ class TestKeyMaterialLeakage:
 
     def test_logging_filters_sensitive_fields(self):
         """Structured logging should filter sensitive field names."""
-        from tensorguard.logging import StructuredFormatter
-
         import json
         import logging
+
+        from tensorguard.logging import StructuredFormatter
 
         stream = StringIO()
         handler = logging.StreamHandler(stream)
@@ -332,7 +331,6 @@ class TestSecurityHeaders:
         # This test requires the server - skip if not available
         pytest.importorskip("fastapi")
 
-        import sys
         import tempfile
 
         # Set up test environment
@@ -346,6 +344,7 @@ class TestSecurityHeaders:
                 del sys.modules[mod]
 
             from fastapi.testclient import TestClient
+
             from tensorguard.platform.main import app
 
             client = TestClient(app)
@@ -362,10 +361,9 @@ class TestErrorCodeRegistry:
 
     def test_all_error_classes_have_registered_codes(self):
         """All TensorGuardError subclasses should use registered codes."""
-        from tensorguard.errors import ERROR_CODES, TensorGuardError
-
         # Get all error classes from the module
         import tensorguard.errors as errors_module
+        from tensorguard.errors import ERROR_CODES, TensorGuardError
 
         for name in dir(errors_module):
             obj = getattr(errors_module, name)

@@ -7,30 +7,30 @@ These tests verify batch adjustability and scaling behavior:
   3. Results are consistent across batch sizes
 """
 
-import pytest
-import numpy as np
-
-import sys
 import os
+import sys
+
+import numpy as np
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+from he_lora_microkernel.backend.gpu_ckks_backend import BackendType
 from he_lora_microkernel.compiler import (
+    CKKSProfile,
     LoRAConfig,
     LoRATargets,
-    CKKSProfile,
-    get_profile,
     compile_schedule,
     estimate_costs,
+    get_profile,
 )
 from he_lora_microkernel.runtime import (
-    HELoRAExecutor,
     BatchManager,
     DynamicBatchExecutor,
+    HELoRAExecutor,
     pad_activations,
     unpad_activations,
 )
-from he_lora_microkernel.backend.gpu_ckks_backend import BackendType
-
 
 # =============================================================================
 # FIXTURES

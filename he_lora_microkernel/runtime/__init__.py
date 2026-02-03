@@ -27,13 +27,6 @@ Usage:
 """
 
 # Executor
-from .executor import (
-    ExecutionMode,
-    ExecutionContext,
-    HELoRAExecutor,
-    LoRAAdapterExecutor,
-)
-
 # Batching
 from .batching import (
     BatchConfig,
@@ -42,18 +35,23 @@ from .batching import (
     pad_activations,
     unpad_activations,
 )
+from .executor import (
+    ExecutionContext,
+    ExecutionMode,
+    HELoRAExecutor,
+    LoRAAdapterExecutor,
+)
 
 # Telemetry
 from .telemetry import (
+    InvariantChecker,
     MetricType,
     MetricValue,
-    TelemetryCollector,
     PerformanceReporter,
-    InvariantChecker,
+    TelemetryCollector,
     get_global_collector,
     reset_global_collector,
 )
-
 
 __all__ = [
     # Executor

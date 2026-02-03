@@ -6,8 +6,8 @@ This package contains benchmarks for the HE-LoRA microkernel:
   - bench_end2end: End-to-end inference benchmarks
 """
 
-from .bench_micro import run_microbenchmarks, Microbenchmarker
-from .bench_end2end import run_e2e_benchmarks, EndToEndBenchmarker
+from .bench_end2end import EndToEndBenchmarker, run_e2e_benchmarks
+from .bench_micro import Microbenchmarker, run_microbenchmarks
 
 __all__ = [
     'run_microbenchmarks',

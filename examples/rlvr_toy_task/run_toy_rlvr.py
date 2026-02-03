@@ -31,9 +31,8 @@ from typing import Any, Dict, List, Optional
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tensafe.rlvr import RLVRTrainer, RLVRConfig, resolve_reward, register_reward
+from tensafe.rlvr import RLVRConfig, RLVRTrainer, register_reward
 from tensafe.rlvr.rollout import MockRolloutSampler
-
 
 # ==============================================================================
 # Custom Reward Function for Toy Task

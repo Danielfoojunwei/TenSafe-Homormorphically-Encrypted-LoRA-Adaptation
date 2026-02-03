@@ -51,6 +51,7 @@ dependencies = [
     "httpx>=0.25.0,<1.0.0",
     # Numeric
     "numpy>=1.24.0,<2.0.0",
+    "scipy>=1.11.0,<2.0.0",  # Required for DP accounting
     # Authentication
     "python-jose[cryptography]>=3.3.0,<4.0.0",
     "passlib[argon2]>=1.7.4,<2.0.0",

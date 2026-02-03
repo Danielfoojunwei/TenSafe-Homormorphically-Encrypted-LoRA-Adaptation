@@ -7,13 +7,12 @@ Provides privacy-preserving distributed training with:
 - Privacy budget accounting
 """
 
-from typing import Optional, Dict, Any, List
-from dataclasses import dataclass
-import math
 import logging
+import math
+from dataclasses import dataclass
+from typing import Dict, List
 
 import torch
-import torch.nn as nn
 from torch.optim import Optimizer
 
 logger = logging.getLogger(__name__)

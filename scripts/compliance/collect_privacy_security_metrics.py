@@ -22,9 +22,8 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -95,7 +94,7 @@ class PIIScanner:
 
     def scan_text(self, text: str) -> Dict[str, int]:
         """Scan text and return PII counts by type."""
-        counts = {pii_type: 0 for pii_type in self.PATTERNS}
+        counts = dict.fromkeys(self.PATTERNS, 0)
 
         for pii_type, pattern in self.PATTERNS.items():
             matches = pattern.findall(text)
@@ -110,14 +109,14 @@ class PIIScanner:
         try:
             # Skip binary files
             if self._is_binary(filepath):
-                return {pii_type: 0 for pii_type in self.PATTERNS}
+                return dict.fromkeys(self.PATTERNS, 0)
 
-            with open(filepath, 'r', errors='ignore') as f:
+            with open(filepath, errors='ignore') as f:
                 content = f.read()
             return self.scan_text(content)
         except Exception as e:
             logger.debug(f"Could not scan {filepath}: {e}")
-            return {pii_type: 0 for pii_type in self.PATTERNS}
+            return dict.fromkeys(self.PATTERNS, 0)
 
     def _is_binary(self, filepath: Path) -> bool:
         """Check if file is binary."""
@@ -146,12 +145,12 @@ class PIIScanner:
             Tuple of (counts dict, files scanned count)
         """
         if not directory.exists():
-            return {pii_type: 0 for pii_type in self.PATTERNS}, 0
+            return dict.fromkeys(self.PATTERNS, 0), 0
 
         if extensions is None:
             extensions = ['.py', '.json', '.yaml', '.yml', '.txt', '.md', '.log', '.csv']
 
-        total_counts = {pii_type: 0 for pii_type in self.PATTERNS}
+        total_counts = dict.fromkeys(self.PATTERNS, 0)
         files_scanned = 0
 
         files_to_scan = []
@@ -222,13 +221,13 @@ class SecretsScanner:
     def scan_file(self, filepath: Path) -> Dict[str, int]:
         """Scan a single file for secrets patterns."""
         if self._is_excluded_path(filepath):
-            return {secret_type: 0 for secret_type in self.PATTERNS}
+            return dict.fromkeys(self.PATTERNS, 0)
 
         try:
-            with open(filepath, 'r', errors='ignore') as f:
+            with open(filepath, errors='ignore') as f:
                 content = f.read()
 
-            counts = {secret_type: 0 for secret_type in self.PATTERNS}
+            counts = dict.fromkeys(self.PATTERNS, 0)
             for secret_type, pattern in self.PATTERNS.items():
                 matches = pattern.findall(content)
                 counts[secret_type] = len(matches)
@@ -236,11 +235,11 @@ class SecretsScanner:
             return counts
         except Exception as e:
             logger.debug(f"Could not scan {filepath} for secrets: {e}")
-            return {secret_type: 0 for secret_type in self.PATTERNS}
+            return dict.fromkeys(self.PATTERNS, 0)
 
     def scan_repository(self, repo_path: Path, max_files: int = 2000) -> Tuple[Dict[str, int], int]:
         """Scan a repository for secrets."""
-        total_counts = {secret_type: 0 for secret_type in self.PATTERNS}
+        total_counts = dict.fromkeys(self.PATTERNS, 0)
         files_scanned = 0
 
         extensions = ['.py', '.js', '.ts', '.json', '.yaml', '.yml', '.env', '.sh', '.cfg', '.ini', '.toml']
@@ -1058,11 +1057,11 @@ def main():
     metrics = collector.collect_all()
     output_file = collector.save_metrics(metrics)
 
-    print(f"\nMetrics collection complete!")
+    print("\nMetrics collection complete!")
     print(f"Output: {output_file}")
     print(f"Git SHA: {metrics.git_sha}")
     print(f"Mode: {metrics.environment}")
-    print(f"\nSummary:")
+    print("\nSummary:")
     print(f"  - PII found: {metrics.pii_scan.get('total_pii_found', 0)}")
     print(f"  - Secrets found: {metrics.secrets_hygiene.get('secrets_found', 0)}")
     print(f"  - Audit log enabled: {metrics.audit_logging.get('audit_log_enabled', False)}")

@@ -19,9 +19,8 @@ Claim 3: Reproducibility & Stability
 
 import argparse
 import json
-import os
 import subprocess
-from dataclasses import dataclass, asdict, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -333,8 +332,8 @@ def build_evidence_pack(
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     git_sha, git_branch = get_git_info()
 
-    print(f"\nValue Evidence Pack Builder")
-    print(f"============================")
+    print("\nValue Evidence Pack Builder")
+    print("============================")
     print(f"Timestamp: {timestamp}")
     print(f"Git SHA: {git_sha}")
     print(f"Git Branch: {git_branch}")
@@ -343,7 +342,7 @@ def build_evidence_pack(
     qa_data = find_latest_qa_results(qa_dir)
     bench_data = find_latest_bench_results(bench_dir)
 
-    print(f"\nData Sources:")
+    print("\nData Sources:")
     print(f"  QA Data: {'Found' if qa_data else 'Not found'}")
     print(f"  Bench Data: {'Found' if bench_data else 'Not found'}")
 
@@ -405,7 +404,7 @@ def build_evidence_pack(
         f.write(f"**Generated**: {timestamp}\n")
         f.write(f"**Git SHA**: {git_sha}\n")
         f.write(f"**Git Branch**: {git_branch}\n")
-        f.write(f"**Version**: 1.0.0\n\n")
+        f.write("**Version**: 1.0.0\n\n")
 
         f.write("## Executive Summary\n\n")
         f.write(f"- **Overall Score**: {total_score:.1%}\n")
@@ -455,7 +454,7 @@ def build_evidence_pack(
         f.write("- Flakiness detection requires multiple runs\n")
 
     print(f"\n{'='*60}")
-    print(f"Evidence Pack Complete")
+    print("Evidence Pack Complete")
     print(f"{'='*60}")
     print(f"Overall Score: {total_score:.1%}")
     print(f"JSON: {json_file}")

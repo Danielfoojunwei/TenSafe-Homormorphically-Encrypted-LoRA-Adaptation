@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .provider import AttestationProvider, AttestationError, AttestationType
+from .provider import AttestationError, AttestationProvider
 
 logger = logging.getLogger(__name__)
 

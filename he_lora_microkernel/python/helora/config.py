@@ -15,23 +15,23 @@ Usage:
     )
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
-from enum import Enum
+import os
 
 # Import from compiler
 import sys
-import os
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Dict, Optional
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from he_lora_microkernel.compiler import (
+    CKKSParams,
+    CKKSProfile,
+    CostBudget,
     LoRAConfig,
     LoRATargets,
-    CKKSProfile,
-    CKKSParams,
     get_profile,
-    select_optimal_profile,
-    CostBudget,
 )
 
 
@@ -113,9 +113,7 @@ class HELoRAConfig:
 
     def get_cost_budget(self) -> CostBudget:
         """Get cost budget for this configuration."""
-        from he_lora_microkernel.compiler import (
-            RotationBudget, KeyswitchBudget, RescaleBudget, CostBudget
-        )
+        from he_lora_microkernel.compiler import CostBudget, KeyswitchBudget, RescaleBudget, RotationBudget
 
         return CostBudget(
             rotation=RotationBudget(

@@ -9,10 +9,9 @@ import argparse
 import json
 import os
 import re
-import sys
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 
 def parse_junit_xml(xml_path: str) -> List[Dict[str, Any]]:
@@ -60,7 +59,7 @@ def parse_static_checks(md_path: str) -> List[Dict[str, Any]]:
         return issues
 
     try:
-        with open(md_path, "r") as f:
+        with open(md_path) as f:
             content = f.read()
 
         # Look for ruff errors
@@ -110,7 +109,7 @@ def parse_perf_baseline(json_path: str) -> List[Dict[str, Any]]:
         return issues
 
     try:
-        with open(json_path, "r") as f:
+        with open(json_path) as f:
             data = json.load(f)
 
         for scenario in data.get("scenarios", []):
@@ -121,13 +120,13 @@ def parse_perf_baseline(json_path: str) -> List[Dict[str, Any]]:
                         "severity": "P1",
                         "component": "performance",
                         "reproduction_steps": [
-                            f"Run: python benchmarks/perf_baseline/run_perf.py"
+                            "Run: python benchmarks/perf_baseline/run_perf.py"
                         ],
                         "expected": f"Latency < {op.get('budget_ms', 'N/A')}ms",
                         "actual": f"Latency = {op.get('latency_ms', op.get('avg_latency_ms', 'N/A'))}ms",
                         "logs_path": json_path,
                         "proposed_fix": "Investigate slow code path and optimize",
-                        "regression_test": f"test_metrics_endpoint_latency_budget"
+                        "regression_test": "test_metrics_endpoint_latency_budget"
                     })
 
     except Exception as e:

@@ -14,32 +14,27 @@ The executor is stateless - each token is processed independently
 through the compiled HE-LoRA microkernel.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List, Tuple, Callable
-from enum import Enum
 import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 
+from ..backend.gpu_ckks_backend import (
+    BackendType,
+    GPUCKKSBackend,
+    PlaintextPacked,
+    create_backend,
+)
 from ..compiler import (
+    CostBudget,
+    CostTracker,
     ExecutionSchedule,
-    PackingLayout,
-    CKKSParams,
-    LoRAConfig,
     PackedLoRAWeights,
     pack_activations,
     unpack_activations,
-    CostTracker,
-    CostBudget,
-    LoRATargets,
 )
-from ..backend.gpu_ckks_backend import (
-    GPUCKKSBackend,
-    GPUCiphertext,
-    PlaintextPacked,
-    BackendType,
-    create_backend,
-)
-
 
 # =============================================================================
 # EXECUTION CONTEXT

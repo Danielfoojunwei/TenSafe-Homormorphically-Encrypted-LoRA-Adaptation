@@ -36,10 +36,10 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, Literal
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
 
@@ -82,7 +82,7 @@ class HEMode(str, Enum):
     N2HE_HEXL = "n2he_hexl"  # DEPRECATED: Maps to PRODUCTION
 
     @classmethod
-    def resolve(cls, mode: "HEMode") -> "HEMode":
+    def resolve(cls, mode: HEMode) -> HEMode:
         """
         Resolve legacy modes to their modern equivalents.
 
@@ -92,26 +92,31 @@ class HEMode(str, Enum):
         Returns:
             Resolved mode (DISABLED, PRODUCTION, or SIMULATION)
         """
-        import logging
-        logger = logging.getLogger(__name__)
+        import warnings
 
         if mode == cls.TOY:
-            logger.warning(
+            warnings.warn(
                 "HEMode.TOY is deprecated. Use HEMode.SIMULATION instead. "
-                "Note: SIMULATION mode is NOT cryptographically secure."
+                "Note: SIMULATION mode is NOT cryptographically secure.",
+                DeprecationWarning,
+                stacklevel=2
             )
             return cls.SIMULATION
         elif mode == cls.N2HE:
-            logger.warning(
+            warnings.warn(
                 "HEMode.N2HE is deprecated. The N2HE standalone path has been removed. "
                 "All HE now uses the unified microkernel with MOAI optimizations. "
-                "Mapping to HEMode.PRODUCTION."
+                "Mapping to HEMode.PRODUCTION.",
+                DeprecationWarning,
+                stacklevel=2
             )
             return cls.PRODUCTION
         elif mode == cls.N2HE_HEXL:
-            logger.warning(
+            warnings.warn(
                 "HEMode.N2HE_HEXL is deprecated. HEXL acceleration is now integrated "
-                "into the unified microkernel. Mapping to HEMode.PRODUCTION."
+                "into the unified microkernel. Mapping to HEMode.PRODUCTION.",
+                DeprecationWarning,
+                stacklevel=2
             )
             return cls.PRODUCTION
 
@@ -542,7 +547,7 @@ class TenSafeConfig:
         return convert(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TenSafeConfig":
+    def from_dict(cls, data: Dict[str, Any]) -> TenSafeConfig:
         """Create from dictionary."""
         # Parse nested configs
         model = ModelConfig(**data.get("model", {})) if "model" in data else ModelConfig()

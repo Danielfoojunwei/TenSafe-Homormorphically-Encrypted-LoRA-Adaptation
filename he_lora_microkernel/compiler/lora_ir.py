@@ -16,15 +16,14 @@ The IR is designed to be:
   - Deterministic (same inputs → identical schedules)
 """
 
-from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import List, Dict, Optional, Any, Tuple, Set
 import hashlib
 import json
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from typing import Any, Dict, List, Optional, Set
 
 from .ckks_params import CKKSParams, CKKSProfile
-from .packer import PackingLayout, PackingStrategy
-
+from .packer import PackingLayout
 
 # =============================================================================
 # LoRA CONFIGURATION
@@ -68,7 +67,7 @@ class LoRAConfig:
         if self.batch_size <= 0:
             raise ValueError(f"batch_size must be positive: {self.batch_size}")
         if self.max_context_length <= 0:
-            raise ValueError(f"max_context_length must be positive")
+            raise ValueError("max_context_length must be positive")
 
     @property
     def scaling_factor(self) -> float:

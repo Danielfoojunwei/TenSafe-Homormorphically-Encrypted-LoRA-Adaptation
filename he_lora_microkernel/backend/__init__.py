@@ -32,16 +32,16 @@ Usage:
 from .gpu_ckks_backend import (
     # Types
     BackendType,
-    GPUCKKSBackend,
     GPUCiphertext,
-    PlaintextPacked,
+    GPUCKKSBackend,
     OperationCounters,
+    PlaintextPacked,
+    # Simulation
+    SimulationBackend,
     # Factory
     create_backend,
     get_available_backends,
     register_backend,
-    # Simulation
-    SimulationBackend,
 )
 
 __all__ = [

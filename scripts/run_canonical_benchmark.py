@@ -9,15 +9,15 @@ This script produces canonical, reproducible benchmark results for:
 Results are empirical measurements on the actual HE implementations.
 """
 
-import os
-import sys
 import json
+import sys
 import time
-import numpy as np
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List
+
+import numpy as np
 
 # Add project root
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -199,8 +199,8 @@ def benchmark_gated_lora(
 
     from he_lora_microkernel.hybrid_compiler.gated_lora import (
         GatedLoRAConfig,
-        compile_gated_lora,
         GatedLoRAExecutor,
+        compile_gated_lora,
         plaintext_gated_lora,
     )
     from he_lora_microkernel.hybrid_compiler.ir import validate_program
@@ -441,8 +441,8 @@ def print_results_table(results: Dict[str, Any]):
     print("-" * 70)
     comp = results["summary"]["comparison"]
     print(f"Gated LoRA overhead: {comp['gated_overhead_ratio']:.2f}x (linear is {comp['linear_faster_by']} faster)")
-    print(f"Recommendation: Use Linear LoRA for latency-critical paths")
-    print(f"              Use Gated LoRA when conditional adaptation is required")
+    print("Recommendation: Use Linear LoRA for latency-critical paths")
+    print("              Use Gated LoRA when conditional adaptation is required")
 
 
 def main():
