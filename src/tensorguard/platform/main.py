@@ -18,6 +18,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from .database import check_db_health, engine
 from .tg_tinker_api import router as tinker_router
 from .playground import router as playground_router
+from .auth_routes import router as auth_router
+from .sso.routes import router as sso_router
 
 # Security modules
 from ..security.rate_limiter import RateLimitMiddleware, RateLimitConfig
@@ -135,6 +137,14 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     openapi_tags=[
+        {
+            "name": "auth",
+            "description": "User authentication - signup, login, password reset",
+        },
+        {
+            "name": "sso",
+            "description": "Enterprise SSO - OIDC and SAML authentication",
+        },
         {
             "name": "training",
             "description": "Training client management and operations",
@@ -269,6 +279,10 @@ async def version_info():
     }
 
 
+# Authentication routes
+app.include_router(auth_router)
+app.include_router(sso_router)
+
 # TG-Tinker API routes
 app.include_router(tinker_router, prefix="/api")
 
@@ -299,6 +313,11 @@ async def root():
             "current": "v1",
             "supported": ["v1"],
             "deprecated": [],
+        },
+        "auth": {
+            "signup": "/auth/signup",
+            "login": "/auth/token",
+            "sso_providers": "/auth/sso/providers",
         },
         "endpoints": {
             "training": "/api/v1/training_clients",
