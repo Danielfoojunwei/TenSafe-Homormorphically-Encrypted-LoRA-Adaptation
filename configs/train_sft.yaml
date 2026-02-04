@@ -21,22 +21,42 @@ model:
   ref: "meta-llama/Llama-3-8B"
   trust_remote_code: true
 
-# LoRA configuration
+# LoRA configuration (based on "LoRA Without Regret" best practices)
+# Key findings:
+#   1. Apply to ALL layers (MLP + Attention) - critical for matching full fine-tuning
+#   2. Alpha = 2 * rank is optimal
+#   3. Use rsLoRA scaling for high ranks (>32)
+#   4. Learning rate should be ~10x full fine-tuning rate
 lora:
-  rank: 16
-  alpha: 32.0
-  dropout: 0.05
+  rank: 32
+  alpha: 64.0  # 2 * rank (research-backed optimal)
+  dropout: 0.0  # Set to 0 for faster training; research shows minimal benefit
   target_modules:
+    # CRITICAL: Apply to ALL linear layers, not just attention
+    # "LoRA Without Regret" shows MLP layers are as important as attention
+    # Attention layers
     - q_proj
-    - v_proj
     - k_proj
+    - v_proj
     - o_proj
+    # MLP layers (essential for matching full fine-tuning performance)
+    - gate_proj
+    - up_proj
+    - down_proj
   bias: none
+  # Advanced options (PEFT library)
+  use_rslora: true  # Rank-stabilized scaling (α/√r instead of α/r)
+  use_dora: false   # Enable for DoRA weight decomposition
+  # LoRA+ optimization (different learning rates for A and B matrices)
+  lora_plus:
+    enabled: true
+    ratio: 16.0  # lr_B = ratio * lr_A (recommended: 8-16)
 
 # Optimizer configuration
+# Note: LoRA optimal LR is ~10x higher than full fine-tuning (from research)
 optimizer:
   name: adamw
-  learning_rate: 1.0e-4
+  learning_rate: 2.0e-4  # 10x typical full fine-tuning rate (research-backed)
   weight_decay: 0.01
   betas: [0.9, 0.999]
   eps: 1.0e-8

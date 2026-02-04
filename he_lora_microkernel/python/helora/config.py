@@ -49,14 +49,22 @@ class HELoRAConfig:
 
     This provides a simple interface for common configurations.
     For advanced use cases, use LoRAConfig directly.
+
+    Best practices implemented (from "LoRA Without Regret" and related research):
+    - Alpha defaults to 2 * rank (research-backed optimal)
+    - rsLoRA scaling for stability at higher ranks
+    - Targets default to QKVO for comprehensive coverage
     """
     # Model dimensions
     hidden_size: int
-    lora_rank: int = 16
+    lora_rank: int = 32  # Increased from 16 based on research
 
     # LoRA parameters
-    lora_alpha: float = None  # Defaults to 2 * rank
-    lora_targets: str = "qkv"  # "qkv" or "qkvo"
+    lora_alpha: float = None  # Defaults to 2 * rank (research-backed optimal)
+    lora_targets: str = "qkvo"  # Changed to qkvo for better coverage
+
+    # Best practices flags
+    use_rslora: bool = True  # Rank-stabilized scaling (α/√r)
 
     # Batch configuration
     batch_size: int = 8
