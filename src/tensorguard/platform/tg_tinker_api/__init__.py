@@ -60,7 +60,7 @@ from .tgsp_bridge import (
     create_dp_certificate,
 )
 from .worker import (
-    MockMLBackend,
+    ProductionMLBackend,
     Worker,
     get_worker,
     start_worker,
@@ -86,7 +86,7 @@ __all__ = [
     "set_job_queue",
     # Worker
     "Worker",
-    "MockMLBackend",
+    "ProductionMLBackend",
     "get_worker",
     "start_worker",
     "stop_worker",

@@ -915,6 +915,7 @@ _tgsp_registries: Dict[str, Any] = {}
 
 # Request ID counter for audit correlation (SOC 2 CC4.1)
 import uuid
+import threading
 _request_id_counter = 0
 _request_id_lock = threading.Lock()
 
