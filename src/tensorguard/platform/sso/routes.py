@@ -22,6 +22,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from ..auth import create_access_token, create_refresh_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from ...admin.permissions import AdminUserContext, require_super_admin
 from .models import (
     OIDCConfig,
     SAMLConfig,
@@ -705,7 +706,7 @@ class CreateSSOProviderRequest(BaseModel):
 @router.post("/providers", status_code=status.HTTP_201_CREATED)
 async def create_sso_provider(
     request: CreateSSOProviderRequest,
-    # TODO: Add admin authentication
+    admin_user: AdminUserContext = Depends(require_super_admin),
 ) -> SSOProviderInfo:
     """
     Create a new SSO provider configuration.
@@ -764,7 +765,7 @@ async def create_sso_provider(
 @router.delete("/providers/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_sso_provider(
     provider_id: str,
-    # TODO: Add admin authentication
+    admin_user: AdminUserContext = Depends(require_super_admin),
 ):
     """Delete an SSO provider configuration."""
     registry = get_provider_registry()
