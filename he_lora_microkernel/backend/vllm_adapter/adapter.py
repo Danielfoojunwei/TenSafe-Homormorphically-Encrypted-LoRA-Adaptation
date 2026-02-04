@@ -26,6 +26,7 @@ from ..base_adapter import (
     LoRATargets,
     LayerDeltas,
     DeltaCallback,
+    AttentionType,
     register_adapter,
 )
 from .hooks import (
@@ -110,16 +111,60 @@ class VLLMAdapter(BaseRuntimeAdapter):
 
         # Extract metadata
         config = self._model.config
+        model_type = getattr(config, 'model_type', 'unknown').lower()
+
+        # Detect attention type and MoE configuration
+        attention_type = AttentionType.STANDARD
+        is_moe = False
+        num_experts = None
+        num_selected_experts = None
+        num_shared_experts = None
+        kv_lora_rank = None
+        q_lora_rank = None
+        qk_nope_head_dim = None
+        qk_rope_head_dim = None
+
+        # Detect Kimi/DeepSeek MLA architecture
+        if model_type in ('kimi', 'deepseek', 'deepseek_v2', 'deepseek_v3'):
+            attention_type = AttentionType.MLA
+            # MLA specific parameters
+            kv_lora_rank = getattr(config, 'kv_lora_rank', None)
+            q_lora_rank = getattr(config, 'q_lora_rank', None)
+            qk_nope_head_dim = getattr(config, 'qk_nope_head_dim', None)
+            qk_rope_head_dim = getattr(config, 'qk_rope_head_dim', None)
+
+        # Detect MoE architecture
+        if hasattr(config, 'num_experts') or hasattr(config, 'n_routed_experts'):
+            is_moe = True
+            num_experts = getattr(config, 'num_experts', None) or getattr(config, 'n_routed_experts', None)
+            num_selected_experts = getattr(config, 'num_experts_per_tok', None) or getattr(config, 'num_selected_experts', None)
+            num_shared_experts = getattr(config, 'n_shared_experts', None) or getattr(config, 'num_shared_experts', None)
+
+        # Calculate head_dim (may be different for MLA models)
+        head_dim = getattr(config, 'head_dim', None)
+        if head_dim is None:
+            head_dim = config.hidden_size // config.num_attention_heads
+
         self._metadata = ModelMetadata(
             model_id=self._model_id,
             num_layers=config.num_hidden_layers,
             hidden_size=config.hidden_size,
             num_attention_heads=config.num_attention_heads,
-            head_dim=config.hidden_size // config.num_attention_heads,
+            head_dim=head_dim,
             vocab_size=config.vocab_size,
-            max_position_embeddings=config.max_position_embeddings,
-            architecture=config.model_type,
+            max_position_embeddings=getattr(config, 'max_position_embeddings', 4096),
+            architecture=model_type,
             has_output_projection=True,  # Most models have o_proj
+            attention_type=attention_type,
+            is_moe=is_moe,
+            num_experts=num_experts,
+            num_selected_experts=num_selected_experts,
+            num_shared_experts=num_shared_experts,
+            kv_lora_rank=kv_lora_rank,
+            q_lora_rank=q_lora_rank,
+            qk_nope_head_dim=qk_nope_head_dim,
+            qk_rope_head_dim=qk_rope_head_dim,
+            requires_trust_remote_code=model_type in ('kimi', 'deepseek', 'deepseek_v2', 'deepseek_v3'),
         )
 
         self._initialized = True
