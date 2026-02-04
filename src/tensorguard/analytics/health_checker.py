@@ -8,10 +8,11 @@ Run this as a scheduled job (cron) or integrate with your monitoring stack.
 import json
 import logging
 import os
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
+
 import httpx
 
 logger = logging.getLogger(__name__)
