@@ -1,9 +1,19 @@
 """Core database models for TensorGuard Platform."""
 
 from datetime import datetime
+from enum import Enum
 from typing import Optional
 
 from sqlmodel import Field, SQLModel
+
+
+class UserRole(str, Enum):
+    """User role enumeration."""
+
+    USER = "user"
+    OPERATOR = "operator"
+    SITE_ADMIN = "site_admin"
+    ORG_ADMIN = "org_admin"
 
 
 class Tenant(SQLModel, table=True):
@@ -28,11 +38,18 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: str = Field(index=True, unique=True)
     tenant_id: str = Field(index=True)
-    email: str = Field(index=True)
+    email: str = Field(index=True, unique=True)
     name: str
+    hashed_password: str
     role: str = Field(default="user")
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
     is_active: bool = Field(default=True)
+    email_verified: bool = Field(default=False)
+    email_verification_token: Optional[str] = Field(default=None)
+    password_reset_token: Optional[str] = Field(default=None)
+    password_reset_expires: Optional[datetime] = Field(default=None)
+    last_login: Optional[datetime] = Field(default=None)
 
 
 class Fleet(SQLModel, table=True):
