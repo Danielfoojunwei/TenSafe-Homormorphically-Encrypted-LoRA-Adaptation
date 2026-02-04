@@ -238,7 +238,7 @@ async def health_check():
     return {
         "status": "healthy" if db_health["status"] == "healthy" else "degraded",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "3.0.0",
+        "version": "4.0.0",
         "environment": TG_ENVIRONMENT,
         "checks": {"database": db_health},
     }

@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install dependencies
-COPY pyproject.toml setup.py setup.cfg ./
+COPY pyproject.toml ./
 COPY src/ ./src/
 
 # Create virtual environment and install

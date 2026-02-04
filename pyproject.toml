@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tensafe"
-version = "3.0.0"
+version = "4.0.0"
 description = "TenSafe: Privacy-First ML Training API with Differential Privacy, Encrypted Storage, and Post-Quantum Security"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -41,7 +41,7 @@ dependencies = [
     # API Framework
     "fastapi>=0.104.0,<1.0.0",
     "uvicorn>=0.24.0,<1.0.0",
-    "pydantic>=2.5.0,<3.0.0",
+    "pydantic[email]>=2.5.0,<3.0.0",
     "pydantic-settings>=2.1.0,<3.0.0",
     # Database
     "sqlmodel>=0.0.14,<1.0.0",
@@ -57,6 +57,10 @@ dependencies = [
     "argon2-cffi>=23.1.0,<24.0.0",
     # Serialization
     "msgpack>=1.0.0,<2.0.0",
+    # Scientific computing (required for DP accounting)
+    "scipy>=1.11.0,<2.0.0",
+    # Form handling (required for OAuth2 token endpoint)
+    "python-multipart>=0.0.6",
 ]
 
 [project.optional-dependencies]
