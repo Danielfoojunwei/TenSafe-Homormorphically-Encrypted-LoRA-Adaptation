@@ -1,0 +1,144 @@
+# TenSafe Kimi K2.5 Training Configuration
+#
+# Configuration for fine-tuning Moonshot AI's Kimi K2.5 model.
+# Kimi K2.5 uses MLA (Multi-head Latent Attention) and MoE architecture.
+#
+# Model: https://huggingface.co/moonshotai/Kimi-K2.5
+#
+# Key Features:
+#   - 1T total parameters, 32B activated per token
+#   - 61 layers with MLA attention
+#   - 384 experts with 8 selected per token + 1 shared expert
+#   - 256K context length
+#   - Native multimodal support (vision + text)
+#
+# Requirements:
+#   - transformers >= 4.57.1
+#   - trust_remote_code: true (required for MLA implementation)
+#   - Significant GPU memory (recommend 8x A100 80GB or equivalent)
+#
+# Usage:
+#   python scripts/train.py --config configs/train_kimi_k25.yaml
+
+# Training mode
+training:
+  mode: sft
+  seed: 42
+  deterministic: false
+  max_steps: 1000
+  eval_steps: 100
+  save_steps: 500
+  logging_steps: 10
+
+# Model configuration
+# Note: Kimi K2.5 requires trust_remote_code=true due to custom MLA implementation
+model:
+  ref: "moonshotai/Kimi-K2.5"
+  trust_remote_code: true
+  # Kimi K2.5 model specifications:
+  #   - Architecture: MLA + MoE
+  #   - Hidden size: 7168
+  #   - Attention heads: 64
+  #   - Layers: 61 (including 1 dense layer)
+  #   - Experts: 384 (8 selected + 1 shared per token)
+  #   - Vocab size: 160K
+
+# LoRA configuration for Kimi K2.5 MLA architecture
+# Kimi uses Multi-head Latent Attention (MLA) which has different projection names
+# than standard transformers. The MLA projections are:
+#   - q_a_proj: Query input projection (to latent space)
+#   - q_b_proj: Query output projection (from latent space)
+#   - kv_a_proj_with_mqa: Key-Value projection with Multi-Query Attention
+#   - kv_b_proj: Key-Value output projection
+#   - o_proj: Output projection
+lora:
+  rank: 16
+  alpha: 32.0
+  dropout: 0.05
+  # MLA-specific target modules for Kimi K2.5
+  target_modules:
+    - q_a_proj
+    - q_b_proj
+    - kv_a_proj_with_mqa
+    - kv_b_proj
+    - o_proj
+  bias: none
+  # Enable auto-detection for future compatibility
+  auto_detect_targets: false
+
+# Optimizer configuration
+# Lower learning rate recommended for large MoE models
+optimizer:
+  name: adamw
+  learning_rate: 5.0e-5  # Lower LR for large model stability
+  weight_decay: 0.01
+  betas: [0.9, 0.95]     # Adjusted beta2 for MoE training
+  eps: 1.0e-8
+
+# Learning rate scheduler
+scheduler:
+  type: cosine
+  warmup_ratio: 0.05     # Longer warmup for large models
+  min_lr_ratio: 0.0
+
+# Loss function configuration
+loss:
+  type: token_ce
+  kwargs:
+    ignore_index: -100
+    label_smoothing: 0.0
+    reduction: mean
+
+# Batch configuration
+# Smaller batch size due to large model memory requirements
+batch:
+  size: 2                           # Reduced for memory
+  gradient_accumulation_steps: 16   # Effective batch size: 32
+  max_seq_length: 4096              # Kimi supports up to 256K
+
+# Differential privacy (optional)
+dp:
+  enabled: false
+  noise_multiplier: 1.0
+  max_grad_norm: 1.0
+  target_epsilon: 8.0
+  target_delta: 1.0e-5
+  accountant_type: rdp
+
+# Checkpointing
+checkpoint:
+  save_total_limit: 2    # Fewer checkpoints due to large model size
+  resume_from: null
+
+# Data configuration
+data:
+  train_path: null
+  eval_path: null
+  dataset_name: null
+  text_field: text
+
+# Output configuration
+output:
+  dir: outputs/kimi_k25_sft
+  experiment_name: null
+
+# Hardware configuration
+hardware:
+  bf16: true             # Kimi K2.5 works best with bf16
+  fp16: false
+  tf32: true
+  use_flash_attention: true
+  # MoE-specific settings
+  expert_parallel: false  # Set true for multi-GPU expert parallelism
+
+# Logging configuration
+logging:
+  level: INFO
+  log_to_file: true
+  report_to: []
+
+# Kimi K2.5 specific inference settings (for reference)
+# inference:
+#   thinking_mode: true       # Enable reasoning mode (temperature=1.0, top_p=0.95)
+#   instant_mode: false       # Disable thinking (temperature=0.6, top_p=0.95)
+#   max_tokens: 4096          # Recommended for thinking mode

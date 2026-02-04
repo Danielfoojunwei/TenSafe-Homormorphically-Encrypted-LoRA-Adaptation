@@ -138,6 +138,92 @@ class LoRATarget(str, Enum):
     GATE_PROJ = "gate_proj"
     UP_PROJ = "up_proj"
     DOWN_PROJ = "down_proj"
+    # Kimi MLA (Multi-head Latent Attention) specific projections
+    Q_A_PROJ = "q_a_proj"
+    Q_B_PROJ = "q_b_proj"
+    KV_A_PROJ_WITH_MQA = "kv_a_proj_with_mqa"
+    KV_B_PROJ = "kv_b_proj"
+
+
+# Model presets for LoRA target modules
+# Different model architectures use different projection layer names
+MODEL_LORA_TARGET_PRESETS: Dict[str, List[str]] = {
+    # Standard transformer attention (Llama, Mistral, etc.)
+    "llama": ["q_proj", "k_proj", "v_proj", "o_proj"],
+    "mistral": ["q_proj", "k_proj", "v_proj", "o_proj"],
+    "qwen2": ["q_proj", "k_proj", "v_proj", "o_proj"],
+    "gemma": ["q_proj", "k_proj", "v_proj", "o_proj"],
+    "phi": ["q_proj", "k_proj", "v_proj", "dense"],
+
+    # Kimi K2.5 uses MLA (Multi-head Latent Attention) architecture
+    # MLA compresses KV cache by projecting K/V through a lower-dimensional latent space
+    # See: https://huggingface.co/moonshotai/Kimi-K2.5
+    "kimi": [
+        "q_a_proj",           # Query input projection (to latent space)
+        "q_b_proj",           # Query output projection (from latent space)
+        "kv_a_proj_with_mqa", # Key-Value projection with MQA
+        "kv_b_proj",          # Key-Value output projection
+        "o_proj",             # Output projection
+    ],
+
+    # DeepSeek models also use MLA
+    "deepseek": [
+        "q_a_proj",
+        "q_b_proj",
+        "kv_a_proj_with_mqa",
+        "kv_b_proj",
+        "o_proj",
+    ],
+
+    # Default fallback (standard transformer attention)
+    "default": ["q_proj", "k_proj", "v_proj", "o_proj"],
+}
+
+
+def get_model_lora_targets(model_name_or_type: str) -> List[str]:
+    """
+    Get the recommended LoRA target modules for a given model.
+
+    Args:
+        model_name_or_type: Either a HuggingFace model ID (e.g., "moonshotai/Kimi-K2.5")
+                           or a model type string (e.g., "kimi", "llama")
+
+    Returns:
+        List of target module names for LoRA adaptation
+
+    Example:
+        >>> get_model_lora_targets("moonshotai/Kimi-K2.5")
+        ['q_a_proj', 'q_b_proj', 'kv_a_proj_with_mqa', 'kv_b_proj', 'o_proj']
+
+        >>> get_model_lora_targets("llama")
+        ['q_proj', 'k_proj', 'v_proj', 'o_proj']
+    """
+    # Normalize to lowercase
+    model_lower = model_name_or_type.lower()
+
+    # Check for direct model type match
+    for model_type, targets in MODEL_LORA_TARGET_PRESETS.items():
+        if model_type in model_lower:
+            return targets.copy()
+
+    # Try to detect from HuggingFace model ID patterns
+    if "kimi" in model_lower or "moonshot" in model_lower:
+        return MODEL_LORA_TARGET_PRESETS["kimi"].copy()
+    elif "deepseek" in model_lower:
+        return MODEL_LORA_TARGET_PRESETS["deepseek"].copy()
+    elif "llama" in model_lower or "meta-llama" in model_lower:
+        return MODEL_LORA_TARGET_PRESETS["llama"].copy()
+    elif "mistral" in model_lower:
+        return MODEL_LORA_TARGET_PRESETS["mistral"].copy()
+    elif "qwen" in model_lower:
+        return MODEL_LORA_TARGET_PRESETS["qwen2"].copy()
+    elif "gemma" in model_lower:
+        return MODEL_LORA_TARGET_PRESETS["gemma"].copy()
+    elif "phi" in model_lower:
+        return MODEL_LORA_TARGET_PRESETS["phi"].copy()
+
+    # Return default
+    return MODEL_LORA_TARGET_PRESETS["default"].copy()
 
 
 @dataclass
@@ -181,9 +267,13 @@ class LoRAConfig:
     dropout: float = 0.05
 
     # Target modules
+    # Set to None or empty to auto-detect based on model architecture
     target_modules: List[str] = field(default_factory=lambda: [
         "q_proj", "k_proj", "v_proj", "o_proj"
     ])
+
+    # Auto-detection settings
+    auto_detect_targets: bool = False  # If True, override target_modules based on model
 
     # LoRA variant settings
     use_rslora: bool = False  # Rank-stabilized LoRA
@@ -199,6 +289,23 @@ class LoRAConfig:
     def scaling(self) -> float:
         """Compute LoRA scaling factor."""
         return self.alpha / self.rank
+
+    def get_targets_for_model(self, model_name: str) -> List[str]:
+        """
+        Get target modules for a specific model.
+
+        If auto_detect_targets is True or target_modules is empty,
+        this will return architecture-specific targets.
+
+        Args:
+            model_name: HuggingFace model ID or model type
+
+        Returns:
+            List of target module names
+        """
+        if self.auto_detect_targets or not self.target_modules:
+            return get_model_lora_targets(model_name)
+        return self.target_modules
 
 
 @dataclass
