@@ -62,16 +62,32 @@ class LocalStorageBackend(StorageBackend):
         self.base_path.mkdir(parents=True, exist_ok=True)
 
     def _get_path(self, key: str) -> Path:
-        """Get full path for a storage key with secure path traversal prevention."""
+        """Get full path for a storage key with secure path traversal prevention.
+
+        Supports hierarchical keys with '/' separators (e.g., 'tenant/client/artifact').
+        Each segment must be a valid filename component.
+        """
         import re
 
-        # Validate key format: only allow alphanumeric, dash, underscore, dot
-        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$', key):
-            raise ValueError(f"Invalid storage key format: {key!r}")
+        # Reject empty keys
+        if not key:
+            raise ValueError("Storage key cannot be empty")
 
-        # Length limit to prevent DoS
-        if len(key) > 255:
-            raise ValueError(f"Storage key too long: {len(key)} > 255")
+        # Split into segments and validate each
+        segments = key.split("/")
+        for segment in segments:
+            # Each segment must be valid: alphanumeric start, then alphanumeric/dash/underscore/dot
+            if not segment:
+                raise ValueError(f"Empty segment in storage key: {key!r}")
+            if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$', segment):
+                raise ValueError(f"Invalid segment in storage key: {segment!r} in {key!r}")
+            # Reject path traversal attempts
+            if segment in ('.', '..'):
+                raise ValueError(f"Path traversal attempt detected: {key!r}")
+
+        # Total length limit to prevent DoS
+        if len(key) > 512:
+            raise ValueError(f"Storage key too long: {len(key)} > 512")
 
         # Create candidate path
         candidate = (self.base_path / key).resolve()
@@ -85,8 +101,10 @@ class LocalStorageBackend(StorageBackend):
         return candidate
 
     def write(self, key: str, data: bytes) -> None:
-        """Write data to local filesystem."""
+        """Write data to local filesystem. Creates parent directories if needed."""
         path = self._get_path(key)
+        # Create parent directories for hierarchical keys
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
 
     def read(self, key: str) -> bytes:
@@ -286,7 +304,16 @@ class KeyManager:
 
         # Legacy local mode
         if master_key is None:
-            # In production, this should come from a secure vault
+            # Check if we're in production mode
+            environment = os.getenv("TG_ENVIRONMENT", "development").lower()
+            if environment in ("production", "prod"):
+                raise RuntimeError(
+                    "KeyManager requires explicit master key configuration in production mode. "
+                    "Set TENSAFE_MASTER_KEY environment variable (base64-encoded 32-byte key) "
+                    "or configure a KMS provider. "
+                    "To generate a key: python -c \"import secrets, base64; print(base64.b64encode(secrets.token_bytes(32)).decode())\""
+                )
+            # In development, generate ephemeral key (will be lost on restart)
             self._master_key = secrets.token_bytes(32)
             logger.warning("KeyManager using generated master key - use KMS in production")
         else:
