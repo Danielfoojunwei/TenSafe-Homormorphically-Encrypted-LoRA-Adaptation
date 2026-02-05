@@ -1,0 +1,218 @@
+// Schema Bridge Service for Interactive CKKS-TFHE Conversion
+//
+// This service implements the interactive bridge protocol where:
+// - Server sends CKKS ciphertext to client
+// - Client decrypts, quantizes, re-encrypts with TFHE key
+// - Client sends back TFHE ciphertext
+//
+// Security: The server NEVER sees plaintext during conversion.
+
+syntax = "proto3";
+
+package tensafe.hybrid;
+
+option java_package = "com.tensafe.hybrid.proto";
+option java_outer_classname = "BridgeProto";
+
+// Schema Bridge Service
+service SchemeBridgeService {
+    // Convert CKKS ciphertext to TFHE (client-side operation)
+    // Server sends CKKS ciphertext, client returns TFHE ciphertext
+    rpc CKKSDecryptAndEncryptToTFHE(BridgeRequest) returns (BridgeResponse);
+
+    // Convert TFHE ciphertext to CKKS (client-side operation)
+    // Server sends TFHE ciphertext, client returns CKKS ciphertext
+    rpc TFHEDecryptAndEncryptToCKKS(BridgeRequest) returns (BridgeResponse);
+
+    // Batched conversion (multiple scalars in one call)
+    rpc BatchedBridge(BatchedBridgeRequest) returns (BatchedBridgeResponse);
+
+    // Health check
+    rpc HealthCheck(HealthRequest) returns (HealthResponse);
+
+    // Streaming bridge for continuous conversion during inference
+    rpc StreamingBridge(stream BridgeRequest) returns (stream BridgeResponse);
+}
+
+// Direction of bridge conversion
+enum BridgeDirection {
+    CKKS_TO_TFHE = 0;
+    TFHE_TO_CKKS = 1;
+}
+
+// Quantization parameters for CKKS -> TFHE conversion
+message QuantizationParams {
+    // Quantization bit width (typically 4-12)
+    int32 bits = 1;
+
+    // Clipping range for input values
+    double clip_min = 2;
+    double clip_max = 3;
+
+    // Use symmetric quantization around zero
+    bool symmetric = 4;
+}
+
+// Single bridge conversion request
+message BridgeRequest {
+    // Unique request identifier for tracking
+    string request_id = 1;
+
+    // Session identifier for key binding
+    string session_id = 2;
+
+    // Associated adapter identifier
+    string adapter_id = 3;
+
+    // Serialized ciphertext (CKKS or TFHE depending on direction)
+    bytes ciphertext_blob = 4;
+
+    // Direction of conversion
+    BridgeDirection direction = 5;
+
+    // Quantization parameters (for CKKS_TO_TFHE only)
+    QuantizationParams quant_params = 6;
+
+    // Layer index (for debugging/telemetry)
+    int32 layer_idx = 7;
+
+    // Token index in sequence
+    int32 token_idx = 8;
+
+    // Priority (higher = more urgent)
+    int32 priority = 9;
+
+    // Deadline in milliseconds from now
+    int64 deadline_ms = 10;
+}
+
+// Single bridge conversion response
+message BridgeResponse {
+    // Echo of request_id
+    string request_id = 1;
+
+    // Converted ciphertext (TFHE or CKKS depending on direction)
+    bytes ciphertext_blob = 2;
+
+    // Conversion metrics
+    BridgeMetrics metrics = 3;
+
+    // Error information (if failed)
+    ErrorInfo error = 4;
+
+    // Status
+    ResponseStatus status = 5;
+}
+
+// Metrics for bridge operation
+message BridgeMetrics {
+    // Time to decrypt original ciphertext (ms)
+    double decrypt_time_ms = 1;
+
+    // Time to quantize values (ms) - for CKKS_TO_TFHE only
+    double quantize_time_ms = 2;
+
+    // Time to encrypt with new scheme (ms)
+    double encrypt_time_ms = 3;
+
+    // Quantization error (max absolute error)
+    double quantization_error = 4;
+
+    // Number of values converted
+    int32 num_values = 5;
+
+    // Total round-trip time (ms)
+    double total_time_ms = 6;
+}
+
+// Error information
+message ErrorInfo {
+    // Error code
+    ErrorCode code = 1;
+
+    // Human-readable message
+    string message = 2;
+
+    // Additional details
+    map<string, string> details = 3;
+}
+
+// Error codes
+enum ErrorCode {
+    ERROR_NONE = 0;
+    ERROR_INVALID_REQUEST = 1;
+    ERROR_DECRYPTION_FAILED = 2;
+    ERROR_ENCRYPTION_FAILED = 3;
+    ERROR_QUANTIZATION_OVERFLOW = 4;
+    ERROR_SESSION_NOT_FOUND = 5;
+    ERROR_DEADLINE_EXCEEDED = 6;
+    ERROR_INTERNAL = 99;
+}
+
+// Response status
+enum ResponseStatus {
+    STATUS_OK = 0;
+    STATUS_ERROR = 1;
+    STATUS_PARTIAL = 2;
+}
+
+// Batched bridge request (multiple conversions in one call)
+message BatchedBridgeRequest {
+    // Common session and adapter info
+    string session_id = 1;
+    string adapter_id = 2;
+
+    // Individual requests
+    repeated BridgeRequest requests = 3;
+
+    // Shared quantization params (can be overridden per-request)
+    QuantizationParams default_quant_params = 4;
+}
+
+// Batched bridge response
+message BatchedBridgeResponse {
+    // Individual responses (same order as requests)
+    repeated BridgeResponse responses = 1;
+
+    // Aggregate metrics
+    BatchMetrics aggregate_metrics = 2;
+}
+
+// Aggregate metrics for batch
+message BatchMetrics {
+    // Number of successful conversions
+    int32 successful = 1;
+
+    // Number of failed conversions
+    int32 failed = 2;
+
+    // Total time for batch (ms)
+    double total_time_ms = 3;
+
+    // Average per-conversion time (ms)
+    double avg_time_ms = 4;
+}
+
+// Health check request
+message HealthRequest {
+    // Optional service identifier
+    string service_id = 1;
+}
+
+// Health check response
+message HealthResponse {
+    // Service is healthy
+    bool healthy = 1;
+
+    // Service version
+    string version = 2;
+
+    // Uptime in seconds
+    int64 uptime_seconds = 3;
+
+    // Current load (0.0 - 1.0)
+    float load = 4;
+
+    // Available capacity for new requests
+    int32 available_capacity = 5;
+}

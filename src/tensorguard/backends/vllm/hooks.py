@@ -78,6 +78,15 @@ class HELoRAConfig:
     use_moai: bool = True  # MOAI rotation elimination
     enable_metrics: bool = True
 
+    # Gated LoRA / Hybrid settings
+    adapter_type: str = "linear_lora"  # "linear_lora" | "gated_lora"
+    gate_type: str = "step"  # "step" | "sign" (for gated_lora)
+
+    # HAS service settings (for hybrid mode)
+    has_service_url: Optional[str] = None
+    bridge_service_url: Optional[str] = None
+    bridge_timeout_ms: int = 5000
+
 
 class HELoRAHook:
     """Forward hook for injecting HE-LoRA computation.
@@ -105,6 +114,8 @@ class HELoRAHook:
         config: HELoRAConfig,
         he_scheme: Optional['N2HEScheme'] = None,
         evaluation_key: Optional['EvaluationKey'] = None,
+        w_gate: Optional[torch.Tensor] = None,  # Shape: (hidden_size,) for gated_lora
+        b_gate: Optional[torch.Tensor] = None,  # Shape: (1,) for gated_lora
     ):
         self.layer_name = layer_name
         self.config = config
@@ -115,6 +126,13 @@ class HELoRAHook:
         self.lora_a = lora_a
         self.lora_b = lora_b
         self.scaling = config.alpha / config.rank
+
+        # Gate weights (for gated_lora)
+        self.w_gate = w_gate
+        self.b_gate = b_gate
+
+        # Hybrid backend (for gated_lora with hybrid scheme)
+        self._hybrid_backend = None
 
         # Metrics
         self.metrics = HELoRAMetrics() if config.enable_metrics else None
@@ -131,6 +149,10 @@ class HELoRAHook:
                 import warnings
                 warnings.warn(f"Failed to create HE-LoRA executor: {e}")
 
+        # Initialize hybrid backend for gated adapters
+        if config.scheme == "hybrid" and config.adapter_type == "gated_lora":
+            self._init_hybrid_backend()
+
     def _create_executor(self) -> Optional['HELoRAExecutor']:
         """Create HE-LoRA executor with GPU backend."""
         if not HELORA_MICROKERNEL_AVAILABLE:
@@ -145,6 +167,15 @@ class HELoRAHook:
             return HELoRAExecutor(backend=backend)
         except Exception:
             return None
+
+    def _init_hybrid_backend(self) -> None:
+        """Initialize hybrid CKKS-TFHE backend for gated adapters."""
+        try:
+            from he_lora_microkernel.hybrid_compiler.backend import HybridHEBackend
+            self._hybrid_backend = HybridHEBackend.create_simulated()
+        except ImportError:
+            import warnings
+            warnings.warn("Hybrid backend not available, gated LoRA will use simulation")
 
     def __call__(
         self,
@@ -168,21 +199,22 @@ class HELoRAHook:
             # Get input tensor
             x = input[0] if isinstance(input, tuple) else input
 
-            # Apply LoRA transformation
-            # In production, this uses encrypted operations
-            if self._executor is not None:
-                # Use HE-LoRA microkernel
+            # Route based on scheme and adapter type
+            if self.config.scheme == "hybrid" and self.config.adapter_type == "gated_lora":
+                # Use hybrid CKKS-TFHE path for gated LoRA
+                result = self._apply_gated_lora(x, output)
+            elif self._executor is not None:
+                # Use HE-LoRA microkernel for linear LoRA
                 lora_output = self._executor.apply(
                     hidden_states=x,
                     lora_a=self.lora_a,
                     lora_b=self.lora_b,
                 )
+                result = output + self.scaling * lora_output
             else:
                 # Fallback to simulated computation
                 lora_output = self._apply_lora_simulated(x)
-
-            # Scale and add to output
-            result = output + self.scaling * lora_output
+                result = output + self.scaling * lora_output
 
             # Record metrics
             if self.metrics is not None:
@@ -203,6 +235,74 @@ class HELoRAHook:
 
             # Return original output on error
             return output
+
+    def _apply_gated_lora(
+        self,
+        x: torch.Tensor,
+        base_output: torch.Tensor,
+    ) -> torch.Tensor:
+        """Apply gated LoRA using hybrid CKKS-TFHE.
+
+        y = Wx + g(x) * scaling * B(Ax)
+        where g(x) = LUT(w_g^T @ x + b_g)
+        """
+        import numpy as np
+
+        # Convert to numpy for hybrid backend
+        x_np = x.detach().cpu().numpy().astype(np.float64)
+        base_np = base_output.detach().cpu().numpy().astype(np.float64)
+
+        # Get weights
+        lora_a = self.lora_a.detach().cpu().numpy().astype(np.float64)
+        lora_b = self.lora_b.detach().cpu().numpy().astype(np.float64)
+
+        # Get gate weights
+        if self.w_gate is None:
+            # No gate weights, fall back to linear
+            lora_output = self._apply_lora_simulated(x)
+            return base_output + self.scaling * lora_output
+
+        w_gate = self.w_gate.detach().cpu().numpy().astype(np.float64)
+        b_gate = self.b_gate.detach().cpu().numpy().astype(np.float64) if self.b_gate is not None else None
+
+        # Process each sample in batch
+        batch_shape = x_np.shape[:-1]
+        hidden_size = x_np.shape[-1]
+
+        x_flat = x_np.reshape(-1, hidden_size)
+        base_flat = base_np.reshape(-1, hidden_size)
+        output_flat = np.zeros_like(base_flat)
+
+        for i in range(x_flat.shape[0]):
+            xi = x_flat[i]
+            base_i = base_flat[i]
+
+            # LoRA delta: u = A @ x; delta = B @ u
+            u = lora_a @ xi
+            delta = lora_b @ u
+
+            # Gate pre-activation: z = w_g^T @ x + b_g
+            z = w_gate @ xi
+            if b_gate is not None:
+                z = z + float(b_gate.flat[0])
+
+            # Apply gate LUT (simulation)
+            if self.config.gate_type == "step":
+                g = 1.0 if float(z) >= 0 else 0.0
+            else:  # sign
+                if float(z) > 0:
+                    g = 1.0
+                elif float(z) < 0:
+                    g = -1.0
+                else:
+                    g = 0.0
+
+            # Gated output
+            output_flat[i] = base_i + g * self.scaling * delta
+
+        # Reshape and convert back to torch
+        output = output_flat.reshape(base_np.shape)
+        return torch.from_numpy(output).to(base_output.device, dtype=base_output.dtype)
 
     def _apply_lora_simulated(self, x: torch.Tensor) -> torch.Tensor:
         """Apply LoRA transformation (simulated, non-HE).

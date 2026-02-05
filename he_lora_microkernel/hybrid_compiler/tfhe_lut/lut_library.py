@@ -31,6 +31,8 @@ class LUTEntry:
     is_signed_input: bool = True
     is_signed_output: bool = False
     description: str = ""
+    # Encoding offset for signed outputs stored as unsigned
+    output_offset: int = 0
 
     @property
     def size(self) -> int:
@@ -38,7 +40,7 @@ class LUTEntry:
         return len(self.entries)
 
     def lookup(self, value: int) -> int:
-        """Lookup a value in the table."""
+        """Lookup a value in the table (returns encoded value)."""
         if self.is_signed_input:
             # Convert signed to index
             offset = self.size // 2
@@ -50,6 +52,36 @@ class LUTEntry:
         index = max(0, min(self.size - 1, index))
         return self.entries[index]
 
+    def lookup_decoded(self, value: int) -> int:
+        """Lookup a value and decode the result."""
+        encoded = self.lookup(value)
+        return self.decode_output(encoded)
+
+    def decode_output(self, encoded_value: int) -> int:
+        """Decode an encoded output value to the actual logical value."""
+        if self.is_signed_output and self.output_offset > 0:
+            return encoded_value - self.output_offset
+        return encoded_value
+
+    def encode_output(self, logical_value: int) -> int:
+        """Encode a logical output value for storage."""
+        if self.is_signed_output and self.output_offset > 0:
+            return logical_value + self.output_offset
+        return logical_value
+
+    def validate_entries(self) -> List[str]:
+        """Validate that all entries are within valid range."""
+        errors = []
+        max_val = (1 << self.output_bits) - 1
+
+        for i, entry in enumerate(self.entries):
+            if entry < 0:
+                errors.append(f"Entry {i} is negative ({entry}), but entries must be non-negative")
+            if entry > max_val:
+                errors.append(f"Entry {i} ({entry}) exceeds max value for {self.output_bits}-bit output ({max_val})")
+
+        return errors
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             'name': self.name,
@@ -58,6 +90,7 @@ class LUTEntry:
             'output_bits': self.output_bits,
             'is_signed_input': self.is_signed_input,
             'is_signed_output': self.is_signed_output,
+            'output_offset': self.output_offset,
             'description': self.description,
         }
 
@@ -96,29 +129,42 @@ def sign_lut(bits: int = 8) -> LUTEntry:
 
     sign(x) = 1 if x > 0, -1 if x < 0, 0 if x == 0
 
-    Uses 2-bit signed output: {-1, 0, 1}
+    Encoding: Uses 2-bit signed output with offset encoding.
+    - -1 is encoded as 0
+    -  0 is encoded as 1
+    -  1 is encoded as 2
+
+    This ensures all entries are in range [0, 2^output_bits - 1].
+    To decode: output_value - 1 gives the actual sign.
+
+    For output_bits=2: valid range is [0, 3], we use [0, 1, 2] for {-1, 0, 1}
     """
     size = 1 << bits
     half = size // 2
+
+    # Output encoding: sign_value + 1 (offset by 1 to make all values non-negative)
+    # -1 -> 0, 0 -> 1, 1 -> 2
+    OFFSET = 1
 
     entries = []
     for i in range(size):
         signed_val = i - half
         if signed_val > 0:
-            entries.append(1)
+            entries.append(1 + OFFSET)  # 1 -> 2
         elif signed_val < 0:
-            entries.append(-1 + 256)  # Encode -1 as 255 for unsigned storage
+            entries.append(-1 + OFFSET)  # -1 -> 0
         else:
-            entries.append(0)
+            entries.append(0 + OFFSET)  # 0 -> 1
 
     return LUTEntry(
         name="sign",
         entries=entries,
         input_bits=bits,
-        output_bits=2,
+        output_bits=2,  # 2 bits can represent [0, 3], we need [0, 2]
         is_signed_input=True,
-        is_signed_output=True,
-        description="Sign function: 1, 0, or -1",
+        is_signed_output=True,  # Logical output is signed (-1, 0, 1)
+        output_offset=OFFSET,  # Decode by subtracting OFFSET
+        description="Sign function: 1, 0, or -1 (encoded with +1 offset)",
     )
 
 

@@ -48,7 +48,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from he_lora_microkernel.hybrid_compiler.adapters import HEGatedLoRAAdapter
 
 import numpy as np
 
@@ -91,6 +94,42 @@ class NoActiveAdapterError(Exception):
 
 
 @dataclass
+class GateConfig:
+    """Configuration for gated adapters."""
+    gate_type: str = "step"  # "step" or "sign"
+    gate_lut_id: Optional[str] = None
+    input_bits: int = 8
+    output_bits: int = 1
+    signed_input: bool = True
+    signed_output: bool = False
+    clip_range: Tuple[float, float] = (-10.0, 10.0)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "gate_type": self.gate_type,
+            "gate_lut_id": self.gate_lut_id,
+            "input_bits": self.input_bits,
+            "output_bits": self.output_bits,
+            "signed_input": self.signed_input,
+            "signed_output": self.signed_output,
+            "clip_range": list(self.clip_range),
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> 'GateConfig':
+        clip = d.get('clip_range', [-10.0, 10.0])
+        return cls(
+            gate_type=d.get('gate_type', 'step'),
+            gate_lut_id=d.get('gate_lut_id'),
+            input_bits=d.get('input_bits', 8),
+            output_bits=d.get('output_bits', 1),
+            signed_input=d.get('signed_input', True),
+            signed_output=d.get('signed_output', False),
+            clip_range=(clip[0], clip[1]) if isinstance(clip, list) else clip,
+        )
+
+
+@dataclass
 class TGSPAdapterMetadata:
     """Metadata for a loaded TGSP adapter."""
 
@@ -111,6 +150,16 @@ class TGSPAdapterMetadata:
     lora_alpha: float
     target_modules: List[str]
 
+    # Adapter type (v2: supports gated_lora)
+    adapter_type: str = "linear_lora"  # "linear_lora" | "gated_lora"
+
+    # Gate configuration (for gated_lora)
+    gate_config: Optional[GateConfig] = None
+
+    # Hybrid HE configuration
+    hybrid_he_enabled: bool = False
+    bridge_mode: str = "interactive"  # "interactive" | "simulation"
+
     # Timestamps
     loaded_at: datetime = field(default_factory=datetime.utcnow)
     last_used_at: Optional[datetime] = None
@@ -121,7 +170,7 @@ class TGSPAdapterMetadata:
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
-        return {
+        result = {
             "adapter_id": self.adapter_id,
             "tgsp_path": self.tgsp_path,
             "model_name": self.model_name,
@@ -134,11 +183,17 @@ class TGSPAdapterMetadata:
             "lora_rank": self.lora_rank,
             "lora_alpha": self.lora_alpha,
             "target_modules": self.target_modules,
+            "adapter_type": self.adapter_type,
+            "hybrid_he_enabled": self.hybrid_he_enabled,
+            "bridge_mode": self.bridge_mode,
             "loaded_at": self.loaded_at.isoformat(),
             "last_used_at": self.last_used_at.isoformat() if self.last_used_at else None,
             "forward_count": self.forward_count,
             "total_inference_time_ms": self.total_inference_time_ms,
         }
+        if self.gate_config:
+            result["gate_config"] = self.gate_config.to_dict()
+        return result
 
 
 @dataclass
@@ -149,9 +204,16 @@ class LoadedAdapter:
     weights: Dict[str, Tuple[np.ndarray, np.ndarray]]  # module -> (lora_a, lora_b)
     he_adapter: Optional[Any] = None  # HELoRAAdapter instance when initialized
 
+    # Gate weights (for gated_lora)
+    gate_weights: Optional[Dict[str, Tuple[np.ndarray, Optional[np.ndarray]]]] = None  # module -> (w_gate, b_gate)
+
+    # Gated adapter instance (for gated_lora)
+    gated_adapter: Optional['HEGatedLoRAAdapter'] = None
+
     # State
     is_active: bool = False
     is_he_initialized: bool = False
+    is_hybrid_initialized: bool = False
 
 
 class TGSPAdapterRegistry:
