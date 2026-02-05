@@ -30,6 +30,7 @@ from he_lora_microkernel.compiler import (
     CKKSProfile,
     get_profile,
     compile_schedule,
+    select_optimal_profile,
 )
 from he_lora_microkernel.runtime import (
     HELoRAExecutor,
@@ -134,6 +135,19 @@ class EndToEndBenchmarker:
         result = BenchmarkResult(config=config)
 
         try:
+            # Auto-select optimal profile for large configurations
+            try:
+                ckks_params = select_optimal_profile(
+                    hidden_size=config.hidden_size,
+                    lora_rank=config.rank,
+                    batch_size=config.batch_size,
+                )
+                profile = ckks_params.profile
+            except ValueError:
+                # Fall back to specified profile
+                profile = config.profile
+                ckks_params = get_profile(profile)
+
             # Create LoRA config
             lora_config = LoRAConfig(
                 hidden_size=config.hidden_size,
@@ -142,11 +156,10 @@ class EndToEndBenchmarker:
                 targets=config.targets,
                 batch_size=config.batch_size,
                 max_context_length=config.num_tokens + self.warmup_tokens,
-                ckks_profile=config.profile,
+                ckks_profile=profile,
             )
 
             # Compile
-            ckks_params = get_profile(config.profile)
             schedule = compile_schedule(lora_config, ckks_params)
 
             if not schedule.is_valid:

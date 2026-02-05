@@ -492,7 +492,6 @@ class TestEndToEnd:
         batch_config = BatchConfig(
             max_batch_size=4,
             max_context_length=2048,
-            max_generation_length=512,
         )
 
         adapter_cls = get_adapter("vllm")

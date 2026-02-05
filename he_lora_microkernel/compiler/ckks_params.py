@@ -19,6 +19,7 @@ class CKKSProfile(Enum):
     """CKKS security/performance profile selector."""
     FAST = "fast"
     SAFE = "safe"
+    TURBO = "turbo"  # For large batch/hidden configurations
 
 
 @dataclass(frozen=True)
@@ -223,12 +224,36 @@ def get_safe_profile() -> CKKSParams:
     )
 
 
+def get_turbo_profile() -> CKKSParams:
+    """
+    TURBO profile: Maximum depth for large configurations.
+
+    - poly_modulus_degree = 16384 (8192 slots)
+    - coeff_modulus_bits = [60, 40, 40, 40, 40, 60]
+    - scale = 2^40
+    - max_depth = 4
+
+    Best for:
+    - Large batch sizes (b >= 8)
+    - Large hidden dimensions (h >= 1024)
+    - Configurations that exceed FAST profile depth
+    """
+    return CKKSParams(
+        poly_modulus_degree=16384,
+        coeff_modulus_bits=(60, 40, 40, 40, 40, 60),
+        scale_bits=40,
+        profile=CKKSProfile.TURBO,
+    )
+
+
 def get_profile(profile: CKKSProfile) -> CKKSParams:
     """Get CKKS parameters for specified profile."""
     if profile == CKKSProfile.FAST:
         return get_fast_profile()
     elif profile == CKKSProfile.SAFE:
         return get_safe_profile()
+    elif profile == CKKSProfile.TURBO:
+        return get_turbo_profile()
     else:
         raise ValueError(f"Unknown profile: {profile}")
 
@@ -251,12 +276,22 @@ def select_optimal_profile(
     Returns:
         Optimal CKKSParams for the workload.
     """
-    # Start with FAST profile
-    params = get_fast_profile()
+    # For large configurations, use TURBO profile
+    # This handles h>=1024 with b>=8 which exceeds FAST depth
+    if hidden_size >= 1024 and batch_size >= 8:
+        params = get_turbo_profile()
+    elif hidden_size >= 512 and batch_size >= 16:
+        params = get_turbo_profile()
+    else:
+        # Start with FAST profile
+        params = get_fast_profile()
 
-    # Check if FAST profile can handle the workload
+    # Check if current profile can handle the workload
     if not params.can_compute_lora(lora_rank):
-        params = get_safe_profile()
+        if params.profile == CKKSProfile.FAST:
+            params = get_safe_profile()
+        elif params.profile == CKKSProfile.SAFE:
+            params = get_turbo_profile()
 
     # Check slot requirements
     required_slots = batch_size * max(hidden_size // 512, 1)  # Block packing
