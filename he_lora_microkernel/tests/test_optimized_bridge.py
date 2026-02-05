@@ -2,8 +2,8 @@
 Tests for Optimized CKKS-TFHE Bridge
 
 Tests cover:
-1. Batched quantization correctness
-2. Reduced precision modes
+1. 8-bit quantization correctness
+2. Batched LUT evaluation
 3. SIMD packing operations
 4. Lazy evaluation queue
 5. Step function accuracy
@@ -15,74 +15,60 @@ import numpy as np
 from he_lora_microkernel.hybrid_compiler.bridge.optimized_bridge import (
     OptimizedCKKSTFHEBridge,
     BatchedBootstrapConfig,
-    PrecisionMode,
-    OptimizedQuantizationParams,
+    QuantizationParams,
     BatchedLUT,
     SIMDPackedTFHE,
     LazyGateBridge,
 )
 
 
-class TestOptimizedQuantization:
-    """Test quantization with different precision modes."""
+class TestQuantization:
+    """Test 8-bit quantization."""
 
-    def test_full_precision_quantization(self):
-        """8-bit quantization should preserve more detail."""
-        params = OptimizedQuantizationParams(precision=PrecisionMode.FULL)
+    def test_quantization_range(self):
+        """8-bit quantization should produce values in [-127, 127]."""
+        params = QuantizationParams()
 
-        values = np.array([-3.5, -1.0, 0.0, 1.0, 3.5])
+        values = np.array([-10.0, -5.0, -1.0, 0.0, 1.0, 5.0, 10.0])
         quantized = params.quantize_batch(values)
 
-        # Verify quantization is within expected range
-        max_val = (1 << (params.bits - 1)) - 1
-        assert np.all(quantized >= -max_val)
-        assert np.all(quantized <= max_val)
+        assert np.all(quantized >= -127)
+        assert np.all(quantized <= 127)
 
-    def test_reduced_precision_quantization(self):
-        """4-bit quantization for gate pre-activations."""
-        params = OptimizedQuantizationParams(precision=PrecisionMode.REDUCED)
+    def test_sign_preservation(self):
+        """Quantization should preserve sign for non-tiny values."""
+        params = QuantizationParams()
 
-        values = np.array([-3.5, -1.0, 0.0, 1.0, 3.5])
+        values = np.array([-5.0, -1.0, 0.0, 1.0, 5.0])
         quantized = params.quantize_batch(values)
 
-        # 4-bit: range is -7 to 7
-        assert np.all(quantized >= -7)
-        assert np.all(quantized <= 7)
-
-    def test_binary_precision_for_step(self):
-        """2-bit quantization with scale=0.25 (clip_range [-4,4])."""
-        params = OptimizedQuantizationParams(precision=PrecisionMode.BINARY)
-
-        # With 2-bit and clip_range [-4,4]: scale = 1/4 = 0.25
-        # Values need magnitude >= 2.0 to quantize to +/-1
-        # -3.5 * 0.25 = -0.875 -> rounds to -1
-        # 3.5 * 0.25 = 0.875 -> rounds to 1
-        values = np.array([-3.5, 0.0, 3.5])
-        quantized = params.quantize_batch(values)
-
-        # 2-bit: range is -1 to 1
-        assert np.all(quantized >= -1)
-        assert np.all(quantized <= 1)
-
-        # Sign should be preserved for large enough values
-        assert quantized[0] < 0  # -3.5 -> -1
-        assert quantized[1] == 0  # 0.0 -> 0
-        assert quantized[2] > 0  # 3.5 -> 1
+        assert quantized[0] < 0  # -5.0 -> negative
+        assert quantized[1] < 0  # -1.0 -> negative
+        assert quantized[2] == 0  # 0.0 -> 0
+        assert quantized[3] > 0  # 1.0 -> positive
+        assert quantized[4] > 0  # 5.0 -> positive
 
     def test_clipping_behavior(self):
         """Values outside clip range should be clamped."""
-        params = OptimizedQuantizationParams(
-            precision=PrecisionMode.FULL,
-            clip_min=-4.0,
-            clip_max=4.0
-        )
+        params = QuantizationParams(clip_min=-10.0, clip_max=10.0)
 
-        values = np.array([-100.0, -4.0, 0.0, 4.0, 100.0])
+        values = np.array([-100.0, -10.0, 0.0, 10.0, 100.0])
         quantized = params.quantize_batch(values)
 
         # Extreme values should be clipped
         assert quantized[0] == quantized[1]  # Both clipped to min
         assert quantized[4] == quantized[3]  # Both clipped to max
+
+    def test_dequantize_roundtrip(self):
+        """Quantize-dequantize should approximately preserve values."""
+        params = QuantizationParams()
+
+        original = 5.0
+        quantized = params.quantize(original)
+        recovered = params.dequantize(quantized)
+
+        # Should be close (within quantization error)
+        assert abs(recovered - original) < 0.1
 
 
 class TestBatchedLUT:
@@ -90,10 +76,10 @@ class TestBatchedLUT:
 
     def test_step_lut_correctness(self):
         """Step LUT should return 0 for negative, 1 for non-negative."""
-        lut = BatchedLUT.step_lut(bits=4)
+        lut = BatchedLUT.step_lut(bits=8)
 
-        # Test range: -7 to 7 for 4-bit
-        test_values = np.array([-7, -3, -1, 0, 1, 3, 7], dtype=np.int32)
+        # Test range for 8-bit: -127 to 127
+        test_values = np.array([-127, -64, -1, 0, 1, 64, 127], dtype=np.int32)
         results = lut.evaluate_batch(test_values)
 
         expected = np.array([0, 0, 0, 1, 1, 1, 1], dtype=np.int32)
@@ -101,9 +87,9 @@ class TestBatchedLUT:
 
     def test_sign_lut_correctness(self):
         """Sign LUT should return -1, 0, or 1."""
-        lut = BatchedLUT.sign_lut(bits=4)
+        lut = BatchedLUT.sign_lut(bits=8)
 
-        test_values = np.array([-7, -1, 0, 1, 7], dtype=np.int32)
+        test_values = np.array([-127, -1, 0, 1, 127], dtype=np.int32)
         results = lut.evaluate_batch(test_values)
 
         expected = np.array([-1, -1, 0, 1, 1], dtype=np.int32)
@@ -132,7 +118,7 @@ class TestOptimizedBridge:
         """Batched gate evaluation should produce correct results."""
         bridge = OptimizedCKKSTFHEBridge()
 
-        # Test values with clear sign (avoid values that might round to 0)
+        # Test values with clear sign
         preactivations = np.array([-5.0, -1.0, 0.0, 1.0, 5.0])
         gates = bridge.evaluate_gates_batched(preactivations)
 
@@ -144,7 +130,6 @@ class TestOptimizedBridge:
         """Results should be same regardless of batch size."""
         bridge = OptimizedCKKSTFHEBridge()
 
-        # Fixed random seed for reproducibility
         np.random.seed(42)
         values = np.random.randn(64) * 3
 
@@ -160,37 +145,6 @@ class TestOptimizedBridge:
 
         np.testing.assert_array_equal(full_result, combined_result)
 
-    def test_precision_modes(self):
-        """Precision modes with sufficient resolution should produce correct step."""
-        # Use values with clear sign
-        values = np.array([-3.0, -1.5, 0.0, 1.5, 3.0])
-        expected = np.array([0.0, 0.0, 1.0, 1.0, 1.0])
-
-        # Test FULL and REDUCED modes (which have sufficient resolution)
-        for precision in [PrecisionMode.FULL, PrecisionMode.REDUCED]:
-            bridge = OptimizedCKKSTFHEBridge(
-                BatchedBootstrapConfig(precision=precision)
-            )
-            gates = bridge.evaluate_gates_batched(values)
-            np.testing.assert_array_equal(
-                gates, expected,
-                err_msg=f"Failed for precision mode {precision.name}"
-            )
-
-    def test_binary_precision_large_values(self):
-        """BINARY mode requires larger values to preserve sign."""
-        bridge = OptimizedCKKSTFHEBridge(
-            BatchedBootstrapConfig(precision=PrecisionMode.BINARY)
-        )
-
-        # BINARY (2-bit) has scale=0.25, so values need magnitude > 2.0
-        # to reliably quantize to non-zero
-        values = np.array([-4.0, -3.0, 0.0, 3.0, 4.0])
-        gates = bridge.evaluate_gates_batched(values)
-
-        expected = np.array([0.0, 0.0, 1.0, 1.0, 1.0])
-        np.testing.assert_array_equal(gates, expected)
-
     def test_statistics_tracking(self):
         """Bridge should track statistics correctly."""
         bridge = OptimizedCKKSTFHEBridge()
@@ -204,6 +158,12 @@ class TestOptimizedBridge:
         stats = bridge.get_stats()
         assert stats['batched_bootstraps'] == 3
         assert stats['total_values_processed'] == 8 + 16 + 32
+
+    def test_empty_batch(self):
+        """Empty batch should not crash."""
+        bridge = OptimizedCKKSTFHEBridge()
+        result = bridge.evaluate_gates_batched(np.array([]))
+        assert len(result) == 0
 
 
 class TestSIMDPackedTFHE:
@@ -296,12 +256,6 @@ class TestLazyGateBridge:
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
-    def test_empty_batch(self):
-        """Empty batch should not crash."""
-        bridge = OptimizedCKKSTFHEBridge()
-        result = bridge.evaluate_gates_batched(np.array([]))
-        assert len(result) == 0
-
     def test_single_value(self):
         """Single value should work correctly."""
         bridge = OptimizedCKKSTFHEBridge()
@@ -319,31 +273,15 @@ class TestEdgeCases:
         values = np.array([-1e10, -1.0, 0.0, 1.0, 1e10])
         result = bridge.evaluate_gates_batched(values)
 
-        # Large negative -> clipped to min -> gate=0
-        # Large positive -> clipped to max -> gate=1
         expected = np.array([0.0, 0.0, 1.0, 1.0, 1.0])
         np.testing.assert_array_equal(result, expected)
-
-    def test_tiny_values_quantize_to_zero(self):
-        """Very small values near zero may quantize to 0 (expected behavior)."""
-        bridge = OptimizedCKKSTFHEBridge()
-
-        # Very tiny negative values might quantize to 0 due to scale
-        # This is expected behavior with reduced precision
-        tiny_neg = np.array([-1e-10])
-        result = bridge.evaluate_gates_batched(tiny_neg)
-
-        # -1e-10 with clip_range=[-4, 4] and 4-bit precision:
-        # scale = 7/4 = 1.75, so -1e-10 * 1.75 rounds to 0
-        # 0 is treated as non-negative by step function -> gate=1
-        assert result[0] == 1.0  # Expected: tiny neg rounds to 0 -> gate=1
 
     def test_nan_handling(self):
         """NaN values should be handled gracefully."""
         bridge = OptimizedCKKSTFHEBridge()
 
         values = np.array([1.0, np.nan, -1.0])
-        # Should not crash (NaN behavior depends on implementation)
+        # Should not crash
         result = bridge.evaluate_gates_batched(values)
         assert len(result) == 3
 

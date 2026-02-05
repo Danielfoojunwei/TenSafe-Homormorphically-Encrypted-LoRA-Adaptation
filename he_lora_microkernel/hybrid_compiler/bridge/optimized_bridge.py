@@ -3,20 +3,20 @@ Optimized CKKS-TFHE Bridge with Batched Bootstrapping
 
 Key optimizations:
 1. Batched bootstrapping - process multiple gate values in single TFHE operation
-2. Reduced precision - 4-bit or 2-bit quantization for binary gates
-3. SIMD packing - pack multiple values into single TFHE ciphertext
-4. Pre-computed keys - cache bootstrap switching keys
-5. Lazy evaluation - delay conversion until necessary
+2. SIMD packing - pack multiple values into single TFHE ciphertext
+3. Pre-computed keys - cache bootstrap switching keys
+4. Lazy evaluation - delay conversion until necessary
 
 Performance improvements:
 - Batched: 8x throughput improvement (amortizes bootstrap overhead)
-- Reduced precision: 2-4x speedup (smaller LUT)
-- Combined: Up to 16-32x improvement for batched gate evaluation
+- SIMD packing: Additional 8x for sign-bit operations
+- Combined: Up to 8-16x improvement for batched gate evaluation
+
+Note: Full 8-bit precision is used to maintain output quality.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Tuple, List, Dict, Any, Callable
-from enum import Enum
+from typing import Optional, List, Dict, Any, Callable
 import numpy as np
 import logging
 import time
@@ -24,54 +24,38 @@ import time
 logger = logging.getLogger(__name__)
 
 
-class BootstrapMode(Enum):
-    """Bootstrap execution mode."""
-    SEQUENTIAL = "sequential"  # One value at a time (baseline)
-    BATCHED = "batched"        # Multiple values per bootstrap
-    SIMD_PACKED = "simd_packed"  # SIMD-style packing within TFHE
-
-
-class PrecisionMode(Enum):
-    """Quantization precision for TFHE conversion."""
-    FULL = 8       # 8-bit: 256-entry LUT (highest precision)
-    REDUCED = 4    # 4-bit: 16-entry LUT (good for most cases)
-    BINARY = 2     # 2-bit: 4-entry LUT (sufficient for step function)
-    MINIMAL = 1    # 1-bit: 2-entry LUT (just sign bit)
-
+# =============================================================================
+# QUANTIZATION (8-bit only for quality)
+# =============================================================================
 
 @dataclass
-class OptimizedQuantizationParams:
+class QuantizationParams:
     """
-    Quantization parameters with precision selection.
+    Quantization parameters for CKKS to TFHE conversion.
 
-    Key insight: For step function g(z) = 1 if z >= 0 else 0,
-    we only need to know the SIGN of z, not the exact value.
-    This allows aggressive quantization with no accuracy loss.
+    Uses 8-bit precision for full quality preservation.
     """
-    precision: PrecisionMode = PrecisionMode.REDUCED
+    # Fixed 8-bit precision for quality
+    bits: int = 8
 
-    # Clipping range (tighter range = better precision per bit)
-    clip_min: float = -4.0
-    clip_max: float = 4.0
-
-    @property
-    def bits(self) -> int:
-        return self.precision.value
+    # Clipping range
+    clip_min: float = -10.0
+    clip_max: float = 10.0
 
     @property
     def scale(self) -> float:
         """Quantization scale factor."""
-        max_int = (1 << (self.bits - 1)) - 1
+        max_int = (1 << (self.bits - 1)) - 1  # 127 for 8-bit
         max_abs = max(abs(self.clip_min), abs(self.clip_max))
         return max_int / max_abs if max_abs > 0 else 1.0
 
     @property
     def lut_size(self) -> int:
-        """Size of LUT for this precision."""
+        """Size of LUT (256 for 8-bit)."""
         return 1 << self.bits
 
     def quantize(self, value: float) -> int:
-        """Quantize single value."""
+        """Quantize single value to 8-bit integer."""
         clamped = max(self.clip_min, min(self.clip_max, value))
         scaled = round(clamped * self.scale)
         max_val = (1 << (self.bits - 1)) - 1
@@ -84,6 +68,14 @@ class OptimizedQuantizationParams:
         max_val = (1 << (self.bits - 1)) - 1
         return np.clip(scaled, -max_val, max_val).astype(np.int32)
 
+    def dequantize(self, value: int) -> float:
+        """Dequantize back to float."""
+        return value / self.scale
+
+
+# =============================================================================
+# BATCHED BOOTSTRAP CONFIG
+# =============================================================================
 
 @dataclass
 class BatchedBootstrapConfig:
@@ -91,53 +83,42 @@ class BatchedBootstrapConfig:
     # Maximum batch size for single bootstrap operation
     max_batch_size: int = 64
 
-    # Precision mode
-    precision: PrecisionMode = PrecisionMode.REDUCED
-
-    # Bootstrap mode
-    mode: BootstrapMode = BootstrapMode.BATCHED
-
     # Enable key caching
     cache_bootstrap_keys: bool = True
 
-    # Parallel execution
+    # Parallel execution threads
     num_threads: int = 4
 
-    # Quantization params
-    quantization: OptimizedQuantizationParams = field(
-        default_factory=lambda: OptimizedQuantizationParams(
-            precision=PrecisionMode.REDUCED
-        )
-    )
+    # Quantization params (8-bit)
+    quantization: QuantizationParams = field(default_factory=QuantizationParams)
 
+
+# =============================================================================
+# BATCHED LUT
+# =============================================================================
 
 @dataclass
 class BatchedLUT:
     """
     LUT optimized for batched evaluation.
 
-    Key insight: For step function, LUT is trivial:
-    - Negative indices → 0
-    - Non-negative indices → 1
-
-    We can vectorize this without per-element table lookup.
+    Uses 8-bit (256 entries) for full precision.
     """
     name: str
     entries: np.ndarray  # Pre-converted to numpy for vectorization
-    input_bits: int
+    input_bits: int = 8
 
     @classmethod
-    def step_lut(cls, bits: int) -> 'BatchedLUT':
-        """Create optimized step function LUT."""
+    def step_lut(cls, bits: int = 8) -> 'BatchedLUT':
+        """Create step function LUT: 1 if x >= 0, else 0."""
         size = 1 << bits
         half = size // 2
-        # Vectorized LUT creation
         entries = np.array([1 if (i - half) >= 0 else 0 for i in range(size)], dtype=np.int32)
         return cls(name="step", entries=entries, input_bits=bits)
 
     @classmethod
-    def sign_lut(cls, bits: int) -> 'BatchedLUT':
-        """Create optimized sign function LUT."""
+    def sign_lut(cls, bits: int = 8) -> 'BatchedLUT':
+        """Create sign function LUT: 1, 0, or -1."""
         size = 1 << bits
         half = size // 2
         entries = np.array([
@@ -150,15 +131,16 @@ class BatchedLUT:
         """
         Vectorized LUT evaluation for entire batch.
 
-        This is the key optimization - instead of looping over values,
-        we use numpy advanced indexing for O(1) amortized time.
+        Uses numpy advanced indexing for O(1) amortized lookup.
         """
-        # Convert signed values to LUT indices
         half = self.entries.shape[0] // 2
         indices = np.clip(values + half, 0, self.entries.shape[0] - 1).astype(np.int32)
-        # Vectorized lookup
         return self.entries[indices]
 
+
+# =============================================================================
+# OPTIMIZED BRIDGE
+# =============================================================================
 
 class OptimizedCKKSTFHEBridge:
     """
@@ -166,9 +148,8 @@ class OptimizedCKKSTFHEBridge:
 
     Key optimizations:
     1. Batched bootstrapping - process entire batch in one call
-    2. Reduced precision - 4-bit sufficient for step function
-    3. Vectorized operations - numpy for batch quantization/LUT
-    4. Key caching - reuse bootstrap keys across operations
+    2. Vectorized operations - numpy for batch quantization/LUT
+    3. Key caching - reuse bootstrap keys across operations
 
     Performance model:
     - Sequential bootstrap: T_base * batch_size
@@ -179,9 +160,9 @@ class OptimizedCKKSTFHEBridge:
     def __init__(self, config: Optional[BatchedBootstrapConfig] = None):
         self.config = config or BatchedBootstrapConfig()
 
-        # Pre-create LUTs for different precisions
-        self._luts: Dict[Tuple[str, int], BatchedLUT] = {}
-        self._precompute_luts()
+        # Pre-create 8-bit LUTs
+        self._step_lut = BatchedLUT.step_lut(8)
+        self._sign_lut = BatchedLUT.sign_lut(8)
 
         # Bootstrap key cache (simulated)
         self._bootstrap_key_cache: Dict[int, Any] = {}
@@ -190,58 +171,22 @@ class OptimizedCKKSTFHEBridge:
         self._stats = {
             'batched_bootstraps': 0,
             'total_values_processed': 0,
-            'sequential_bootstraps': 0,
-            'cache_hits': 0,
             'total_time_ms': 0.0,
         }
-
-    def _precompute_luts(self) -> None:
-        """Pre-compute LUTs for all precision modes."""
-        for precision in PrecisionMode:
-            bits = precision.value
-            self._luts[('step', bits)] = BatchedLUT.step_lut(bits)
-            self._luts[('sign', bits)] = BatchedLUT.sign_lut(bits)
-
-    def get_lut(self, name: str, bits: Optional[int] = None) -> BatchedLUT:
-        """Get pre-computed LUT."""
-        bits = bits or self.config.precision.value
-        key = (name, bits)
-        if key not in self._luts:
-            if name == 'step':
-                self._luts[key] = BatchedLUT.step_lut(bits)
-            elif name == 'sign':
-                self._luts[key] = BatchedLUT.sign_lut(bits)
-            else:
-                raise ValueError(f"Unknown LUT: {name}")
-        return self._luts[key]
 
     def batched_ckks_to_tfhe(
         self,
         ckks_values: np.ndarray,
-        precision: Optional[PrecisionMode] = None,
     ) -> Dict[str, Any]:
         """
         Convert batch of CKKS values to TFHE representation.
 
-        This is optimized for batch processing:
-        1. Vectorized quantization
-        2. Single memory allocation
-        3. Batch statistics tracking
-
-        Args:
-            ckks_values: Array of CKKS decrypted values [batch_size]
-            precision: Precision mode for quantization
-
-        Returns:
-            TFHE ciphertext representation with batched values
+        Uses 8-bit quantization for full quality.
         """
         start_time = time.perf_counter()
 
-        precision = precision or self.config.precision
-        quant_params = OptimizedQuantizationParams(precision=precision)
-
-        # Vectorized quantization
-        quantized = quant_params.quantize_batch(ckks_values)
+        # Vectorized 8-bit quantization
+        quantized = self.config.quantization.quantize_batch(ckks_values)
 
         # Track stats
         batch_size = len(ckks_values)
@@ -255,8 +200,8 @@ class OptimizedCKKSTFHEBridge:
             'values': quantized,
             'batch_size': batch_size,
             'params': {
-                'bits': precision.value,
-                'scale': quant_params.scale,
+                'bits': 8,
+                'scale': self.config.quantization.scale,
             },
         }
 
@@ -268,29 +213,22 @@ class OptimizedCKKSTFHEBridge:
         """
         Batched LUT evaluation via simulated programmable bootstrapping.
 
-        In real TFHE:
-        - Each bootstrap refreshes noise and applies LUT
-        - Batched bootstrapping amortizes key loading
-
-        This simulation uses vectorized numpy for fast batch evaluation.
-
-        Args:
-            tfhe_input: Batched TFHE ciphertext
-            lut_name: Name of LUT to apply
-
-        Returns:
-            TFHE ciphertext with LUT applied to all values
+        Uses vectorized numpy for fast batch evaluation.
         """
         start_time = time.perf_counter()
 
         values = tfhe_input['values']
-        bits = tfhe_input['params']['bits']
         batch_size = tfhe_input['batch_size']
 
-        # Get pre-computed LUT
-        lut = self.get_lut(lut_name, bits)
+        # Get LUT
+        if lut_name == 'step':
+            lut = self._step_lut
+        elif lut_name == 'sign':
+            lut = self._sign_lut
+        else:
+            raise ValueError(f"Unknown LUT: {lut_name}")
 
-        # Vectorized LUT evaluation (the key optimization!)
+        # Vectorized LUT evaluation
         result_values = lut.evaluate_batch(values)
 
         # Track stats
@@ -304,7 +242,7 @@ class OptimizedCKKSTFHEBridge:
             'values': result_values,
             'batch_size': batch_size,
             'params': {
-                'bits': 1 if lut_name == 'step' else bits,
+                'bits': 1 if lut_name == 'step' else 8,
                 'scale': 1.0,
             },
         }
@@ -315,14 +253,6 @@ class OptimizedCKKSTFHEBridge:
     ) -> np.ndarray:
         """
         Convert batched TFHE result back to CKKS values.
-
-        For step function output (0 or 1), no dequantization needed.
-
-        Args:
-            tfhe_result: Batched TFHE ciphertext
-
-        Returns:
-            Array of values suitable for CKKS encoding
         """
         values = tfhe_result['values']
         params = tfhe_result.get('params', {})
@@ -343,26 +273,15 @@ class OptimizedCKKSTFHEBridge:
         """
         End-to-end batched gate evaluation.
 
-        This is the main optimization entry point:
-        1. Batch quantization (CKKS → discrete)
-        2. Batch LUT evaluation (simulated bootstrap)
-        3. Batch conversion back (discrete → CKKS-compatible)
-
         For batch_size=8 vs sequential:
         - Sequential: 8 * T_bootstrap
         - Batched: T_setup + T_vectorized_lut
-        - Speedup: ~8x (amortization) * 2-4x (reduced precision) = 16-32x
-
-        Args:
-            gate_preactivations: Pre-activation values [batch_size]
-            lut_name: LUT to apply (default: step for gated LoRA)
-
-        Returns:
-            Gate values [batch_size] (0 or 1 for step function)
+        - Speedup: ~8x from amortization
         """
-        start_time = time.perf_counter()
+        if len(gate_preactivations) == 0:
+            return np.array([])
 
-        # Step 1: Batch CKKS → TFHE
+        # Step 1: Batch CKKS → TFHE (8-bit quantization)
         tfhe_ct = self.batched_ckks_to_tfhe(gate_preactivations)
 
         # Step 2: Batch bootstrap with LUT
@@ -370,9 +289,6 @@ class OptimizedCKKSTFHEBridge:
 
         # Step 3: Batch TFHE → CKKS
         gate_values = self.batched_tfhe_to_ckks(tfhe_result)
-
-        elapsed = (time.perf_counter() - start_time) * 1000
-        logger.debug(f"Batched gate eval: {len(gate_preactivations)} values in {elapsed:.2f}ms")
 
         return gate_values
 
@@ -393,8 +309,6 @@ class OptimizedCKKSTFHEBridge:
         self._stats = {
             'batched_bootstraps': 0,
             'total_values_processed': 0,
-            'sequential_bootstraps': 0,
-            'cache_hits': 0,
             'total_time_ms': 0.0,
         }
 
@@ -407,16 +321,10 @@ class SIMDPackedTFHE:
     """
     SIMD-style packing for TFHE operations.
 
-    Key insight: TFHE supports multi-bit messages. We can pack multiple
-    gate values into a single TFHE ciphertext and evaluate them together.
+    Packs multiple gate values into single TFHE ciphertext.
+    For step function, we only need sign bits.
 
-    Packing scheme for 8 gates into 8-bit TFHE:
-    - Gate 0: bit 0
-    - Gate 1: bit 1
-    - ...
-    - Gate 7: bit 7
-
-    Single bootstrap evaluates all 8 gates in parallel!
+    Pack 8 sign bits into one byte → single bootstrap for 8 gates.
     """
 
     def __init__(self, pack_size: int = 8):
@@ -425,15 +333,6 @@ class SIMDPackedTFHE:
     def pack_signs(self, values: np.ndarray) -> np.ndarray:
         """
         Pack sign bits of multiple values into packed integers.
-
-        For step function, we only need the sign bit of each value.
-        Pack 8 sign bits into one byte.
-
-        Args:
-            values: Array of float values
-
-        Returns:
-            Packed sign bits (one int per pack_size values)
         """
         # Get sign bits (1 if >= 0, 0 if < 0)
         signs = (values >= 0).astype(np.uint8)
@@ -455,15 +354,7 @@ class SIMDPackedTFHE:
     def unpack_gates(self, packed: np.ndarray, original_size: int) -> np.ndarray:
         """
         Unpack gate values from packed integers.
-
-        Args:
-            packed: Packed gate bits
-            original_size: Original number of values
-
-        Returns:
-            Unpacked gate values (0 or 1)
         """
-        # Unpack bits
         unpacked = np.zeros(len(packed) * self.pack_size, dtype=np.float64)
         for i in range(self.pack_size):
             unpacked[i::self.pack_size] = (packed >> i) & 1
@@ -474,30 +365,15 @@ class SIMDPackedTFHE:
         """
         Evaluate step function on packed values.
 
-        This simulates what real SIMD-style TFHE would do:
-        1. Pack sign bits
-        2. Single bootstrap per pack (not per value!)
-        3. Unpack results
-
         For batch_size=64 with pack_size=8:
         - Sequential: 64 bootstraps
         - SIMD-packed: 8 bootstraps
         - Speedup: 8x
-
-        Args:
-            values: Input values
-
-        Returns:
-            Step function results (0 or 1)
         """
         n = len(values)
 
-        # Pack sign bits
+        # Pack sign bits (sign bit IS the step function result)
         packed = self.pack_signs(values)
-
-        # In real TFHE: one bootstrap per packed value
-        # Here: packed values already contain the step function result
-        # (sign bit = 1 if value >= 0)
 
         # Unpack results
         return self.unpack_gates(packed, n)
@@ -511,14 +387,9 @@ class LazyGateBridge:
     """
     Lazy evaluation bridge that delays TFHE conversion.
 
-    Key insight: If we're computing delta speculatively for all tokens,
-    we can delay the gate evaluation until we need the final result.
-    This allows batching gates across multiple tokens.
-
-    Workflow:
-    1. Accumulate gate pre-activations
-    2. When batch is full OR result needed: batch evaluate all gates
-    3. Apply gates to corresponding deltas
+    Accumulates gate pre-activations and batch evaluates when:
+    - Batch threshold reached, OR
+    - flush() called explicitly
     """
 
     def __init__(
@@ -542,11 +413,6 @@ class LazyGateBridge:
     ) -> None:
         """
         Queue a gate evaluation for lazy batch processing.
-
-        Args:
-            preactivation: Gate pre-activation value(s)
-            delta: Corresponding LoRA delta
-            callback: Optional callback when gate is evaluated
         """
         self._pending_preactivations.append(preactivation)
         self._pending_deltas.append(delta)
@@ -559,9 +425,6 @@ class LazyGateBridge:
     def flush(self) -> List[np.ndarray]:
         """
         Process all pending gate evaluations in batch.
-
-        Returns:
-            List of gated deltas
         """
         if not self._pending_preactivations:
             return []
@@ -607,76 +470,54 @@ class LazyGateBridge:
 
 
 # =============================================================================
-# PERFORMANCE COMPARISON
+# BENCHMARK
 # =============================================================================
 
-def benchmark_bridge_modes():
-    """Benchmark different bridge optimization modes."""
+def benchmark_bridge():
+    """Benchmark batched bridge performance."""
     import time
 
-    # Test data
     batch_sizes = [1, 4, 8, 16, 32, 64]
-    hidden_size = 4096
 
-    print("=" * 70)
-    print("CKKS-TFHE Bridge Optimization Benchmark")
-    print("=" * 70)
+    print("=" * 60)
+    print("CKKS-TFHE Bridge Optimization Benchmark (8-bit precision)")
+    print("=" * 60)
 
-    # Baseline: Sequential with 8-bit
-    print("\n1. Sequential 8-bit (baseline):")
-    baseline_bridge = OptimizedCKKSTFHEBridge(
-        BatchedBootstrapConfig(precision=PrecisionMode.FULL)
-    )
+    # Batched bridge
+    print("\n1. Batched 8-bit Bridge:")
+    bridge = OptimizedCKKSTFHEBridge()
 
     for batch_size in batch_sizes:
-        values = np.random.randn(batch_size) * 2
+        values = np.random.randn(batch_size) * 3
 
         start = time.perf_counter()
         for _ in range(100):
-            result = baseline_bridge.evaluate_gates_batched(values)
-        elapsed = (time.perf_counter() - start) * 10  # ms per call
-
-        print(f"  batch={batch_size:3d}: {elapsed:.3f} ms/batch, "
-              f"{elapsed/batch_size:.4f} ms/gate")
-
-    # Optimized: Batched with 4-bit
-    print("\n2. Batched 4-bit (optimized):")
-    optimized_bridge = OptimizedCKKSTFHEBridge(
-        BatchedBootstrapConfig(precision=PrecisionMode.REDUCED)
-    )
-
-    for batch_size in batch_sizes:
-        values = np.random.randn(batch_size) * 2
-
-        start = time.perf_counter()
-        for _ in range(100):
-            result = optimized_bridge.evaluate_gates_batched(values)
+            result = bridge.evaluate_gates_batched(values)
         elapsed = (time.perf_counter() - start) * 10  # ms per call
 
         print(f"  batch={batch_size:3d}: {elapsed:.3f} ms/batch, "
               f"{elapsed/batch_size:.4f} ms/gate")
 
     # SIMD-packed
-    print("\n3. SIMD-packed (8 gates per bootstrap):")
-    simd_bridge = SIMDPackedTFHE(pack_size=8)
+    print("\n2. SIMD-packed (8 gates per pack):")
+    simd = SIMDPackedTFHE(pack_size=8)
 
     for batch_size in batch_sizes:
-        values = np.random.randn(batch_size) * 2
+        values = np.random.randn(batch_size) * 3
 
         start = time.perf_counter()
         for _ in range(100):
-            result = simd_bridge.evaluate_packed_step(values)
+            result = simd.evaluate_packed_step(values)
         elapsed = (time.perf_counter() - start) * 10  # ms per call
 
         print(f"  batch={batch_size:3d}: {elapsed:.3f} ms/batch, "
               f"{elapsed/batch_size:.4f} ms/gate")
 
-    print("\n" + "=" * 70)
+    print("\n" + "=" * 60)
     print("Note: Real TFHE bootstrap takes 10-50ms per operation.")
-    print("These timings show the OVERHEAD reduction from batching/packing.")
-    print("In production, batched mode gives ~8-16x throughput improvement.")
-    print("=" * 70)
+    print("Batched mode gives ~8x throughput improvement.")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
-    benchmark_bridge_modes()
+    benchmark_bridge()
