@@ -84,8 +84,22 @@ class VLLMAdapter(BaseRuntimeAdapter):
             from vllm import LLM, SamplingParams
             from vllm.model_executor.model_loader import get_model
         except ImportError:
-            # Fallback for testing without vLLM
-            logger.warning("vLLM not installed, using mock implementation")
+            # Check execution policy before allowing fallback
+            import os
+            environment = os.getenv("TG_ENVIRONMENT", "development").lower()
+            allow_mock = os.getenv("TG_ALLOW_MOCK_BACKEND", "false").lower() == "true"
+
+            if environment in ("production", "prod") and not allow_mock:
+                raise RuntimeError(
+                    "vLLM is required for production HE-LoRA but not installed. "
+                    "Install vLLM (pip install vllm) or set TG_ALLOW_MOCK_BACKEND=true "
+                    "to explicitly allow mock mode (NOT RECOMMENDED for production)."
+                )
+
+            logger.warning(
+                "vLLM not installed, using mock implementation. "
+                "THIS PROVIDES NO HE PROTECTION - for testing only!"
+            )
             return self._init_mock()
 
         # Initialize vLLM engine
@@ -129,9 +143,17 @@ class VLLMAdapter(BaseRuntimeAdapter):
         return self._metadata
 
     def _init_mock(self) -> ModelMetadata:
-        """Initialize mock for testing without vLLM."""
+        """
+        Initialize mock for testing without vLLM.
+
+        WARNING: This provides NO HE protection. Inputs are processed in
+        plaintext. Only use for testing/development.
+        """
         import torch
         import torch.nn as nn
+
+        # Set flag indicating mock mode
+        self._is_mock = True
 
         # Create a minimal mock model
         class MockAttention(nn.Module):
