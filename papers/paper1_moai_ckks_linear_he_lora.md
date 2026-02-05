@@ -4,7 +4,9 @@
 
 **Abstract**
 
-Low-Rank Adaptation (LoRA) has emerged as the predominant method for efficient fine-tuning of large language models (LLMs). However, deploying LoRA adapters in privacy-sensitive contexts—where adapter weights represent proprietary intellectual property or were trained on confidential data—remains challenging. We present MOAI-CKKS, a novel approach to Homomorphically Encrypted LoRA (HE-LoRA) inference that eliminates the computational bottleneck of ciphertext rotations through MOAI column packing. Our method achieves **7-14ms per-token latency** in production settings, representing a **10-50x speedup** over naive HE implementations. By keeping the frozen base model in plaintext and encrypting only the low-rank adapter computations, we achieve practical encrypted inference with minimal accuracy degradation (max error < 0.19 relative to plaintext). Our benchmarks demonstrate that MOAI-CKKS enables privacy-preserving LoRA inference at scale, opening new possibilities for secure model-as-a-service deployments.
+Low-Rank Adaptation (LoRA) has emerged as the predominant method for efficient fine-tuning of large language models (LLMs). However, deploying LoRA adapters in privacy-sensitive contexts—where adapter weights represent proprietary intellectual property or were trained on confidential data—remains challenging. We present MOAI-CKKS, a novel approach to Homomorphically Encrypted LoRA (HE-LoRA) inference that eliminates the computational bottleneck of ciphertext rotations through MOAI column packing. Our simulation-mode benchmarks demonstrate **zero rotation operations** regardless of matrix dimensions, with estimated production latency of **7-14ms per-token**. We report computational precision errors (max |HE - plaintext| < 0.19), distinct from downstream task accuracy which requires separate evaluation. This paper presents the architectural innovation and computational efficiency gains; full empirical validation including model quality metrics, DP-SGD impact analysis, and comparison with "LoRA Without Regret" baselines represents required future work.
+
+**Keywords:** Homomorphic Encryption, CKKS, LoRA, Privacy-Preserving Machine Learning, Low-Rank Adaptation
 
 ---
 
@@ -30,11 +32,24 @@ The CKKS scheme [2] supports approximate arithmetic on encrypted data, making it
 
 We present **MOAI-CKKS**, a system that achieves practical HE-LoRA inference through three key innovations:
 
-1. **Hybrid Encryption Architecture**: Only LoRA adapter computations run under HE; the frozen base model operates in plaintext, reducing encryption overhead to ~10% of total computation.
+1. **Hybrid Encryption Architecture**: Only LoRA adapter computations run under HE; the frozen base model operates in plaintext, reducing encryption overhead.
 
 2. **MOAI Column Packing**: We adapt the MOAI optimization [3] to eliminate all rotation operations from LoRA matrix multiplication, achieving **O(1) rotations regardless of matrix dimensions**.
 
 3. **Production-Grade Implementation**: Full integration with vLLM inference engine, enabling deployment at scale with OpenAI-compatible APIs.
+
+### 1.4 Scope and Limitations
+
+**This paper addresses:**
+- Computational efficiency of HE-LoRA inference
+- Elimination of rotation bottleneck via MOAI packing
+- CKKS numerical precision (computational error vs plaintext)
+
+**This paper does NOT yet address (future work):**
+- Downstream task accuracy (GSM8K, MMLU, etc.)
+- Impact of DP-SGD training on model quality
+- Comparison with "LoRA Without Regret" baselines
+- End-to-end production benchmarks with real cryptography
 
 ---
 
@@ -62,7 +77,23 @@ y = Wx + α(BAx) = Wx + αΔ(x)
 
 where Δ(x) = BAx is the LoRA delta.
 
-### 2.2 CKKS Homomorphic Encryption
+### 2.2 LoRA Without Regret: Baseline Best Practices
+
+Recent research [7] establishes conditions under which LoRA matches full fine-tuning performance:
+
+| Condition | Requirement |
+|-----------|-------------|
+| Layer Coverage | Applied to **all layers** (attention + MLP) |
+| Capacity | rank × 2 bits/param > dataset information content |
+| Batch Size | < 512 |
+| Learning Rate | 10x full fine-tuning optimal |
+| Training Duration | Sufficient for B matrix to develop |
+
+**Critical finding**: Attention-only LoRA significantly underperforms MLP-only LoRA. Best practice is to apply LoRA to all layers including `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`.
+
+Any HE-LoRA system must be evaluated against these baselines to claim practical utility.
+
+### 2.3 CKKS Homomorphic Encryption
 
 CKKS [2] is a leveled homomorphic encryption scheme supporting approximate arithmetic on encrypted complex vectors. Key parameters include:
 
@@ -78,9 +109,9 @@ CKKS supports three core operations on ciphertexts:
 - **Multiplication**: ct₁ × ct₂ (moderate, ~0.1ms, consumes 1 level)
 - **Rotation**: Rotate(ct, k) (expensive, ~0.5ms)
 
-The rotation operation permutes SIMD slots and is essential for naive matrix multiplication but represents the primary computational bottleneck.
+**Important**: CKKS is an *approximate* scheme. Each operation introduces small numerical errors that accumulate. This is **computational precision error**, distinct from model accuracy on downstream tasks.
 
-### 2.3 The Rotation Problem in HE Matrix Multiplication
+### 2.4 The Rotation Problem in HE Matrix Multiplication
 
 Consider computing y = Wx for W ∈ ℝ^(m×n) and x ∈ ℝ^n under encryption.
 
@@ -228,8 +259,8 @@ def moai_lora_forward(ct_x, A, B, alpha, rank):
 ```
 
 **Operation Count:**
-| Operation | Count | Per-Op Latency | Total |
-|-----------|-------|----------------|-------|
+| Operation | Count | Per-Op Latency (est.) | Total |
+|-----------|-------|----------------------|-------|
 | Encrypt | 1 | 1-2 ms | 1-2 ms |
 | Multiply Plain | k + r | 0.05 ms | (k+r) × 0.05 ms |
 | Add | k + r - 2 | 0.01 ms | negligible |
@@ -320,112 +351,159 @@ Traditional: Load entire W matrix → O(d × k) memory
 MOAI: Stream columns one at a time → O(max(d, k)) memory
 ```
 
-This is critical for large models where LoRA matrices may exceed GPU memory when fully materialized.
-
 ---
 
 ## 5. Experimental Evaluation
 
-### 5.1 Benchmark Configuration
+### 5.1 Experimental Methodology
+
+**IMPORTANT CLARIFICATIONS:**
+
+1. **Simulation Mode**: All benchmarks use simulation mode where CKKS operations are cost-modeled, not executed with real cryptographic backends. This measures algorithmic overhead, not production latency.
+
+2. **Computational Precision vs Model Accuracy**: The "error" metrics measure `max|y_HE - y_plaintext|`, the numerical deviation introduced by CKKS approximation. This is **NOT** downstream task accuracy (GSM8K, MMLU, perplexity).
+
+3. **No DP-SGD in Inference Benchmarks**: These benchmarks measure inference-time HE overhead. DP-SGD affects training, not inference precision.
+
+### 5.2 Benchmark Configuration
 
 | Parameter | Value |
 |-----------|-------|
+| Mode | **Simulation** (cost model, not real crypto) |
 | Hidden Sizes | 512, 1024 |
 | LoRA Ranks | 8, 16, 32 |
 | Iterations | 100 |
 | Warmup | 10 iterations |
-| Hardware | NVIDIA A100 (simulated), Intel Xeon |
+| Metric | Computational latency + numerical precision |
 
-### 5.2 Latency Results
+### 5.3 Latency Results (Simulation Mode)
 
-**Simulation Mode (measures computational overhead):**
+**Simulation Mode (algorithmic overhead only):**
 
-| Hidden Size | LoRA Rank | Mean (μs) | P95 (μs) | Ops/sec | Max Error |
+| Hidden Size | LoRA Rank | Mean (μs) | P95 (μs) | Ops/sec | Rotations |
 |-------------|-----------|-----------|----------|---------|-----------|
-| 512 | 8 | 722.0 | 839.3 | 1,385 | 6.64e-02 |
-| 512 | 16 | 411.1 | 664.0 | 2,432 | 9.09e-02 |
-| 512 | 32 | 362.2 | 402.3 | 2,761 | 1.15e-01 |
-| 1024 | 8 | 729.3 | 1001.3 | 1,371 | 1.13e-01 |
-| 1024 | 16 | 823.6 | 1101.4 | 1,214 | 1.39e-01 |
-| 1024 | 32 | 777.0 | 1034.5 | 1,287 | 1.87e-01 |
+| 512 | 8 | 722.0 | 839.3 | 1,385 | **0** |
+| 512 | 16 | 411.1 | 664.0 | 2,432 | **0** |
+| 512 | 32 | 362.2 | 402.3 | 2,761 | **0** |
+| 1024 | 8 | 729.3 | 1001.3 | 1,371 | **0** |
+| 1024 | 16 | 823.6 | 1101.4 | 1,214 | **0** |
+| 1024 | 32 | 777.0 | 1034.5 | 1,287 | **0** |
 
-**Production Estimates (with cryptographic operations):**
+**Production Latency Estimates (extrapolated from cryptographic library benchmarks):**
 
-| Component | Latency |
-|-----------|---------|
+| Component | Estimated Latency |
+|-----------|------------------|
 | CKKS Encryption | 1-2 ms |
 | HE Computation | 5-10 ms |
 | CKKS Decryption | 1-2 ms |
-| **Total per token** | **7-14 ms** |
+| **Total per token** | **7-14 ms (estimated)** |
 
-### 5.3 Rotation Elimination Verification
+⚠️ **These are estimates, not empirically measured production numbers.**
 
-| Configuration | Naive Rotations | MOAI Rotations | Speedup |
-|---------------|-----------------|----------------|---------|
-| h=512, r=8 | 520 | 0 | ∞ |
-| h=512, r=16 | 528 | 0 | ∞ |
-| h=1024, r=16 | 1040 | 0 | ∞ |
-| h=1024, r=32 | 1056 | 0 | ∞ |
+### 5.4 Rotation Elimination Verification
+
+| Configuration | Naive Rotations | MOAI Rotations | Reduction |
+|---------------|-----------------|----------------|-----------|
+| h=512, r=8 | 520 | 0 | 100% |
+| h=512, r=16 | 528 | 0 | 100% |
+| h=1024, r=16 | 1040 | 0 | 100% |
+| h=1024, r=32 | 1056 | 0 | 100% |
 
 **MOAI achieves zero rotations across all configurations**, eliminating the primary bottleneck in HE matrix multiplication.
 
-### 5.4 Precision Analysis
+### 5.5 Computational Precision Analysis
 
-We measure the maximum absolute error between MOAI-CKKS output and plaintext reference:
+**What This Measures:** Maximum element-wise deviation between HE output and plaintext reference.
 
-```
-Max Error = max|y_he - y_plain| / ||y_plain||
-```
-
-| Configuration | Max Error | Acceptable? |
-|---------------|-----------|-------------|
-| h=512, r=8 | 6.64e-02 | Yes |
-| h=512, r=16 | 9.09e-02 | Yes |
-| h=512, r=32 | 1.15e-01 | Yes |
-| h=1024, r=16 | 1.39e-01 | Yes |
-| h=1024, r=32 | 1.87e-01 | Marginal |
-
-Errors remain within acceptable bounds for most LLM applications. For precision-critical tasks, increasing CKKS scale bits reduces error at the cost of additional levels.
-
-### 5.5 Throughput Scaling
-
-**Tokens per second vs. LoRA rank:**
-
-```
-Rank 8:  ~1,400 tokens/sec (simulation)
-Rank 16: ~2,400 tokens/sec (simulation)
-Rank 32: ~2,700 tokens/sec (simulation)
-
-Production (with crypto): 70-140 tokens/sec
+```python
+# Computation performed:
+ref = scaling * (x @ lora_a.T @ lora_b.T)  # Plaintext reference
+delta = adapter.forward(x, "test")          # HE computation
+error = np.max(np.abs(delta - ref))         # Computational error
 ```
 
-Higher ranks paradoxically show better throughput due to improved SIMD utilization.
+**What This Does NOT Measure:**
+- Task accuracy (GSM8K, MMLU, MT-Bench)
+- Perplexity degradation
+- Generation quality
+- Impact of DP-SGD training noise
+
+| Configuration | Computational Max Error | Note |
+|---------------|------------------------|------|
+| h=512, r=8 | 6.64e-02 | CKKS approximation error |
+| h=512, r=16 | 9.09e-02 | CKKS approximation error |
+| h=512, r=32 | 1.15e-01 | CKKS approximation error |
+| h=1024, r=16 | 1.39e-01 | CKKS approximation error |
+| h=1024, r=32 | 1.87e-01 | CKKS approximation error |
+
+**Interpretation**: These errors represent numerical precision loss from CKKS encoding/computation, not model quality degradation. Whether these errors translate to meaningful accuracy loss on downstream tasks requires separate empirical evaluation.
 
 ---
 
 ## 6. Comparison with Prior Work
 
-### 6.1 Comparison Table
+### 6.1 Computational Efficiency Comparison
 
-| Method | Rotations | Latency | Accuracy | Production Ready |
-|--------|-----------|---------|----------|------------------|
-| Naive CKKS [4] | O(n²) | ~1000 ms | High | No |
-| Diagonal CKKS [5] | O(n) | ~100 ms | High | Marginal |
-| CryptoNets [6] | O(n) | ~50 ms | Medium | No |
-| MOAI-CKKS (Ours) | **O(1)** | **7-14 ms** | High | **Yes** |
+| Method | Rotations | Simulation Latency | Notes |
+|--------|-----------|-------------------|-------|
+| Naive CKKS [4] | O(n²) | ~1000 ms | Impractical |
+| Diagonal CKKS [5] | O(n) | ~100 ms | Linear scaling |
+| CryptoNets [6] | O(n) | ~50 ms | Shallow networks |
+| MOAI-CKKS (Ours) | **O(1)** | ~0.7 ms (sim) | Rotation-free |
 
-### 6.2 Key Differentiators
+### 6.2 What This Comparison Shows
 
-1. **Rotation Elimination**: We are the first to achieve O(1) rotations for LoRA inference
-2. **Hybrid Architecture**: Selective encryption minimizes overhead
-3. **Production Integration**: Full vLLM compatibility with OpenAI API
-4. **Practical Latency**: Sub-15ms enables real-time inference
+✅ **Verified**: MOAI eliminates rotation complexity
+✅ **Verified**: Algorithmic efficiency improvement in simulation
+⚠️ **Not Verified**: End-to-end production latency with real crypto
+⚠️ **Not Verified**: Impact on downstream task accuracy
 
 ---
 
-## 7. Security Analysis
+## 7. Required Future Experiments
 
-### 7.1 Threat Model
+To fully validate MOAI-CKKS for practical deployment, the following experiments are required:
+
+### 7.1 Model Quality Evaluation
+
+| Experiment | Baseline | HE-LoRA | Metric |
+|------------|----------|---------|--------|
+| GSM8K accuracy | Plaintext LoRA | MOAI-CKKS LoRA | Exact match % |
+| MMLU accuracy | Plaintext LoRA | MOAI-CKKS LoRA | Average % |
+| MT-Bench score | Plaintext LoRA | MOAI-CKKS LoRA | 1-10 rating |
+| Perplexity | Plaintext LoRA | MOAI-CKKS LoRA | PPL on held-out |
+
+### 7.2 DP-SGD Impact Analysis
+
+When LoRA is trained with Differential Privacy (DP-SGD):
+
+| Experiment | Configuration | Metric |
+|------------|--------------|--------|
+| Privacy-utility curve | ε ∈ {1, 4, 8, 16, ∞} | Task accuracy vs epsilon |
+| Noise impact | σ ∈ {0.5, 1.0, 2.0} | Final loss, gradient norm |
+| Clipping impact | C ∈ {0.1, 1.0, 10.0} | Convergence speed |
+
+### 7.3 LoRA Without Regret Comparison
+
+| Configuration | Task | Baseline (Full FT) | LoRA (Best Practice) | HE-LoRA |
+|--------------|------|-------------------|---------------------|---------|
+| Rank 16, all layers | GSM8K | X% | Y% | Z% |
+| Rank 32, all layers | MMLU | X% | Y% | Z% |
+| With DP (ε=8) | MT-Bench | X | Y | Z |
+
+### 7.4 Production Benchmarks
+
+| Configuration | Metric | Target |
+|--------------|--------|--------|
+| Real CKKS backend | Per-token latency | < 20ms |
+| GPU acceleration | Throughput | > 50 tok/s |
+| Memory footprint | Peak GPU memory | < 16GB |
+
+---
+
+## 8. Security Analysis
+
+### 8.1 Threat Model
 
 **Protected:**
 - LoRA adapter weights (A, B matrices)
@@ -442,7 +520,7 @@ Higher ranks paradoxically show better throughput due to improved SIMD utilizati
 - Server holds evaluation key, computes on encrypted data
 - Server cannot decrypt without secret key
 
-### 7.2 Security Level
+### 8.2 Security Level
 
 - CKKS parameters provide 128-bit classical security
 - Post-quantum considerations: N = 16,384 provides margin
@@ -450,57 +528,26 @@ Higher ranks paradoxically show better throughput due to improved SIMD utilizati
 
 ---
 
-## 8. Applications
-
-### 8.1 Privacy-Preserving MLaaS
-
-Deploy proprietary LoRA adapters on third-party infrastructure without exposing weights:
-
-```python
-# Client-side
-from tensafe import ServiceClient
-
-client = ServiceClient(api_key="...")
-encrypted_adapter = client.encrypt_lora(my_private_adapter)
-result = client.infer(prompt, encrypted_adapter)
-```
-
-### 8.2 Secure Edge Deployment
-
-Deploy encrypted adapters to untrusted edge devices with attestation:
-
-```python
-# Edge device receives encrypted TSSP package
-package = receive_tssp("adapter.tssp")
-verified = package.verify(fleet_public_key)
-if verified:
-    adapter = package.decrypt_to_gpu(device_private_key)
-```
-
-### 8.3 Model Marketplace
-
-Enable LoRA-as-a-Service where adapter creators sell access without exposing IP:
-
-```
-Creator → Encrypt Adapter → Marketplace → Buyer uses (encrypted)
-                                      ↓
-                         Never decrypts adapter weights
-```
-
----
-
 ## 9. Conclusion
 
-We presented MOAI-CKKS, a practical system for homomorphically encrypted LoRA inference. Through MOAI column packing, we eliminate all rotation operations from CKKS matrix multiplication, achieving 7-14ms per-token latency in production settings. Our hybrid architecture—encrypting only LoRA computations while keeping the base model in plaintext—reduces overhead to ~10% of total computation.
+We presented MOAI-CKKS, a system for homomorphically encrypted LoRA inference that eliminates all rotation operations through column packing. Our simulation benchmarks demonstrate:
 
-MOAI-CKKS enables new deployment paradigms where proprietary LoRA adapters can be used on untrusted infrastructure without exposing intellectual property. The system is production-ready, integrating with vLLM for high-throughput inference with standard APIs.
+1. **Zero rotations** regardless of matrix dimensions
+2. **Sub-millisecond algorithmic latency** in simulation mode
+3. **Computational precision errors < 0.19** (CKKS approximation)
 
-### Future Work
+**Contributions:**
+- First rotation-free HE matrix multiplication for LoRA
+- Practical architecture with vLLM integration
+- Comprehensive cost model for production deployment planning
 
-1. **GPU-native CKKS**: Custom CUDA kernels for further acceleration
-2. **Multi-adapter routing**: Encrypted adapter selection based on input
-3. **Federated LoRA**: Secure aggregation of distributed adapter updates
-4. **Post-quantum migration**: Transition to lattice-based KEM for key exchange
+**Limitations (requiring future work):**
+- No empirical model quality validation (GSM8K, MMLU, etc.)
+- No DP-SGD impact analysis
+- Production latency is estimated, not measured
+- No comparison with "LoRA Without Regret" baselines
+
+We believe MOAI-CKKS provides a strong foundation for privacy-preserving LoRA inference, but rigorous empirical validation on downstream tasks is essential before production deployment.
 
 ---
 
@@ -517,6 +564,8 @@ MOAI-CKKS enables new deployment paradigms where proprietary LoRA adapters can b
 [5] Halevi, S., and Shoup, V. "Algorithms in HElib." CRYPTO 2014.
 
 [6] Microsoft SEAL. https://github.com/microsoft/SEAL
+
+[7] Schulman, J., et al. "LoRA Without Regret." Thinking Machines Lab, 2025.
 
 ---
 
@@ -538,16 +587,26 @@ MOAI-CKKS enables new deployment paradigms where proprietary LoRA adapters can b
 # Install dependencies
 pip install tensafe[he]
 
-# Run canonical benchmark
+# Run canonical benchmark (SIMULATION MODE)
 python scripts/run_canonical_benchmark.py \
   --hidden-sizes 512 1024 \
   --lora-ranks 8 16 32 \
   --iterations 100 \
+  --mode simulation \
   --output benchmark_results.json
+
+# Note: This runs in simulation mode.
+# Production benchmarks with real CKKS require --mode production
+# and appropriate cryptographic backends installed.
 ```
 
-## Appendix C: Code Availability
+## Appendix C: Distinction Between Error Types
 
-The MOAI-CKKS implementation is available at:
-- GitHub: https://github.com/tensafe/he-lora-microkernel
-- Documentation: https://docs.tensafe.io/he-lora
+| Error Type | What It Measures | How Measured | Relevance |
+|------------|-----------------|--------------|-----------|
+| **Computational Precision** | CKKS numerical approximation | `max|y_HE - y_plaintext|` | HE scheme quality |
+| **Model Accuracy** | Task performance | GSM8K exact match, MMLU %, etc. | Practical utility |
+| **DP-SGD Impact** | Privacy-utility tradeoff | Accuracy vs epsilon curve | Privacy compliance |
+| **Inference Quality** | Generation coherence | Human eval, MT-Bench | User experience |
+
+**This paper reports only Computational Precision.** The other error types require separate experiments.
