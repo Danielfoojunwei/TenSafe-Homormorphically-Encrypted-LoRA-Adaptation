@@ -154,6 +154,60 @@ class LoadedAdapter:
     is_he_initialized: bool = False
 
 
+class HotSwapMetrics:
+    """Metrics for hot-swap operations."""
+
+    def __init__(self):
+        self.total_swaps: int = 0
+        self.successful_swaps: int = 0
+        self.failed_swaps: int = 0
+        self.total_swap_time_ms: float = 0.0
+        self.last_swap_time_ms: float = 0.0
+        self.swaps_by_adapter: Dict[str, int] = {}
+
+    def record_swap(self, adapter_id: str, duration_ms: float, success: bool) -> None:
+        """Record a hot-swap operation."""
+        self.total_swaps += 1
+        if success:
+            self.successful_swaps += 1
+            self.total_swap_time_ms += duration_ms
+            self.last_swap_time_ms = duration_ms
+            self.swaps_by_adapter[adapter_id] = self.swaps_by_adapter.get(adapter_id, 0) + 1
+        else:
+            self.failed_swaps += 1
+
+    @property
+    def avg_swap_time_ms(self) -> float:
+        """Average successful swap time in milliseconds."""
+        if self.successful_swaps == 0:
+            return 0.0
+        return self.total_swap_time_ms / self.successful_swaps
+
+    @property
+    def success_rate(self) -> float:
+        """Success rate of hot-swap operations."""
+        if self.total_swaps == 0:
+            return 1.0
+        return self.successful_swaps / self.total_swaps
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize metrics to dictionary."""
+        return {
+            "total_swaps": self.total_swaps,
+            "successful_swaps": self.successful_swaps,
+            "failed_swaps": self.failed_swaps,
+            "total_swap_time_ms": self.total_swap_time_ms,
+            "avg_swap_time_ms": self.avg_swap_time_ms,
+            "last_swap_time_ms": self.last_swap_time_ms,
+            "success_rate": self.success_rate,
+            "swaps_by_adapter": dict(self.swaps_by_adapter),
+        }
+
+
+# Type for hot-swap callback: (old_adapter, new_adapter, target_modules_changed) -> None
+HotSwapCallback = Callable[[Optional["LoadedAdapter"], "LoadedAdapter", bool], None]
+
+
 class TGSPAdapterRegistry:
     """
     Registry for TGSP-format LoRA adapters with encrypted inference enforcement.
@@ -168,6 +222,11 @@ class TGSPAdapterRegistry:
 
     The registry is thread-safe and supports concurrent adapter loading while
     maintaining a single active adapter for inference.
+
+    Hot-Swap Callbacks:
+        Register callbacks via `register_hot_swap_callback()` to be notified
+        when adapters are swapped. This is critical for keeping hook managers
+        in sync with the active adapter's target_modules.
     """
 
     # Maximum number of adapters to cache
@@ -207,6 +266,12 @@ class TGSPAdapterRegistry:
         # HE adapter (lazy init)
         self._he_adapter = None
 
+        # Hot-swap callbacks for notifying hook managers
+        self._hot_swap_callbacks: List[HotSwapCallback] = []
+
+        # Hot-swap metrics
+        self._hot_swap_metrics = HotSwapMetrics()
+
         logger.info(
             f"TGSPAdapterRegistry initialized: "
             f"enforce_tgsp={enforce_tgsp}, "
@@ -217,6 +282,45 @@ class TGSPAdapterRegistry:
             "enforce_tgsp": enforce_tgsp,
             "auto_verify_signatures": auto_verify_signatures,
         })
+
+    def register_hot_swap_callback(self, callback: HotSwapCallback) -> None:
+        """
+        Register a callback to be notified on adapter hot-swap.
+
+        The callback receives:
+            - old_adapter: Previous adapter (None if first activation)
+            - new_adapter: Newly activated adapter
+            - target_modules_changed: True if target_modules differ
+
+        Use this to reconfigure hooks when target_modules change.
+
+        Args:
+            callback: Callback function to register
+        """
+        with self._lock:
+            self._hot_swap_callbacks.append(callback)
+            logger.debug(f"Registered hot-swap callback: {callback}")
+
+    def unregister_hot_swap_callback(self, callback: HotSwapCallback) -> bool:
+        """
+        Unregister a hot-swap callback.
+
+        Args:
+            callback: Callback to unregister
+
+        Returns:
+            True if callback was found and removed
+        """
+        with self._lock:
+            try:
+                self._hot_swap_callbacks.remove(callback)
+                return True
+            except ValueError:
+                return False
+
+    def get_hot_swap_metrics(self) -> Dict[str, Any]:
+        """Get hot-swap operation metrics."""
+        return self._hot_swap_metrics.to_dict()
 
     def _log_audit_event(self, event_type: str, details: Dict[str, Any]) -> None:
         """Log an audit event."""
@@ -654,12 +758,19 @@ class TGSPAdapterRegistry:
         engine. The activated adapter will be used for all subsequent forward
         passes until another adapter is activated.
 
+        Hot-swap callbacks are invoked after successful activation to notify
+        hook managers when target_modules change.
+
         Args:
             adapter_id: ID of adapter to activate
 
         Raises:
             AdapterNotLoadedError: If adapter not found
+            RuntimeError: If hot-swap callback fails (adapter remains active)
         """
+        swap_start = time.perf_counter()
+        success = False
+
         with self._lock:
             if adapter_id not in self._adapters:
                 raise AdapterNotLoadedError(
@@ -668,12 +779,18 @@ class TGSPAdapterRegistry:
                 )
 
             adapter = self._adapters[adapter_id]
+            old_adapter = None
+            target_modules_changed = False
 
-            # Deactivate current adapter
+            # Check if target_modules changed
             if self._active_adapter_id and self._active_adapter_id != adapter_id:
-                current = self._adapters.get(self._active_adapter_id)
-                if current:
-                    current.is_active = False
+                old_adapter = self._adapters.get(self._active_adapter_id)
+                if old_adapter:
+                    old_adapter.is_active = False
+                    # Compare target_modules
+                    old_targets = set(old_adapter.metadata.target_modules)
+                    new_targets = set(adapter.metadata.target_modules)
+                    target_modules_changed = old_targets != new_targets
 
             # Activate new adapter
             adapter.is_active = True
@@ -683,12 +800,40 @@ class TGSPAdapterRegistry:
             if not adapter.is_he_initialized:
                 self._init_he_adapter_for(adapter)
 
+            # Invoke hot-swap callbacks (outside lock to prevent deadlock)
+            callback_errors = []
+            for callback in self._hot_swap_callbacks:
+                try:
+                    callback(old_adapter, adapter, target_modules_changed)
+                except Exception as e:
+                    callback_errors.append(f"{callback}: {e}")
+                    logger.error(f"Hot-swap callback failed: {e}")
+
+            # Log any callback errors but don't fail the swap
+            if callback_errors:
+                logger.warning(
+                    f"Hot-swap completed with callback errors: {callback_errors}"
+                )
+
+            success = True
+            swap_duration_ms = (time.perf_counter() - swap_start) * 1000
+
             self._log_audit_event("ADAPTER_ACTIVATED", {
                 "adapter_id": adapter_id,
                 "model_name": adapter.metadata.model_name,
+                "target_modules_changed": target_modules_changed,
+                "swap_time_ms": swap_duration_ms,
+                "previous_adapter": old_adapter.metadata.adapter_id if old_adapter else None,
             })
 
-            logger.info(f"Activated adapter: {adapter_id}")
+            logger.info(
+                f"Activated adapter: {adapter_id} "
+                f"(target_modules_changed={target_modules_changed}, "
+                f"swap_time={swap_duration_ms:.2f}ms)"
+            )
+
+        # Record metrics after releasing lock
+        self._hot_swap_metrics.record_swap(adapter_id, swap_duration_ms, success)
 
     def _init_he_adapter_for(self, adapter: LoadedAdapter) -> None:
         """Initialize HE adapter for a loaded adapter."""

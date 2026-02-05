@@ -229,33 +229,98 @@ class VLLMAdapter(BaseRuntimeAdapter):
     # -------------------------------------------------------------------------
 
     def set_insertion_config(self, config: InsertionConfig) -> None:
-        """Configure insertion points and install hooks."""
+        """
+        Configure insertion points and install hooks atomically.
+
+        This method implements atomic hook reconfiguration with rollback
+        on failure to ensure the system is never left in an inconsistent state.
+
+        Args:
+            config: New insertion configuration
+
+        Raises:
+            ValueError: If configuration is invalid
+            RuntimeError: If hook installation fails (previous config restored)
+        """
         super().set_insertion_config(config)
 
-        # Remove existing hooks
-        if self._hooks:
-            remove_hooks(self._hooks)
-            self._hooks.clear()
+        # Save current state for rollback
+        old_hooks = self._hooks.copy() if self._hooks else {}
+        old_config = self._insertion_config
 
-        # Determine which layers to hook
-        layer_indices = self.get_patched_layers()
+        try:
+            # Remove existing hooks
+            if self._hooks:
+                remove_hooks(self._hooks)
+                self._hooks.clear()
 
-        # Determine projections
-        if config.targets == LoRATargets.QKV:
-            projections = ['q', 'k', 'v']
-        else:
-            projections = ['q', 'k', 'v', 'o']
+            # Determine which layers to hook
+            layer_indices = self.get_patched_layers()
 
-        # Create and install hooks
-        self._hooks = create_projection_hooks(
-            model=self._model,
-            layer_indices=layer_indices,
-            projections=projections,
-            delta_callback=self._delta_callback,
+            # Determine projections based on config
+            if config.targets == LoRATargets.QKV:
+                projections = ['q', 'k', 'v']
+            else:
+                projections = ['q', 'k', 'v', 'o']
+
+            # Create and install new hooks
+            new_hooks = create_projection_hooks(
+                model=self._model,
+                layer_indices=layer_indices,
+                projections=projections,
+                delta_callback=self._delta_callback,
+            )
+            install_hooks(new_hooks)
+
+            # Success - update state
+            self._hooks = new_hooks
+            logger.info(f"Installed {len(self._hooks)} hooks on layers {layer_indices}")
+
+        except Exception as e:
+            # Rollback on failure
+            logger.error(f"Hook installation failed, rolling back: {e}")
+
+            # Restore old hooks
+            if old_hooks:
+                try:
+                    install_hooks(old_hooks)
+                    self._hooks = old_hooks
+                    self._insertion_config = old_config
+                    logger.info("Rolled back to previous hook configuration")
+                except Exception as rollback_error:
+                    logger.critical(
+                        f"Rollback also failed: {rollback_error}. "
+                        f"System may be in inconsistent state!"
+                    )
+
+            raise RuntimeError(f"Failed to install hooks: {e}") from e
+
+    def reconfigure_for_adapter(
+        self,
+        target_modules: List[str],
+        layer_indices: Optional[List[int]] = None,
+    ) -> None:
+        """
+        Reconfigure hooks for a new adapter's target modules.
+
+        This is the method to call from a hot-swap callback when the
+        active adapter's target_modules change.
+
+        Args:
+            target_modules: New adapter's target modules (e.g., ["q_proj", "k_proj"])
+            layer_indices: Optional layer indices (None = all layers)
+        """
+        # Determine targets based on module names
+        has_output = any("o_proj" in m for m in target_modules)
+        targets = LoRATargets.QKVO if has_output else LoRATargets.QKV
+
+        config = InsertionConfig(
+            targets=targets,
+            layers=layer_indices,
         )
-        install_hooks(self._hooks)
 
-        logger.info(f"Installed {len(self._hooks)} hooks on layers {layer_indices}")
+        self.set_insertion_config(config)
+        logger.info(f"Reconfigured hooks for target_modules: {target_modules}")
 
     def set_delta_callback(self, callback: DeltaCallback) -> None:
         """Set delta callback."""
