@@ -54,6 +54,15 @@ from .scaling import (
     RSLoRAScaling,
     StandardLoRAScaling,
 )
+from .synthetic_batching import (
+    SyntheticBatchExecutor,
+    SpeculativeHEBatcher,
+    LookaheadHEBatcher,
+    HybridSyntheticBatcher,
+    HEBatchConfig,
+    SpeculationStrategy,
+    analyze_synthetic_batching_performance,
+)
 
 __all__ = [
     # Config
@@ -84,6 +93,14 @@ __all__ = [
     "compute_lora_scaling",
     "RSLoRAScaling",
     "StandardLoRAScaling",
+    # Synthetic Batching
+    "SyntheticBatchExecutor",
+    "SpeculativeHEBatcher",
+    "LookaheadHEBatcher",
+    "HybridSyntheticBatcher",
+    "HEBatchConfig",
+    "SpeculationStrategy",
+    "analyze_synthetic_batching_performance",
 ]
 
 __version__ = "1.0.0"
