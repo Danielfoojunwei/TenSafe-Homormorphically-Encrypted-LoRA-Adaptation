@@ -20,7 +20,8 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from fastapi import HTTPException, Request, Response, status
-from jose import jwt, JWTError
+import jwt
+from jwt.exceptions import PyJWTError as JWTError
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)

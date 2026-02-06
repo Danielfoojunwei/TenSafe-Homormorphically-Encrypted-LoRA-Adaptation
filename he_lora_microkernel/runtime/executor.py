@@ -17,8 +17,12 @@ through the compiled HE-LoRA microkernel.
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List, Tuple, Callable
 from enum import Enum
+import logging
+import threading
 import time
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from ..compiler import (
     ExecutionSchedule,
@@ -145,8 +149,16 @@ class HELoRAExecutor:
                   else ExecutionMode.PRODUCTION),
         )
 
+        # Thread-safe lock for counter updates
+        self._stats_lock = threading.Lock()
+
         # Weight plaintexts (loaded later)
         self._weights_loaded = False
+
+        logger.debug(
+            f"HELoRAExecutor initialized: backend={backend_type.value}, "
+            f"device={device_id}, batch_size={schedule.config.batch_size}"
+        )
 
     @property
     def schedule(self) -> ExecutionSchedule:
@@ -442,10 +454,11 @@ class HELoRAExecutor:
         # Step 6: Unpack
         delta = unpack_activations(packed_delta, layout)
 
-        # End token tracking
+        # End token tracking (thread-safe counter updates)
         elapsed_ms = (time.perf_counter() - start_time) * 1000
-        self._context.total_he_time_ms += elapsed_ms
-        self._context.tokens_processed += 1
+        with self._stats_lock:
+            self._context.total_he_time_ms += elapsed_ms
+            self._context.tokens_processed += 1
         self._context.cost_tracker.end_token(config.targets)
 
         return delta
@@ -496,8 +509,9 @@ class HELoRAExecutor:
         self._context.cost_tracker.record_decrypt()
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
-        self._context.total_he_time_ms += elapsed_ms
-        self._context.tokens_processed += 1
+        with self._stats_lock:
+            self._context.total_he_time_ms += elapsed_ms
+            self._context.tokens_processed += 1
         self._context.cost_tracker.end_token(config.targets)
 
         return y_base
@@ -562,6 +576,10 @@ class LoRAAdapterExecutor:
 
     This manages separate executors for each adapter and coordinates
     their execution for a complete attention layer.
+
+    All adapters share a single HE backend instance to avoid duplicating
+    key material (~100MB per backend). The shared backend is created once
+    and injected into each per-adapter executor.
     """
 
     def __init__(
@@ -580,12 +598,22 @@ class LoRAAdapterExecutor:
             device_id: GPU device ID
             budget: Cost budget
         """
+        # Create a single shared backend from the first schedule's params
+        first_schedule = next(iter(schedules.values()))
+        self._shared_backend = create_backend(
+            backend_type, first_schedule.ckks_params, device_id
+        )
+
         self._executors: Dict[str, HELoRAExecutor] = {}
 
         for name, schedule in schedules.items():
-            self._executors[name] = HELoRAExecutor(
+            executor = HELoRAExecutor(
                 schedule, backend_type, device_id, budget
             )
+            # Replace each executor's backend with the shared instance
+            executor._backend = self._shared_backend
+            executor._context.backend = self._shared_backend
+            self._executors[name] = executor
 
         self._adapter_names = list(schedules.keys())
 

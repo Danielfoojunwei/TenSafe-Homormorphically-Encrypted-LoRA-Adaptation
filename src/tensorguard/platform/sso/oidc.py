@@ -28,8 +28,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlencode, urlparse
 
 import httpx
-from jose import JWTError, jwt
-from jose.exceptions import JWKError
+import jwt
+from jwt import PyJWK
+from jwt.exceptions import PyJWTError as JWTError, InvalidKeyError as JWKError
 
 from .models import OIDCConfig, SSOSession, SSOUser, SSOProviderType
 
@@ -418,10 +419,13 @@ class OIDCClient:
                 else:
                     raise OIDCError("invalid_token", "No matching key found in JWKS")
 
+            # Convert JWK dict to a key object for PyJWT
+            jwk_key = PyJWK(key)
+
             # Validate and decode token
             claims = jwt.decode(
                 id_token,
-                key,
+                jwk_key.key,
                 algorithms=[alg],
                 audience=self.config.client_id,
                 issuer=self.config.issuer,

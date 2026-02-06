@@ -326,7 +326,8 @@ async def refresh_token(
     """
     Refresh access token using refresh token.
     """
-    from jose import JWTError, jwt
+    import jwt
+    from jwt.exceptions import PyJWTError as JWTError
     from .auth import SECRET_KEY, ALGORITHM, TOKEN_AUDIENCE, TOKEN_ISSUER
 
     try:

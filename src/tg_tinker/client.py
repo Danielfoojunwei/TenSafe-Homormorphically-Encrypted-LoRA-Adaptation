@@ -5,10 +5,58 @@ This module provides the ServiceClient class, the primary entry point
 for interacting with the TG-Tinker API.
 """
 
+import logging
 import time
 from typing import Any, Dict, List, Optional
 
 import httpx
+
+logger = logging.getLogger(__name__)
+
+
+class CircuitBreaker:
+    """Simple circuit breaker for service resilience.
+
+    Transitions:
+        CLOSED -> OPEN (after failure_threshold consecutive failures)
+        OPEN -> HALF_OPEN (after recovery_timeout seconds)
+        HALF_OPEN -> CLOSED (on success) or OPEN (on failure)
+    """
+
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
+
+    def __init__(self, failure_threshold: int = 5, recovery_timeout: float = 30.0):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self._state = self.CLOSED
+        self._failure_count = 0
+        self._last_failure_time = 0.0
+
+    @property
+    def state(self) -> str:
+        if self._state == self.OPEN:
+            if time.time() - self._last_failure_time >= self.recovery_timeout:
+                self._state = self.HALF_OPEN
+        return self._state
+
+    def record_success(self) -> None:
+        self._failure_count = 0
+        self._state = self.CLOSED
+
+    def record_failure(self) -> None:
+        self._failure_count += 1
+        self._last_failure_time = time.time()
+        if self._failure_count >= self.failure_threshold:
+            self._state = self.OPEN
+            logger.warning(
+                f"Circuit breaker OPEN after {self._failure_count} failures. "
+                f"Will retry after {self.recovery_timeout}s."
+            )
+
+    def allow_request(self) -> bool:
+        return self.state != self.OPEN
 
 from .config import get_config, validate_api_key
 from .exceptions import (
@@ -106,6 +154,12 @@ class ServiceClient:
                 "Content-Type": "application/json",
                 "User-Agent": "tg-tinker-sdk/1.0.0",
             },
+        )
+
+        # Circuit breaker for resilience
+        self._circuit_breaker = CircuitBreaker(
+            failure_threshold=5,
+            recovery_timeout=30.0,
         )
 
     def __enter__(self) -> "ServiceClient":
@@ -368,6 +422,13 @@ class ServiceClient:
         Raises:
             Various TGTinkerError subclasses based on response status
         """
+        # Check circuit breaker before attempting
+        if not self._circuit_breaker.allow_request():
+            raise ServerError(
+                "Service unavailable: circuit breaker is open",
+                details={"circuit_breaker_state": self._circuit_breaker.state},
+            )
+
         last_error = None
 
         for attempt in range(self._config.retry_count + 1):
@@ -380,10 +441,12 @@ class ServiceClient:
                 )
 
                 self._check_response(response)
+                self._circuit_breaker.record_success()
                 return response.json()
 
             except (httpx.TimeoutException, httpx.ConnectError) as e:
                 last_error = e
+                self._circuit_breaker.record_failure()
                 if attempt < self._config.retry_count:
                     backoff = self._config.retry_backoff * (2**attempt)
                     time.sleep(backoff)
@@ -395,6 +458,11 @@ class ServiceClient:
                 if attempt < self._config.retry_count and e.retry_after:
                     time.sleep(min(e.retry_after, 60))
                     continue
+                raise
+
+            except ServerError as e:
+                last_error = e
+                self._circuit_breaker.record_failure()
                 raise
 
         # Should not reach here, but just in case

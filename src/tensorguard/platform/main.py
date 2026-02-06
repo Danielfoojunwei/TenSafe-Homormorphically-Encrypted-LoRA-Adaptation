@@ -202,7 +202,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=TG_ALLOWED_ORIGINS,
     allow_credentials=TG_ALLOW_CREDENTIALS,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Tenant-ID"],
 )
 
@@ -230,11 +230,26 @@ if TG_ENABLE_INPUT_VALIDATION:
     logger.info("Input validation middleware enabled")
 
 
+# Health check caching to avoid hammering the DB on every probe
+_health_cache: dict = {"result": None, "timestamp": 0.0}
+_HEALTH_CACHE_TTL = 5.0  # seconds
+
+
+def _get_cached_db_health() -> dict:
+    """Get DB health with caching to reduce probe overhead."""
+    import time as _time
+    now = _time.time()
+    if _health_cache["result"] is None or (now - _health_cache["timestamp"]) > _HEALTH_CACHE_TTL:
+        _health_cache["result"] = check_db_health()
+        _health_cache["timestamp"] = now
+    return _health_cache["result"]
+
+
 # Health endpoints
 @app.get("/health", tags=["health"])
 async def health_check():
     """Health check endpoint."""
-    db_health = check_db_health()
+    db_health = _get_cached_db_health()
     return {
         "status": "healthy" if db_health["status"] == "healthy" else "degraded",
         "timestamp": datetime.utcnow().isoformat(),
@@ -247,7 +262,7 @@ async def health_check():
 @app.get("/ready", tags=["health"])
 async def readiness_check():
     """Kubernetes readiness probe."""
-    db_health = check_db_health()
+    db_health = _get_cached_db_health()
     if db_health["status"] != "healthy":
         return Response(
             content='{"ready": false, "reason": "database unavailable"}', status_code=503, media_type="application/json"
@@ -343,39 +358,5 @@ def run_development():
     )
 
 
-def run_production():
-    """Run server in production mode (multi-worker via gunicorn)."""
-    import subprocess
-    import sys
-
-    workers = os.getenv("WORKERS", "4")
-    port = os.getenv("PORT", "8000")
-    timeout = os.getenv("TIMEOUT", "120")
-    keepalive = os.getenv("KEEPALIVE", "5")
-
-    cmd = [
-        sys.executable,
-        "-m",
-        "gunicorn",
-        "tensorguard.platform.main:app",
-        "-c",
-        "tensorguard/platform/gunicorn_config.py",
-        "--workers",
-        workers,
-        "--bind",
-        f"0.0.0.0:{port}",
-        "--timeout",
-        timeout,
-        "--keep-alive",
-        keepalive,
-    ]
-
-    logger.info(f"Starting production server with {workers} workers on port {port}")
-    subprocess.run(cmd, check=True)
-
-
 if __name__ == "__main__":
-    if TG_ENVIRONMENT == "production":
-        run_production()
-    else:
-        run_development()
+    run_development()

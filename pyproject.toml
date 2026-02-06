@@ -50,9 +50,9 @@ dependencies = [
     # HTTP Client (SDK)
     "httpx>=0.25.0,<1.0.0",
     # Numeric
-    "numpy>=1.24.0,<2.0.0",
-    # Authentication
-    "python-jose[cryptography]>=3.3.0,<4.0.0",
+    "numpy>=1.24.0",
+    # Authentication (PyJWT replaces python-jose which has known CVEs)
+    "PyJWT[crypto]>=2.8.0,<3.0.0",
     "passlib[argon2]>=1.7.4,<2.0.0",
     "argon2-cffi>=23.1.0,<24.0.0",
     # Serialization

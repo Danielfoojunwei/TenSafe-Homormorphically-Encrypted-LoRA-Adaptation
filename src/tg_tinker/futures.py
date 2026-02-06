@@ -4,7 +4,9 @@ TG-Tinker SDK futures module.
 This module provides the FutureHandle class for async operation management.
 """
 
+import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from .exceptions import (
@@ -16,6 +18,11 @@ from .schemas import FutureStatus, OperationType
 
 if TYPE_CHECKING:
     from .client import ServiceClient
+
+logger = logging.getLogger(__name__)
+
+# Shared bounded thread pool for all FutureHandle callbacks (prevents thread leaks)
+_callback_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="future-cb")
 
 
 class FutureHandle:
@@ -234,22 +241,23 @@ class FutureHandle:
         """
         Add a callback to be called when the future completes.
 
-        Note: In this synchronous implementation, the callback is called
-        in a blocking manner after polling confirms completion.
+        Uses a shared bounded ThreadPoolExecutor to prevent thread leaks
+        when many callbacks are registered.
 
         Args:
             callback: Function to call with this future as argument
         """
-        # Simple implementation: spawn a thread to poll and call back
-        import threading
-
         def _poll_and_callback():
-            while not self.done():
-                time.sleep(self._poll_interval)
-            callback(self)
+            try:
+                while not self.done():
+                    time.sleep(self._poll_interval)
+                callback(self)
+            except Exception:
+                logger.exception(
+                    f"Error in done callback for future {self._future_id}"
+                )
 
-        thread = threading.Thread(target=_poll_and_callback, daemon=True)
-        thread.start()
+        _callback_executor.submit(_poll_and_callback)
 
     def __repr__(self) -> str:
         return (

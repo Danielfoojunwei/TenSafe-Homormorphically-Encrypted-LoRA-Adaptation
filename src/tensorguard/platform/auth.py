@@ -19,7 +19,8 @@ from typing import Dict, List, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError as JWTError
 from passlib.context import CryptContext
 from sqlmodel import Session
 
@@ -321,6 +322,6 @@ def get_token_info(token: str) -> Optional[Dict]:
     """
     try:
         # Decode without verification for inspection
-        return jwt.decode(token, options={"verify_signature": False})
+        return jwt.decode(token, algorithms=[ALGORITHM], options={"verify_signature": False})
     except JWTError:
         return None

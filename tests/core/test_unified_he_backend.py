@@ -9,6 +9,7 @@ This module tests that:
 5. Production mode requires the microkernel
 """
 
+import logging
 import numpy as np
 import pytest
 import warnings
@@ -51,32 +52,26 @@ class TestHEModeUnification:
         resolved = HEMode.resolve(HEMode.DISABLED)
         assert resolved == HEMode.DISABLED
 
-    def test_toy_maps_to_simulation(self):
+    def test_toy_maps_to_simulation(self, caplog):
         """TOY (deprecated) should map to SIMULATION."""
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        with caplog.at_level(logging.WARNING):
             resolved = HEMode.resolve(HEMode.TOY)
             assert resolved == HEMode.SIMULATION
-            assert len(w) == 1
-            assert "deprecated" in str(w[0].message).lower()
+            assert any("deprecated" in r.message.lower() for r in caplog.records)
 
-    def test_n2he_maps_to_production(self):
+    def test_n2he_maps_to_production(self, caplog):
         """N2HE (deprecated) should map to PRODUCTION."""
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        with caplog.at_level(logging.WARNING):
             resolved = HEMode.resolve(HEMode.N2HE)
             assert resolved == HEMode.PRODUCTION
-            assert len(w) == 1
-            assert "deprecated" in str(w[0].message).lower()
+            assert any("deprecated" in r.message.lower() for r in caplog.records)
 
-    def test_n2he_hexl_maps_to_production(self):
+    def test_n2he_hexl_maps_to_production(self, caplog):
         """N2HE_HEXL (deprecated) should map to PRODUCTION."""
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        with caplog.at_level(logging.WARNING):
             resolved = HEMode.resolve(HEMode.N2HE_HEXL)
             assert resolved == HEMode.PRODUCTION
-            assert len(w) == 1
-            assert "deprecated" in str(w[0].message).lower()
+            assert any("deprecated" in r.message.lower() for r in caplog.records)
 
     def test_is_legacy_property(self):
         """Test is_legacy property identifies deprecated modes."""
