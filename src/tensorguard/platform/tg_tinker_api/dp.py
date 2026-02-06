@@ -20,10 +20,8 @@ import logging
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
-import numpy as np
 from scipy import special
 
 logger = logging.getLogger(__name__)
@@ -515,7 +513,7 @@ class MomentsAccountant(PrivacyAccountant):
     def _init_production_accountant(self) -> None:
         """Initialize the production accountant."""
         try:
-            from tensafe.privacy.accountants import ProductionRDPAccountant, DPConfig
+            from tensafe.privacy.accountants import DPConfig, ProductionRDPAccountant
 
             config = DPConfig(
                 target_delta=self.target_delta,
@@ -576,7 +574,7 @@ class PRVAccountant(PrivacyAccountant):
     def _init_production_accountant(self) -> None:
         """Initialize the production accountant."""
         try:
-            from tensafe.privacy.accountants import ProductionPRVAccountant, DPConfig
+            from tensafe.privacy.accountants import DPConfig, ProductionPRVAccountant
 
             config = DPConfig(
                 target_delta=self.target_delta,

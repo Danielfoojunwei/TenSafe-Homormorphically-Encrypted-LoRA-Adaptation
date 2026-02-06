@@ -10,16 +10,28 @@ Enforces critical invariants:
 Validation is performed at compile time to prevent invalid programs.
 """
 
-from typing import List, Dict, Set, Optional, Tuple
 from dataclasses import dataclass
-from .types import Scheme, ValueType, Shape, IRValue
-from .nodes import (
-    IRNode, IRProgram,
-    CKKSMatMul, CKKSAdd, CKKSMul, CKKSRescale, CKKSRotate, CKKSPackMOAI,
-    TFHELUT, TFHECompare, TFHEMUX, TFHEBootstrap,
-    CKKSQuantizeToInt, CKKSToTFHE, TFHEToCKKS, CKKSApplyMask,
-)
+from typing import Dict, List, Tuple
 
+from .nodes import (
+    TFHELUT,
+    TFHEMUX,
+    CKKSAdd,
+    CKKSApplyMask,
+    CKKSMatMul,
+    CKKSMul,
+    CKKSPackMOAI,
+    CKKSQuantizeToInt,
+    CKKSRescale,
+    CKKSRotate,
+    CKKSToTFHE,
+    IRNode,
+    IRProgram,
+    TFHEBootstrap,
+    TFHECompare,
+    TFHEToCKKS,
+)
+from .types import IRValue, Scheme, Shape, ValueType
 
 # =============================================================================
 # VALIDATION ERRORS
@@ -181,7 +193,7 @@ def validate_node(
         for name, value in inputs.items():
             if value.scheme != Scheme.CKKS:
                 errors.append(SchemeViolationError(
-                    f"CKKSToTFHE requires CKKS input",
+                    "CKKSToTFHE requires CKKS input",
                     node.node_id, Scheme.CKKS, value.scheme
                 ))
             # Warn if not quantized first
@@ -196,7 +208,7 @@ def validate_node(
         for name, value in inputs.items():
             if value.scheme != Scheme.TFHE:
                 errors.append(SchemeViolationError(
-                    f"TFHEToCKKS requires TFHE input",
+                    "TFHEToCKKS requires TFHE input",
                     node.node_id, Scheme.TFHE, value.scheme
                 ))
 

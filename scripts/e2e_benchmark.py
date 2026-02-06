@@ -11,16 +11,16 @@ This script runs a complete benchmark workflow:
 Results are written to JSON for documentation updates.
 """
 
+import argparse
+import json
+import logging
 import os
 import sys
-import json
 import time
-import argparse
-import logging
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Optional, Tuple, Any
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -201,15 +201,15 @@ def run_training(
 
     try:
         import torch
+        from datasets import Dataset
+        from peft import LoraConfig, TaskType, get_peft_model
         from transformers import (
             AutoModelForCausalLM,
             AutoTokenizer,
-            TrainingArguments,
-            Trainer,
             DataCollatorForLanguageModeling,
+            Trainer,
+            TrainingArguments,
         )
-        from peft import LoraConfig, get_peft_model, TaskType
-        from datasets import Dataset
 
         # Check GPU
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -428,12 +428,13 @@ def run_linear_lora_inference(
     logger.info("Running linear LoRA encrypted inference...")
 
     try:
-        import torch
         import numpy as np
+        import torch
+
+        from he_lora_microkernel.python.helora.compile import compile_lora
 
         # Import HE modules
         from he_lora_microkernel.python.helora.config import HELoRAConfig, PerformanceProfile
-        from he_lora_microkernel.python.helora.compile import compile_lora
         from he_lora_microkernel.python.helora.run import HELoRARunner
 
         # Load LoRA adapter weights
@@ -569,7 +570,7 @@ def run_linear_lora_inference(
         if torch.cuda.is_available():
             metrics.peak_memory_mb = torch.cuda.max_memory_allocated() / 1e6
 
-        logger.info(f"Linear LoRA inference completed:")
+        logger.info("Linear LoRA inference completed:")
         logger.info(f"  Avg token time: {metrics.avg_token_time_ms:.2f} ms")
         logger.info(f"  Throughput: {metrics.tokens_per_second:.1f} tokens/sec")
         logger.info(f"  Max error: {metrics.max_error:.2e}")
@@ -604,8 +605,8 @@ def run_gated_lora_inference(
         # Import hybrid compiler
         from he_lora_microkernel.hybrid_compiler.gated_lora import (
             GatedLoRAConfig,
-            compile_gated_lora,
             GatedLoRAExecutor,
+            compile_gated_lora,
             plaintext_gated_lora,
         )
         from he_lora_microkernel.hybrid_compiler.ir import validate_program
@@ -751,7 +752,7 @@ def run_gated_lora_inference(
             gate_on_rate = sum(1 for g in gate_activations if g > 0.5) / len(gate_activations)
             logger.info(f"Gate ON rate: {gate_on_rate:.1%}")
 
-        logger.info(f"Gated LoRA inference completed:")
+        logger.info("Gated LoRA inference completed:")
         logger.info(f"  Avg token time: {metrics.avg_token_time_ms:.2f} ms")
         logger.info(f"  Throughput: {metrics.tokens_per_second:.1f} tokens/sec")
         logger.info(f"  Max error: {metrics.max_error:.2e}")
@@ -794,9 +795,7 @@ def generate_comparison(
         },
         "recommendation": (
             "Linear LoRA recommended for latency-critical applications. "
-            "Gated LoRA provides conditional adaptation with ~{:.1f}x overhead.".format(
-                gated_metrics.avg_token_time_ms / max(linear_metrics.avg_token_time_ms, 1e-6)
-            )
+            f"Gated LoRA provides conditional adaptation with ~{gated_metrics.avg_token_time_ms / max(linear_metrics.avg_token_time_ms, 1e-6):.1f}x overhead."
         ),
     }
     return comparison
@@ -908,7 +907,7 @@ def main():
             report.training_metrics = training_metrics
             adapter_path = training_metrics.adapter_path
 
-            print(f"\nTraining Summary:")
+            print("\nTraining Summary:")
             print(f"  Duration: {training_metrics.training_duration_seconds:.1f}s")
             print(f"  Steps: {training_metrics.total_steps}")
             print(f"  Final Loss: {training_metrics.final_loss:.4f}")
@@ -934,7 +933,7 @@ def main():
         )
         report.linear_inference_metrics = linear_metrics
 
-        print(f"\nLinear Inference Summary:")
+        print("\nLinear Inference Summary:")
         print(f"  Avg Token Time: {linear_metrics.avg_token_time_ms:.2f} ms")
         print(f"  P95 Token Time: {linear_metrics.p95_token_time_ms:.2f} ms")
         print(f"  Throughput: {linear_metrics.tokens_per_second:.1f} tokens/sec")
@@ -956,7 +955,7 @@ def main():
         )
         report.gated_inference_metrics = gated_metrics
 
-        print(f"\nGated Inference Summary:")
+        print("\nGated Inference Summary:")
         print(f"  Avg Token Time: {gated_metrics.avg_token_time_ms:.2f} ms")
         print(f"  P95 Token Time: {gated_metrics.p95_token_time_ms:.2f} ms")
         print(f"  Throughput: {gated_metrics.tokens_per_second:.1f} tokens/sec")
@@ -974,7 +973,7 @@ def main():
     if linear_metrics and gated_metrics:
         report.comparison = generate_comparison(linear_metrics, gated_metrics)
 
-        print(f"\nComparison Summary:")
+        print("\nComparison Summary:")
         print(f"  Throughput Ratio (Linear/Gated): {report.comparison['throughput_ratio']:.2f}x")
         print(f"  Latency Overhead (Gated): {report.comparison['latency_ratio']:.2f}x")
         print(f"  Precision (Linear max error): {report.comparison['precision_comparison']['linear_max_error']:.2e}")

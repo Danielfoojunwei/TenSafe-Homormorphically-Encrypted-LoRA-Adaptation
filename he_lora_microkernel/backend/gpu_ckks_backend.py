@@ -16,16 +16,16 @@ CRITICAL REQUIREMENTS:
 NO CPU-ONLY FALLBACK - this module REQUIRES GPU acceleration.
 """
 
+import time
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, List, Union, Tuple, Dict, Any, Callable
-from contextlib import contextmanager
-import time
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
 
-from ..compiler.ckks_params import CKKSParams, CKKSProfile
-
+from ..compiler.ckks_params import CKKSParams
 
 # =============================================================================
 # OPERATION COUNTERS

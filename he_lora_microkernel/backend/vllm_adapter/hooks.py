@@ -8,14 +8,11 @@ The hooks wrap linear projection modules and inject HE-LoRA deltas
 after the projection computation (POST_PROJECTION mode).
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
-import functools
-import weakref
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 if TYPE_CHECKING:
     import torch
-    import torch.nn as nn
 
 
 @dataclass

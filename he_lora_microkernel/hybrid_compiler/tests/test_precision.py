@@ -8,22 +8,19 @@ Tests for:
 4. Performance benchmarks (baseline comparison)
 """
 
-import pytest
-import numpy as np
 import time
-from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 
-from ..ir import validate_program
+import numpy as np
+
+from ..bridge import CKKSTFHEBridge
 from ..gated_lora import (
     GatedLoRAConfig,
-    GatedLoRACompiler,
     GatedLoRAExecutor,
     compile_gated_lora,
     plaintext_gated_lora,
 )
-from ..bridge import CKKSTFHEBridge, QuantizationParams
-from ..tfhe_lut import LUTLibrary, step_lut, sign_lut, relu_lut, clip_lut
+from ..tfhe_lut import clip_lut, relu_lut, sign_lut, step_lut
 
 
 @dataclass
@@ -248,7 +245,7 @@ class TestGatedLoRAPrecision:
         avg_rms_error = np.mean([e.rms_error for e in errors])
         avg_snr = np.mean([e.snr_db for e in errors if np.isfinite(e.snr_db)])
 
-        print(f"\nPrecision Metrics (n=20):")
+        print("\nPrecision Metrics (n=20):")
         print(f"  Avg max error: {avg_max_error:.6f}")
         print(f"  Avg RMS error: {avg_rms_error:.6f}")
         print(f"  Avg SNR (dB): {avg_snr:.1f}")

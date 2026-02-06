@@ -92,26 +92,31 @@ class HEMode(str, Enum):
         Returns:
             Resolved mode (DISABLED, PRODUCTION, or SIMULATION)
         """
-        import logging
-        logger = logging.getLogger(__name__)
+        import warnings
 
         if mode == cls.TOY:
-            logger.warning(
+            warnings.warn(
                 "HEMode.TOY is deprecated. Use HEMode.SIMULATION instead. "
-                "Note: SIMULATION mode is NOT cryptographically secure."
+                "Note: SIMULATION mode is NOT cryptographically secure.",
+                DeprecationWarning,
+                stacklevel=2
             )
             return cls.SIMULATION
         elif mode == cls.N2HE:
-            logger.warning(
+            warnings.warn(
                 "HEMode.N2HE is deprecated. The N2HE standalone path has been removed. "
                 "All HE now uses the unified microkernel with MOAI optimizations. "
-                "Mapping to HEMode.PRODUCTION."
+                "Mapping to HEMode.PRODUCTION.",
+                DeprecationWarning,
+                stacklevel=2
             )
             return cls.PRODUCTION
         elif mode == cls.N2HE_HEXL:
-            logger.warning(
+            warnings.warn(
                 "HEMode.N2HE_HEXL is deprecated. HEXL acceleration is now integrated "
-                "into the unified microkernel. Mapping to HEMode.PRODUCTION."
+                "into the unified microkernel. Mapping to HEMode.PRODUCTION.",
+                DeprecationWarning,
+                stacklevel=2
             )
             return cls.PRODUCTION
 

@@ -35,11 +35,10 @@ Modes:
 from __future__ import annotations
 
 import logging
-import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 
@@ -71,7 +70,7 @@ class HEBackendType(Enum):
     AUTO = "auto"  # DEPRECATED: Maps to PRODUCTION
 
     @classmethod
-    def resolve(cls, backend_type: "HEBackendType") -> "HEBackendType":
+    def resolve(cls, backend_type: HEBackendType) -> HEBackendType:
         """Resolve legacy backend types to their modern equivalents."""
         legacy_mapping = {
             cls.TOY: cls.SIMULATION,

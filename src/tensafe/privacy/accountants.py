@@ -28,10 +28,8 @@ from __future__ import annotations
 import logging
 import math
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Type
-
-import numpy as np
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Type
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +167,7 @@ class ProductionRDPAccountant(PrivacyAccountant):
         super().__init__(config)
 
         self.orders = config.rdp_orders or self.DEFAULT_ORDERS
-        self._rdp_epsilons: Dict[float, float] = {o: 0.0 for o in self.orders}
+        self._rdp_epsilons: Dict[float, float] = dict.fromkeys(self.orders, 0.0)
 
         # Try to use dp-accounting library
         self._use_external = False
@@ -210,7 +208,7 @@ class ProductionRDPAccountant(PrivacyAccountant):
 
     def _step_external(self) -> None:
         """Step using dp-accounting library."""
-        from dp_accounting import dp_event, privacy_accountant
+        from dp_accounting import dp_event
 
         event = dp_event.SelfComposedDpEvent(
             dp_event.PoissonSampledDpEvent(
@@ -364,7 +362,7 @@ class ProductionRDPAccountant(PrivacyAccountant):
     def reset(self) -> None:
         """Reset the accountant."""
         self._steps = 0
-        self._rdp_epsilons = {o: 0.0 for o in self.orders}
+        self._rdp_epsilons = dict.fromkeys(self.orders, 0.0)
 
         if self._external_accountant is not None:
             from dp_accounting.rdp import rdp_privacy_accountant

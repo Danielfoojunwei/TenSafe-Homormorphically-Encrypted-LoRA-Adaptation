@@ -26,16 +26,15 @@ Run with:
 """
 
 import json
-import os
 import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-import pytest
 import numpy as np
+import pytest
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -45,8 +44,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 def _ckks_moai_available() -> bool:
     """Check if CKKS MOAI backend is available."""
     try:
-        from crypto_backend.ckks_moai import CKKSMOAIBackend
         from Pyfhel import Pyfhel
+
+        from crypto_backend.ckks_moai import CKKSMOAIBackend
         return True
     except ImportError:
         return False
@@ -481,22 +481,22 @@ class TestLlama3HELoRABenchmark:
         print(f"Hidden size: {d}")
         print(f"LoRA rank: {mock_layer.config.test_lora_rank}")
         print(f"\nKey Generation: {report['keygen_time_ms']:.2f} ms")
-        print(f"\nEncrypt (per vector):")
+        print("\nEncrypt (per vector):")
         print(f"  Mean: {report['encrypt_stats_ms']['mean']:.2f} ms")
         print(f"  P95:  {report['encrypt_stats_ms']['p95']:.2f} ms")
-        print(f"\nLoRA Delta (per projection):")
+        print("\nLoRA Delta (per projection):")
         print(f"  Mean: {report['lora_delta_stats_ms']['mean']:.2f} ms")
         print(f"  P95:  {report['lora_delta_stats_ms']['p95']:.2f} ms")
-        print(f"\nDecrypt (per vector):")
+        print("\nDecrypt (per vector):")
         print(f"  Mean: {report['decrypt_stats_ms']['mean']:.2f} ms")
         print(f"  P95:  {report['decrypt_stats_ms']['p95']:.2f} ms")
-        print(f"\nOperations:")
+        print("\nOperations:")
         print(f"  Total: {report['total_operations']}")
         print(f"  Multiplications: {report['total_multiplications']}")
         print(f"  Additions: {report['total_additions']}")
         print(f"  Rotations: {report['total_rotations']}")
         print(f"  Rescales: {report['total_rescales']}")
-        print(f"\nAccuracy:")
+        print("\nAccuracy:")
         print(f"  Max Error: {report['accuracy']['max_error']:.8f}")
         print(f"  Avg Error: {report['accuracy']['avg_error']:.8f}")
         print("=" * 60)
@@ -530,7 +530,7 @@ class TestLlama3HELoRAIntegration:
 
     def test_via_he_interface(self, mock_layer):
         """Test via unified HE interface."""
-        from tensafe.core.he_interface import get_backend, HEBackendType
+        from tensafe.core.he_interface import HEBackendType, get_backend
 
         backend = get_backend(HEBackendType.CKKS_MOAI)
 
@@ -553,7 +553,7 @@ class TestLlama3HELoRAIntegration:
 
     def test_auto_select_backend(self, mock_layer):
         """Test auto-selection chooses CKKS MOAI as first priority."""
-        from tensafe.core.he_interface import get_backend, HEBackendType
+        from tensafe.core.he_interface import HEBackendType, get_backend
 
         backend = get_backend(HEBackendType.AUTO)
 
@@ -714,7 +714,7 @@ class TestMOAIBenchmarkComparison:
             "additions": legacy_stats["additions"],
         }
 
-        print(f"\n[1] LEGACY N=8192:")
+        print("\n[1] LEGACY N=8192:")
         print(f"    Polynomial degree: {legacy_params.poly_modulus_degree}")
         print(f"    Slots: {legacy_params.slot_count}")
         print(f"    Mean LoRA delta time: {np.mean(legacy_times):.2f} ms")
@@ -761,7 +761,7 @@ class TestMOAIBenchmarkComparison:
             "moai_cpmm_calls": fast_stats.get("moai_cpmm_calls", 0),
         }
 
-        print(f"\n[2] MOAI FAST N=16384:")
+        print("\n[2] MOAI FAST N=16384:")
         print(f"    Polynomial degree: {fast_params.poly_modulus_degree}")
         print(f"    Slots: {fast_params.slot_count}")
         print(f"    Mean LoRA delta time: {np.mean(fast_times):.2f} ms")

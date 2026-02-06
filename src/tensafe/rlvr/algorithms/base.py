@@ -6,17 +6,16 @@ Defines the interface that all RL algorithms must implement.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol
-
 # Import trajectory types
 import sys
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Protocol
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from tensafe.rlvr.rollout import Trajectory, TrajectoryBatch
+from tensafe.rlvr.rollout import TrajectoryBatch
 
 
 @dataclass

@@ -3,24 +3,22 @@
 Configures comprehensive observability stack with privacy-aware telemetry.
 """
 
-from typing import Optional, Dict, Any, Callable
-from dataclasses import dataclass, field
 import logging
-import os
-import time
 import threading
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 # Conditional OpenTelemetry imports
 OTEL_AVAILABLE = False
 try:
-    from opentelemetry import trace, metrics
-    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry import metrics, trace
     from opentelemetry.sdk.metrics import MeterProvider
-    from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
     from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+    from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
     OTEL_AVAILABLE = True
 except ImportError:
     logger.warning("OpenTelemetry not installed. Install with: pip install opentelemetry-sdk")
@@ -28,8 +26,8 @@ except ImportError:
 # Optional exporters
 OTLP_AVAILABLE = False
 try:
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     OTLP_AVAILABLE = True
 except ImportError:
     pass
@@ -37,7 +35,7 @@ except ImportError:
 PROMETHEUS_AVAILABLE = False
 try:
     from opentelemetry.exporter.prometheus import PrometheusMetricReader
-    from prometheus_client import start_http_server, Counter, Histogram, Gauge
+    from prometheus_client import Counter, Gauge, Histogram, start_http_server
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     pass

@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .provider import KMSProvider, KMSError
+from .provider import KMSError, KMSProvider
 
 logger = logging.getLogger(__name__)
 

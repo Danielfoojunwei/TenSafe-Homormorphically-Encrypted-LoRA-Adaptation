@@ -10,27 +10,25 @@ This module tests that:
 """
 
 import logging
+
 import numpy as np
 import pytest
-import warnings
 
-from tensafe.core.config import HEMode, HEConfig, TenSafeConfig, create_default_config
+from tensafe.core.config import HEConfig, HEMode, TenSafeConfig, create_default_config
 from tensafe.core.he_interface import (
+    CKKSMOAIBackendWrapper,
+    DisabledHEBackend,
     HEBackendType,
     HEParams,
-    HEMetrics,
-    HEBackendInterface,
+    HEXLBackendWrapper,
+    MicrokernelBackendWrapper,
+    N2HEBackendWrapper,
+    # Legacy exports (should all route to UnifiedHEBackend)
+    ToyHEBackend,
     UnifiedHEBackend,
-    DisabledHEBackend,
     get_backend,
     is_backend_available,
     list_available_backends,
-    # Legacy exports (should all route to UnifiedHEBackend)
-    ToyHEBackend,
-    N2HEBackendWrapper,
-    HEXLBackendWrapper,
-    CKKSMOAIBackendWrapper,
-    MicrokernelBackendWrapper,
 )
 
 

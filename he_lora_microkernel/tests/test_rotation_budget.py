@@ -11,33 +11,33 @@ Default budgets:
   - rescales/token ≤ S_max (8)
 """
 
-import pytest
-import numpy as np
-
-import sys
 import os
+import sys
+
+import numpy as np
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+from he_lora_microkernel.backend.gpu_ckks_backend import BackendType
 from he_lora_microkernel.compiler import (
+    CKKSProfile,
+    CostBudget,
+    KeyswitchBudget,
     LoRAConfig,
     LoRATargets,
-    CKKSProfile,
-    get_profile,
-    compile_schedule,
-    CostBudget,
-    RotationBudget,
-    KeyswitchBudget,
     RescaleBudget,
-    estimate_costs,
+    RotationBudget,
     check_budget_compliance,
+    compile_schedule,
     enforce_rotation_invariant,
+    estimate_costs,
+    get_profile,
 )
 from he_lora_microkernel.runtime import (
     HELoRAExecutor,
     InvariantChecker,
 )
-from he_lora_microkernel.backend.gpu_ckks_backend import BackendType
-
 
 # =============================================================================
 # BUDGET DEFINITIONS

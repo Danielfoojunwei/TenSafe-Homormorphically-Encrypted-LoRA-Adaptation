@@ -20,7 +20,6 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 from baseline_sft_smoke import (
     MinimalTrainingClient,
     MockMLBackend,
-    SmokeTestMetrics,
     create_synthetic_batch,
     run_smoke_test,
 )

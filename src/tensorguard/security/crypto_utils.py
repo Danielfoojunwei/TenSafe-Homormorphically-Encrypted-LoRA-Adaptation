@@ -10,7 +10,6 @@ Provides secure cryptographic primitives:
 
 import hashlib
 import hmac
-import os
 import secrets
 from typing import Optional, Union
 

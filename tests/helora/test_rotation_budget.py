@@ -152,7 +152,7 @@ class TestPackingStrategyComparison:
     @pytest.mark.skipif(not backend_available(), reason="Backend required")
     def test_column_vs_estimated_row(self):
         """Compare column packing rotations vs estimated row packing."""
-        from tensafe.he_lora.packing import estimate_rotation_count, PackingStrategy
+        from tensafe.he_lora.packing import PackingStrategy, estimate_rotation_count
 
         hidden_dim = 64
         rank = 8
@@ -177,7 +177,7 @@ class TestPackingStrategyComparison:
     @pytest.mark.skipif(not backend_available(), reason="Backend required")
     def test_rotation_savings_documented(self):
         """Verify the rotation savings are significant."""
-        from tensafe.he_lora.packing import estimate_rotation_count, PackingStrategy
+        from tensafe.he_lora.packing import PackingStrategy, estimate_rotation_count
 
         # Typical LoRA dimensions
         test_cases = [

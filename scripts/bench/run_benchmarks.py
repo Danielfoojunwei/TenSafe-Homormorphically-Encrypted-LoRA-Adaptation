@@ -16,13 +16,12 @@ Modes:
 import argparse
 import gc
 import json
-import os
 import platform
 import statistics
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, asdict, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -144,8 +143,8 @@ def percentile(data: List[float], p: float) -> float:
 def benchmark_schema_validation(iterations: int, warmup: int) -> BenchmarkResult:
     """Benchmark Pydantic schema validation (TG-Tinker schemas)."""
     from tg_tinker.schemas import (
-        TrainingConfig, LoRAConfig, DPConfig,
-        ForwardBackwardRequest, BatchData,
+        BatchData,
+        TrainingConfig,
     )
 
     # Sample data
@@ -201,8 +200,9 @@ def benchmark_schema_validation(iterations: int, warmup: int) -> BenchmarkResult
 
 def benchmark_encryption(iterations: int, warmup: int) -> BenchmarkResult:
     """Benchmark AES-256-GCM encryption (artifact storage)."""
-    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     import secrets
+
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
     key = secrets.token_bytes(32)
     nonce = secrets.token_bytes(12)
@@ -376,9 +376,7 @@ def benchmark_artifact_store(iterations: int, warmup: int) -> BenchmarkResult:
     sys.path.insert(0, str(Path.cwd() / "src"))
 
     try:
-        from tensorguard.platform.tg_tinker_api.storage import (
-            LocalStorageBackend, EncryptedArtifactStore, KeyManager
-        )
+        from tensorguard.platform.tg_tinker_api.storage import EncryptedArtifactStore, KeyManager, LocalStorageBackend
     except ImportError:
         return BenchmarkResult(
             scenario="artifact_store",
@@ -484,8 +482,8 @@ def run_benchmarks(
 
     scenarios = SCENARIOS_SMOKE if mode == "smoke" else SCENARIOS_FULL
 
-    print(f"\nBenchmark Runner")
-    print(f"================")
+    print("\nBenchmark Runner")
+    print("================")
     print(f"Mode: {mode}")
     print(f"Timestamp: {timestamp}")
     print(f"Git SHA: {git_sha}")
@@ -551,7 +549,7 @@ def run_benchmarks(
             f.write(f"| {r.scenario} | {r.latency_p50_ms:.3f} | {r.latency_p95_ms:.3f} | {r.latency_mean_ms:.3f} | {r.throughput_ops:.1f} | {r.memory_rss_delta_mb:.2f} |\n")
 
     print(f"\n{'='*60}")
-    print(f"Benchmarks Complete")
+    print("Benchmarks Complete")
     print(f"{'='*60}")
     print(f"JSON: {json_file}")
     print(f"Markdown: {md_file}")

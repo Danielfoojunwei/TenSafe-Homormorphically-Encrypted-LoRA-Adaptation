@@ -14,14 +14,13 @@ Key metrics tracked:
 All metrics are designed for CI enforcement of performance invariants.
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Callable
-from enum import Enum
-import time
 import json
-from collections import deque
 import threading
-
+import time
+from collections import deque
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
 # =============================================================================
 # METRIC TYPES

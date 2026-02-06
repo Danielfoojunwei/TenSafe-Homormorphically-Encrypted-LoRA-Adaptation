@@ -22,7 +22,7 @@ import logging
 import random
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 from ..hyperparam_utils import LoRAConfig
 from ..model_info import get_recommended_renderer_name
@@ -453,7 +453,7 @@ class MultiAgentTrainer:
             self.judge = None
 
         # ELO tracking
-        self.elo_ratings = {i: 1500.0 for i in range(config.num_agents)}
+        self.elo_ratings = dict.fromkeys(range(config.num_agents), 1500.0)
 
     def play_game(self) -> GameResult:
         """
@@ -569,7 +569,7 @@ class MultiAgentTrainer:
         logger.info(f"  Agents: {[a.name for a in self.config.agent_configs]}")
 
         total_games = 0
-        wins = {i: 0 for i in range(self.config.num_agents)}
+        wins = dict.fromkeys(range(self.config.num_agents), 0)
         draws = 0
 
         for step in range(self.config.max_steps):

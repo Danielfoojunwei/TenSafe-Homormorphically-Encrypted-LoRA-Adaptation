@@ -43,15 +43,15 @@ from __future__ import annotations
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
-from tensafe.core.config import TenSafeConfig, InferenceConfig, LoRAConfig, load_config
-from tensafe.core.he_interface import HEBackendInterface, get_backend, HEParams, HEBackendType
+from tensafe.core.config import InferenceConfig, LoRAConfig, TenSafeConfig, load_config
+from tensafe.core.he_interface import HEBackendInterface, HEBackendType, HEParams, get_backend
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +86,8 @@ class GenerationConfig:
     do_sample: bool = True
     repetition_penalty: float = 1.0
     no_repeat_ngram_size: int = 0
-    eos_token_id: Optional[int] = None
-    pad_token_id: Optional[int] = None
+    eos_token_id: int | None = None
+    pad_token_id: int | None = None
     use_cache: bool = True
 
 
@@ -95,8 +95,8 @@ class GenerationConfig:
 class InferenceResult:
     """Result from inference."""
     output: np.ndarray
-    text: Optional[str] = None
-    tokens: Optional[List[int]] = None
+    text: str | None = None
+    tokens: List[int] | None = None
 
     # Timing
     total_time_ms: float = 0.0
@@ -108,7 +108,7 @@ class InferenceResult:
     mode: str = "plaintext"
 
     # HE metrics (for HE modes)
-    he_metrics: Optional[Dict[str, Any]] = None
+    he_metrics: Dict[str, Any] | None = None
 
 
 @dataclass
@@ -138,12 +138,12 @@ class TenSafeInference:
 
     def __init__(
         self,
-        model: Optional[Any] = None,
-        tokenizer: Optional[Any] = None,
-        lora_weights: Optional[Dict[str, Tuple[np.ndarray, np.ndarray]]] = None,
-        config: Optional[Union[TenSafeConfig, InferenceConfig]] = None,
+        model: Any | None = None,
+        tokenizer: Any | None = None,
+        lora_weights: Dict[str, Tuple[np.ndarray, np.ndarray]] | None = None,
+        config: TenSafeConfig | InferenceConfig | None = None,
         mode: InferenceMode = InferenceMode.PLAINTEXT,
-        tgsp_registry: Optional[Any] = None,
+        tgsp_registry: Any | None = None,
         enforce_tgsp: bool = True,
     ):
         """
@@ -186,7 +186,7 @@ class TenSafeInference:
             self._he_config = None
 
         # HE backend (initialized lazily)
-        self._he_backend: Optional[HEBackendInterface] = None
+        self._he_backend: HEBackendInterface | None = None
         self._packed_weights: Dict[str, Any] = {}
 
         # Metrics
@@ -213,10 +213,10 @@ class TenSafeInference:
     @classmethod
     def from_checkpoint(
         cls,
-        checkpoint_path: Union[str, Path],
+        checkpoint_path: str | Path,
         mode: InferenceMode = InferenceMode.PLAINTEXT,
         device: str = "auto",
-    ) -> "TenSafeInference":
+    ) -> TenSafeInference:
         """
         Create inference engine from checkpoint.
 
@@ -343,8 +343,8 @@ class TenSafeInference:
     def from_config(
         cls,
         config: TenSafeConfig,
-        mode: Optional[InferenceMode] = None,
-    ) -> "TenSafeInference":
+        mode: InferenceMode | None = None,
+    ) -> TenSafeInference:
         """
         Create inference engine from configuration.
 
@@ -364,11 +364,11 @@ class TenSafeInference:
     def from_tgsp_registry(
         cls,
         registry: Any,
-        model: Optional[Any] = None,
-        tokenizer: Optional[Any] = None,
-        config: Optional[Union[TenSafeConfig, InferenceConfig]] = None,
+        model: Any | None = None,
+        tokenizer: Any | None = None,
+        config: TenSafeConfig | InferenceConfig | None = None,
         mode: InferenceMode = InferenceMode.HE_ONLY,
-    ) -> "TenSafeInference":
+    ) -> TenSafeInference:
         """
         Create TenSafeInference from a TGSP adapter registry.
 
@@ -472,7 +472,7 @@ class TenSafeInference:
     def forward(
         self,
         x: np.ndarray,
-        module_name: Optional[str] = None,
+        module_name: str | None = None,
     ) -> InferenceResult:
         """
         Run forward pass with configured LoRA mode.
@@ -562,7 +562,7 @@ class TenSafeInference:
     def _lora_forward_plaintext(
         self,
         x: np.ndarray,
-        module_name: Optional[str] = None,
+        module_name: str | None = None,
     ) -> np.ndarray:
         """Compute LoRA delta in plaintext."""
         if module_name is None and self._lora_weights:
@@ -582,7 +582,7 @@ class TenSafeInference:
     def _lora_forward_he(
         self,
         x: np.ndarray,
-        module_name: Optional[str] = None,
+        module_name: str | None = None,
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
         Compute LoRA delta under homomorphic encryption.
@@ -622,7 +622,7 @@ class TenSafeInference:
     def generate(
         self,
         prompt: str,
-        generation_config: Optional[GenerationConfig] = None,
+        generation_config: GenerationConfig | None = None,
     ) -> InferenceResult:
         """
         Generate text from a prompt.
@@ -723,7 +723,7 @@ class TenSafeInference:
     def generate_batch(
         self,
         prompts: List[str],
-        generation_config: Optional[GenerationConfig] = None,
+        generation_config: GenerationConfig | None = None,
     ) -> BatchInferenceResult:
         """
         Generate text for a batch of prompts.
@@ -756,7 +756,7 @@ class TenSafeInference:
 
     def __call__(
         self,
-        x: Union[str, np.ndarray],
+        x: str | np.ndarray,
         **kwargs: Any,
     ) -> InferenceResult:
         """
@@ -785,8 +785,8 @@ class TenSafeInference:
 
 
 def create_inference(
-    config: Union[str, Path, TenSafeConfig],
-    mode: Optional[InferenceMode] = None,
+    config: str | Path | TenSafeConfig,
+    mode: InferenceMode | None = None,
     **kwargs: Any,
 ) -> TenSafeInference:
     """

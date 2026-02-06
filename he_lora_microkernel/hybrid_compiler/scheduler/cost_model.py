@@ -11,11 +11,10 @@ Used by scheduler for cost-aware optimization.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
 from enum import Enum
-import math
+from typing import Any, Dict, Optional
 
-from ..ir import Scheme, IRNode, IRProgram
+from ..ir import IRNode, IRProgram
 
 
 class OpType(Enum):

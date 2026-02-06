@@ -23,7 +23,7 @@ Example usage:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Protocol
 
 from ..hyperparam_utils import LoRAConfig
@@ -309,9 +309,9 @@ class DistillationTrainer:
         Returns:
             Training batch item
         """
-        from ..tokenizer_utils import get_tokenizer
         from ..renderers import get_renderer
         from ..renderers.base import Message
+        from ..tokenizer_utils import get_tokenizer
 
         tokenizer = get_tokenizer(self.config.model_name)
         renderer = get_renderer(self.config.renderer_name, tokenizer)

@@ -4,12 +4,12 @@ Metrics Export
 Exports metrics to monitoring systems (Prometheus, etc.)
 """
 
+import logging
+import threading
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
-import logging
-import time
-import threading
 
 from .collector import ServiceTelemetryCollector
 
@@ -167,7 +167,7 @@ class PrometheusExporter(MetricsExporter):
     def start(self) -> None:
         """Start the HTTP server for Prometheus scraping."""
         try:
-            from http.server import HTTPServer, BaseHTTPRequestHandler
+            from http.server import BaseHTTPRequestHandler, HTTPServer
         except ImportError:
             logger.warning("HTTP server not available")
             return

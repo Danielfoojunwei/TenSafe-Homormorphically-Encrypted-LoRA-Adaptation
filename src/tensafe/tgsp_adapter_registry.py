@@ -48,7 +48,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -372,7 +372,7 @@ class TGSPAdapterRegistry:
                             )
                         )
                     return False
-        except IOError as e:
+        except OSError as e:
             raise AdapterLoadError(f"Cannot read file '{file_path}': {e}")
 
         return True
@@ -633,7 +633,7 @@ class TGSPAdapterRegistry:
             # Step 5: Load adapter config
             config_path = os.path.join(extract_dir, "adapter_config.json")
             if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
+                with open(config_path) as f:
                     adapter_config = json.load(f)
             else:
                 # Use defaults from manifest

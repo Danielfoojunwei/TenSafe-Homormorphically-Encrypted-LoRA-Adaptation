@@ -14,9 +14,9 @@ This enables delta injection within the TensorRT execution graph.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
+
 import numpy as np
-import ctypes
 
 # Plugin configuration
 PLUGIN_NAME = "HELoRAProjection"

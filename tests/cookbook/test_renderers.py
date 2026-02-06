@@ -1,8 +1,8 @@
 """Tests for cookbook renderers."""
 
+from typing import List
+
 import pytest
-from typing import Any, List
-from unittest.mock import MagicMock
 
 
 class MockTokenizer:
@@ -143,8 +143,8 @@ class TestLlama3Renderer:
 
     def test_render_message(self):
         """Test message rendering."""
-        from tensafe.cookbook.renderers.llama3 import Llama3Renderer
         from tensafe.cookbook.renderers.base import Message, RenderContext
+        from tensafe.cookbook.renderers.llama3 import Llama3Renderer
 
         tokenizer = MockTokenizer()
         renderer = Llama3Renderer(tokenizer)
@@ -160,8 +160,8 @@ class TestLlama3Renderer:
 
     def test_build_generation_prompt(self):
         """Test generation prompt building."""
-        from tensafe.cookbook.renderers.llama3 import Llama3Renderer
         from tensafe.cookbook.renderers.base import Message
+        from tensafe.cookbook.renderers.llama3 import Llama3Renderer
 
         tokenizer = MockTokenizer()
         renderer = Llama3Renderer(tokenizer)
@@ -176,8 +176,8 @@ class TestLlama3Renderer:
 
     def test_build_supervised_example(self):
         """Test supervised example building."""
-        from tensafe.cookbook.renderers.llama3 import Llama3Renderer
         from tensafe.cookbook.renderers.base import Message, SupervisedWeightMode
+        from tensafe.cookbook.renderers.llama3 import Llama3Renderer
 
         tokenizer = MockTokenizer()
         renderer = Llama3Renderer(tokenizer)

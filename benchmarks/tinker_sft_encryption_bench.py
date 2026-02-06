@@ -26,7 +26,7 @@ import warnings
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import numpy as np
 
@@ -41,11 +41,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from tensorguard.core.crypto import (
     N2HEContext,
     N2HEParams,
-    LWECiphertext,
-    sample_skellam,
 )
-from tensorguard.privacy.privacy_core import PrivacyCore, PrivacyMode, N2HEProfile
 from tensorguard.privacy.n2he_router import N2HERouter
+from tensorguard.privacy.privacy_core import N2HEProfile, PrivacyCore, PrivacyMode
 
 # Try to import TenSEAL for MOAI benchmarks
 try:
@@ -651,14 +649,14 @@ class TinkerEncryptionBenchmark:
 
         if "n2he_256" in summary:
             n = summary["n2he_256"]
-            print(f"\n  N2HE (dim=256):")
+            print("\n  N2HE (dim=256):")
             print(f"    Encrypt: {n['encrypt_ms']:.3f}ms")
             print(f"    Decrypt: {n['decrypt_ms']:.3f}ms")
             print(f"    Ciphertext: {n['ciphertext_bytes']} bytes")
 
         if "moai_256" in summary:
             m = summary["moai_256"]
-            print(f"\n  MOAI CKKS (dim=256):")
+            print("\n  MOAI CKKS (dim=256):")
             print(f"    Encrypt: {m['encrypt_ms']:.2f}ms")
             print(f"    Ciphertext: {m['ciphertext_bytes'] / 1024:.1f} KB")
             if "inference_ms" in m:
@@ -667,7 +665,7 @@ class TinkerEncryptionBenchmark:
         # Aggregation results
         agg_results = [r for r in self.results["n2he"] if "gradient_aggregation" in r.get("operation", "")]
         if agg_results:
-            print(f"\n  Federated Gradient Aggregation (dim=256):")
+            print("\n  Federated Gradient Aggregation (dim=256):")
             for r in agg_results:
                 print(f"    {r['num_clients']} clients: {r['latency']['mean_ms']:.1f}ms")
 
