@@ -22,15 +22,15 @@ Usage:
 
 from __future__ import annotations
 
+import json
+import logging
+import math
 import os
 import sys
-import json
 import time
-import logging
 from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 # Add project paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -97,7 +97,7 @@ class GroqCloudBackend:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model: str = "llama-3.3-70b-versatile",
         timeout: float = 120.0,
     ):
@@ -276,7 +276,6 @@ class FFALoRAHEConfig:
     @property
     def scaling_factor(self) -> float:
         """Compute scaling factor (rsLoRA: α/√r)."""
-        import math
         if self.use_rslora:
             return self.alpha / math.sqrt(self.rank)
         return self.alpha / self.rank
@@ -350,7 +349,7 @@ class PrivacyPreservingHELoRA:
     def __init__(
         self,
         config: FFALoRAHEConfig,
-        ckks_params: Optional[HighestQualityCKKSParams] = None,
+        ckks_params: HighestQualityCKKSParams | None = None,
     ):
         """
         Initialize Privacy-Preserving HE-LoRA.
@@ -428,8 +427,6 @@ class PrivacyPreservingHELoRA:
 
         # In FFA-LoRA, A matrices are generated deterministically
         # from seed, so they can be regenerated without loading
-        import math
-
         for module_name in self.config.target_modules:
             # Generate frozen A matrix (same across all clients with same seed)
             # A: (rank x hidden_size)
@@ -613,7 +610,7 @@ class Kimi25HELoRAInference:
     def __init__(
         self,
         config: Kimi25InferenceConfig,
-        groq_api_key: Optional[str] = None,
+        groq_api_key: str | None = None,
     ):
         """
         Initialize Kimi2.5 HE-LoRA inference.
@@ -645,7 +642,7 @@ class Kimi25HELoRAInference:
             f"  Privacy: FFA-LoRA + HE encryption"
         )
 
-    def setup(self, adapter_path: Optional[Path] = None) -> None:
+    def setup(self, adapter_path: Path | None = None) -> None:
         """
         Setup inference pipeline.
 
@@ -665,7 +662,7 @@ class Kimi25HELoRAInference:
     def format_prompt_kimi_style(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
     ) -> List[Dict[str, str]]:
         """
         Format prompt in Kimi2.5/ChatML style.
@@ -695,7 +692,7 @@ class Kimi25HELoRAInference:
     async def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
     ) -> Dict[str, Any]:
         """
         Generate response with HE-LoRA corrections.
@@ -810,26 +807,26 @@ def print_execution_summary(plan: HELoRAExecutionPlan) -> None:
     print("HE-LORA EXECUTION PLAN - HIGHEST QUALITY")
     print("=" * 70)
 
-    print(f"\nModel Configuration:")
+    print("\nModel Configuration:")
     print(f"  Hidden size: {plan.hidden_size:,}")
     print(f"  Num layers: {plan.num_layers}")
     print(f"  Max sequence: {plan.max_sequence_length:,} tokens")
 
-    print(f"\nLoRA Configuration (FFA-LoRA):")
+    print("\nLoRA Configuration (FFA-LoRA):")
     print(f"  Rank: {plan.lora_config.rank}")
     print(f"  Alpha: {plan.lora_config.alpha}")
     print(f"  Scaling (rsLoRA): {plan.lora_config.scaling_factor:.3f}")
     print(f"  Target modules: {len(plan.lora_config.target_modules)}")
-    print(f"  A matrix: FROZEN (public)")
-    print(f"  B matrix: ENCRYPTED (private)")
+    print("  A matrix: FROZEN (public)")
+    print("  B matrix: ENCRYPTED (private)")
 
-    print(f"\nCKKS Parameters (HIGHEST_QUALITY):")
+    print("\nCKKS Parameters (HIGHEST_QUALITY):")
     print(f"  Polynomial degree: {plan.ckks_params.poly_modulus_degree:,}")
     print(f"  Slot count: {plan.ckks_params.slot_count:,}")
     print(f"  Scale bits: {plan.ckks_params.scale_bits}")
     print(f"  Max depth: {plan.ckks_params.max_depth}")
 
-    print(f"\nPer-Token Costs:")
+    print("\nPer-Token Costs:")
     print(f"  Rotations: {plan.rotations_per_token} (MOAI packing = 0)")
     print(f"  Keyswitches: {plan.keyswitches_per_token}")
     print(f"  Rescales: {plan.rescales_per_token}")
