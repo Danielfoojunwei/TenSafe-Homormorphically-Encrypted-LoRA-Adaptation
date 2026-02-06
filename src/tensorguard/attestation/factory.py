@@ -95,15 +95,31 @@ def create_attestation_provider(
         logger.warning("Using software attestation - NOT FOR PRODUCTION")
         return TPMAttestationProvider(use_software_tpm=True)
 
-    if provider_type == "sgx":
-        raise AttestationError("Intel SGX attestation not yet implemented")
+    if provider_type in ("sgx", "tdx"):
+        from .tdx import TDXAttestationProvider
 
-    if provider_type == "sev":
-        raise AttestationError("AMD SEV attestation not yet implemented")
+        use_sim = not config.is_production
+        provider = TDXAttestationProvider(use_simulation=use_sim)
+
+        if not provider.is_available and config.is_production:
+            raise AttestationError("Intel TDX not available in production mode")
+
+        return provider
+
+    if provider_type in ("sev", "sev-snp", "snp"):
+        from .sev import SEVSNPAttestationProvider
+
+        use_sim = not config.is_production
+        provider = SEVSNPAttestationProvider(use_simulation=use_sim)
+
+        if not provider.is_available and config.is_production:
+            raise AttestationError("AMD SEV-SNP not available in production mode")
+
+        return provider
 
     raise AttestationError(
         f"Unknown attestation provider: {provider_type}. "
-        f"Supported: auto, tpm, software, sgx (future), sev (future)"
+        f"Supported: auto, tpm, software, tdx, sev-snp"
     )
 
 
@@ -111,7 +127,23 @@ def _auto_detect_provider(config: AttestationConfig) -> AttestationProvider:
     """Auto-detect the best available attestation provider."""
     from .tpm import TPMAttestationProvider
 
-    # Try TPM first
+    # Try TDX first (most common for confidential AI on cloud)
+    from .tdx import TDXAttestationProvider
+
+    tdx_provider = TDXAttestationProvider(use_simulation=False)
+    if tdx_provider.is_available:
+        logger.info("Auto-detected Intel TDX attestation")
+        return tdx_provider
+
+    # Try SEV-SNP
+    from .sev import SEVSNPAttestationProvider
+
+    sev_provider = SEVSNPAttestationProvider(use_simulation=False)
+    if sev_provider.is_available:
+        logger.info("Auto-detected AMD SEV-SNP attestation")
+        return sev_provider
+
+    # Try TPM
     tpm_provider = TPMAttestationProvider(
         device_path=config.tpm_device_path,
         tcti=config.tpm_tcti,
