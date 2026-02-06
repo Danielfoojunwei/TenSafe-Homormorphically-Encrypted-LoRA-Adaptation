@@ -4,13 +4,12 @@ Service Telemetry Collector
 Collects and aggregates telemetry data from MSS and HAS services.
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
 import logging
 import threading
 import time
-from collections import defaultdict
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -332,7 +331,8 @@ class ServiceTelemetryCollector:
         """
         with self._lock:
             now = time.time()
-            if not force_refresh and (now - self._last_aggregation) < self._aggregation_interval:
+            # Force refresh if aggregated is empty or if explicitly requested
+            if not force_refresh and self._aggregated and (now - self._last_aggregation) < self._aggregation_interval:
                 return self._aggregated
 
             # Compute aggregates

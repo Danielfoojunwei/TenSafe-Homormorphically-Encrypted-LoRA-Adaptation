@@ -14,29 +14,29 @@ Benchmarks are run across:
   - Multiple ranks
 """
 
-import time
 import json
-from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional
+import os
+import sys
+import time
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 
-import sys
-import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+from he_lora_microkernel.backend.gpu_ckks_backend import BackendType
 from he_lora_microkernel.compiler import (
+    CKKSProfile,
     LoRAConfig,
     LoRATargets,
-    CKKSProfile,
-    get_profile,
     compile_schedule,
+    get_profile,
+    select_optimal_profile,
 )
 from he_lora_microkernel.runtime import (
     HELoRAExecutor,
-    TelemetryCollector,
-    PerformanceReporter,
 )
-from he_lora_microkernel.backend.gpu_ckks_backend import BackendType
 
 
 @dataclass
@@ -134,6 +134,19 @@ class EndToEndBenchmarker:
         result = BenchmarkResult(config=config)
 
         try:
+            # Auto-select optimal profile for large configurations
+            try:
+                ckks_params = select_optimal_profile(
+                    hidden_size=config.hidden_size,
+                    lora_rank=config.rank,
+                    batch_size=config.batch_size,
+                )
+                profile = ckks_params.profile
+            except ValueError:
+                # Fall back to specified profile
+                profile = config.profile
+                ckks_params = get_profile(profile)
+
             # Create LoRA config
             lora_config = LoRAConfig(
                 hidden_size=config.hidden_size,
@@ -142,11 +155,10 @@ class EndToEndBenchmarker:
                 targets=config.targets,
                 batch_size=config.batch_size,
                 max_context_length=config.num_tokens + self.warmup_tokens,
-                ckks_profile=config.profile,
+                ckks_profile=profile,
             )
 
             # Compile
-            ckks_params = get_profile(config.profile)
             schedule = compile_schedule(lora_config, ckks_params)
 
             if not schedule.is_valid:
@@ -223,9 +235,9 @@ class EndToEndBenchmarker:
 
     def run_sweep(
         self,
-        batch_sizes: List[int] = [1, 4, 8],
-        hidden_sizes: List[int] = [512, 1024],
-        ranks: List[int] = [8, 16],
+        batch_sizes: List[int] = None,
+        hidden_sizes: List[int] = None,
+        ranks: List[int] = None,
         num_tokens: int = 50,
     ) -> List[BenchmarkResult]:
         """
@@ -240,6 +252,12 @@ class EndToEndBenchmarker:
         Returns:
             List of benchmark results
         """
+        if ranks is None:
+            ranks = [8, 16]
+        if hidden_sizes is None:
+            hidden_sizes = [512, 1024]
+        if batch_sizes is None:
+            batch_sizes = [1, 4, 8]
         results = []
 
         total_configs = len(batch_sizes) * len(hidden_sizes) * len(ranks)
@@ -305,9 +323,9 @@ class EndToEndBenchmarker:
 
 def run_e2e_benchmarks(
     backend_type: str = "SIMULATION",
-    batch_sizes: List[int] = [1, 4, 8],
-    hidden_sizes: List[int] = [512, 1024],
-    ranks: List[int] = [8, 16],
+    batch_sizes: List[int] = None,
+    hidden_sizes: List[int] = None,
+    ranks: List[int] = None,
     num_tokens: int = 50,
     output_file: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -325,6 +343,12 @@ def run_e2e_benchmarks(
     Returns:
         Benchmark report
     """
+    if ranks is None:
+        ranks = [8, 16]
+    if hidden_sizes is None:
+        hidden_sizes = [512, 1024]
+    if batch_sizes is None:
+        batch_sizes = [1, 4, 8]
     backend = BackendType[backend_type]
     benchmarker = EndToEndBenchmarker(backend_type=backend)
 

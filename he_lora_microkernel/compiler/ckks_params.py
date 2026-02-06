@@ -9,16 +9,18 @@ Two profiles are provided:
 NO BOOTSTRAPPING is supported - schedules must fit within the modulus chain.
 """
 
+import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Tuple
-import math
+from typing import Optional, Tuple
 
 
 class CKKSProfile(Enum):
     """CKKS security/performance profile selector."""
     FAST = "fast"
     SAFE = "safe"
+    TURBO = "turbo"  # For large batch/hidden configurations
+    PRODUCTION = "production"  # N=32768 for production Llama-scale models
 
 
 @dataclass(frozen=True)
@@ -223,12 +225,73 @@ def get_safe_profile() -> CKKSParams:
     )
 
 
+def get_turbo_profile() -> CKKSParams:
+    """
+    TURBO profile: Maximum depth for large configurations.
+
+    - poly_modulus_degree = 16384 (8192 slots)
+    - coeff_modulus_bits = [60, 40, 40, 40, 40, 60]
+    - scale = 2^40
+    - max_depth = 4
+
+    Best for:
+    - Large batch sizes (b >= 8)
+    - Large hidden dimensions (h >= 1024)
+    - Configurations that exceed FAST profile depth
+    """
+    return CKKSParams(
+        poly_modulus_degree=16384,
+        coeff_modulus_bits=(60, 40, 40, 40, 40, 60),
+        scale_bits=40,
+        profile=CKKSProfile.TURBO,
+    )
+
+
+def get_production_profile() -> CKKSParams:
+    """
+    PRODUCTION profile: Optimized for Llama-scale models (h=4096+).
+
+    - poly_modulus_degree = 32768 (16384 slots) - 2x more SIMD parallelism
+    - coeff_modulus_bits = [60, 45, 45, 45, 45, 60] - balanced precision/depth
+    - scale = 2^45
+    - max_depth = 4
+
+    Key benefits:
+    - 16384 slots enables block_size=1024 (vs 512 with N=16384)
+    - Fewer blocks for h=4096: 4 blocks instead of 8
+    - Fewer rotations: log2(4)=2 instead of log2(8)=3
+    - ~33% rotation reduction for production Llama 8B workloads
+
+    Best for:
+    - Production inference with Llama 8B/70B scale models
+    - hidden_size >= 2048
+    - Throughput-optimized deployments
+
+    Trade-offs:
+    - 2x more memory per ciphertext
+    - Slightly higher per-operation latency
+    - Amortized by fewer total operations
+
+    Security: 128-bit (881 bits modulus budget at N=32768)
+    """
+    return CKKSParams(
+        poly_modulus_degree=32768,
+        coeff_modulus_bits=(60, 45, 45, 45, 45, 60),
+        scale_bits=45,
+        profile=CKKSProfile.PRODUCTION,
+    )
+
+
 def get_profile(profile: CKKSProfile) -> CKKSParams:
     """Get CKKS parameters for specified profile."""
     if profile == CKKSProfile.FAST:
         return get_fast_profile()
     elif profile == CKKSProfile.SAFE:
         return get_safe_profile()
+    elif profile == CKKSProfile.TURBO:
+        return get_turbo_profile()
+    elif profile == CKKSProfile.PRODUCTION:
+        return get_production_profile()
     else:
         raise ValueError(f"Unknown profile: {profile}")
 
@@ -238,6 +301,7 @@ def select_optimal_profile(
     lora_rank: int,
     batch_size: int,
     precision_requirement: float = 1e-2,
+    prefer_production: bool = True,
 ) -> CKKSParams:
     """
     Automatically select the best CKKS profile for given parameters.
@@ -247,28 +311,60 @@ def select_optimal_profile(
         lora_rank: LoRA rank (r)
         batch_size: Batch size
         precision_requirement: Maximum acceptable relative error
+        prefer_production: Use PRODUCTION profile for large models (h>=2048)
 
     Returns:
         Optimal CKKSParams for the workload.
-    """
-    # Start with FAST profile
-    params = get_fast_profile()
 
-    # Check if FAST profile can handle the workload
+    Profile Selection Logic:
+    1. PRODUCTION (N=32768): h >= 2048, optimizes rotation count for Llama-scale
+    2. TURBO (N=16384): h >= 1024 with b >= 8, or h >= 512 with b >= 16
+    3. SAFE (N=16384): Higher precision requirements
+    4. FAST (N=16384): Default for smaller workloads
+    """
+    # For Llama-scale models (h >= 2048), use PRODUCTION profile
+    # This provides 2x more slots, enabling larger blocks and fewer rotations
+    if prefer_production and hidden_size >= 2048:
+        params = get_production_profile()
+    # For large configurations, use TURBO profile
+    # This handles h>=1024 with b>=8 which exceeds FAST depth
+    elif hidden_size >= 1024 and batch_size >= 8:
+        params = get_turbo_profile()
+    elif hidden_size >= 512 and batch_size >= 16:
+        params = get_turbo_profile()
+    else:
+        # Start with FAST profile
+        params = get_fast_profile()
+
+    # Check if current profile can handle the workload
     if not params.can_compute_lora(lora_rank):
-        params = get_safe_profile()
+        if params.profile == CKKSProfile.FAST:
+            params = get_safe_profile()
+        elif params.profile == CKKSProfile.SAFE:
+            params = get_turbo_profile()
+        elif params.profile == CKKSProfile.TURBO:
+            params = get_production_profile()
 
     # Check slot requirements
     required_slots = batch_size * max(hidden_size // 512, 1)  # Block packing
     if required_slots > params.slot_count:
-        # Need larger polynomial degree - not supported in current profiles
-        raise ValueError(
-            f"Workload requires {required_slots} slots but "
-            f"profile only has {params.slot_count}. "
-            f"Reduce batch_size or hidden_size."
-        )
+        # Try upgrading to PRODUCTION profile for more slots
+        if params.profile != CKKSProfile.PRODUCTION:
+            params = get_production_profile()
+            if required_slots > params.slot_count:
+                raise ValueError(
+                    f"Workload requires {required_slots} slots but "
+                    f"max available is {params.slot_count}. "
+                    f"Reduce batch_size or hidden_size."
+                )
+        else:
+            raise ValueError(
+                f"Workload requires {required_slots} slots but "
+                f"profile only has {params.slot_count}. "
+                f"Reduce batch_size or hidden_size."
+            )
 
-    # Upgrade to SAFE if precision is critical
+    # Upgrade to SAFE if precision is critical (but not if using PRODUCTION)
     if precision_requirement < 5e-3 and params.profile == CKKSProfile.FAST:
         params = get_safe_profile()
 
