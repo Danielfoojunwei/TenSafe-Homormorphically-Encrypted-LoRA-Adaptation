@@ -1,0 +1,44 @@
+{
+  "config": {
+    "hidden_dim": 768,
+    "rank": 16,
+    "alpha": 32.0,
+    "batch_size": 2,
+    "keygen_runs": 50,
+    "init_runs": 20,
+    "delta_trials": 50,
+    "delta_warmup": 5
+  },
+  "before": {
+    "label": "BEFORE (11 Galois keys)",
+    "galois_key_count": 11,
+    "keygen_mean_ms": 22.717030100003512,
+    "keygen_std_ms": 3.60887053900892,
+    "keygen_memory_bytes": 7346299,
+    "server_init_mean_ms": 25.38656985000216,
+    "server_init_std_ms": 7.255380462290318,
+    "server_init_memory_bytes": 7346930,
+    "scheduler_rotations": 0,
+    "scheduler_galois_keys_needed": 0,
+    "delta_mean_ms": 0.06780234000189012,
+    "delta_std_ms": 0.01051755927414103,
+    "delta_min_ms": 0.05977400002166178,
+    "delta_max_ms": 0.11161700001594
+  },
+  "after": {
+    "label": "AFTER (0 Galois keys)",
+    "galois_key_count": 0,
+    "keygen_mean_ms": 5.963348220001308,
+    "keygen_std_ms": 0.5470197782872546,
+    "keygen_memory_bytes": 1574726,
+    "server_init_mean_ms": 7.396057799999767,
+    "server_init_std_ms": 0.9371536759753664,
+    "server_init_memory_bytes": 1575165,
+    "scheduler_rotations": 0,
+    "scheduler_galois_keys_needed": 0,
+    "delta_mean_ms": 0.06474163999882876,
+    "delta_std_ms": 0.006409833654033179,
+    "delta_min_ms": 0.05904199997530668,
+    "delta_max_ms": 0.0924560000044039
+  }
+}
