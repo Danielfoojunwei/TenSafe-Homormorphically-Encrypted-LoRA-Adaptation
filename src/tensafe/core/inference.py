@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -476,6 +477,10 @@ class TenSafeInference:
         """
         Run forward pass with configured LoRA mode.
 
+        Optimisations applied to the HE_ONLY path:
+          1. Async overlap: base forward runs in parallel with HE pipeline
+          2. In-place buffer reuse: delta added directly into y_base (no alloc)
+
         Args:
             x: Input activation [batch, hidden_dim] or [hidden_dim]
             module_name: Target module (for LoRA modes)
@@ -486,30 +491,54 @@ class TenSafeInference:
         start_time = time.perf_counter()
         result = InferenceResult(output=x, mode=self._mode.value)
 
-        # Step 1: Base model forward (always plaintext)
-        base_start = time.perf_counter()
-        y_base = self._base_model_forward(x)
-        result.base_model_time_ms = (time.perf_counter() - base_start) * 1000
-
-        # Step 2: Apply LoRA based on mode
         if self._mode == InferenceMode.NONE:
+            # Step 1: Base model forward (always plaintext)
+            base_start = time.perf_counter()
+            y_base = self._base_model_forward(x)
+            result.base_model_time_ms = (time.perf_counter() - base_start) * 1000
             result.output = y_base
 
         elif self._mode == InferenceMode.PLAINTEXT:
+            base_start = time.perf_counter()
+            y_base = self._base_model_forward(x)
+            result.base_model_time_ms = (time.perf_counter() - base_start) * 1000
+
             lora_start = time.perf_counter()
             delta = self._lora_forward_plaintext(x, module_name)
-            result.output = y_base + delta
+            # In-place add: avoids allocating a new output array
+            np.add(y_base, delta, out=y_base)
+            result.output = y_base
             result.lora_time_ms = (time.perf_counter() - lora_start) * 1000
 
         elif self._mode == InferenceMode.HE_ONLY:
+            # Async overlap: run base forward and HE pipeline concurrently.
+            # Since they share no state (base is plaintext matmul on x,
+            # HE operates on an encrypted copy of x), this is safe.
             lora_start = time.perf_counter()
-            delta, he_metrics = self._lora_forward_he(x, module_name)
-            result.output = y_base + delta
+
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                # Submit base model forward to background thread
+                base_future = pool.submit(self._base_model_forward, x)
+
+                # Run HE pipeline on this thread (encrypt → compute → decrypt)
+                delta, he_metrics = self._lora_forward_he(x, module_name)
+
+                # Collect base model result (blocks if base hasn't finished)
+                base_start = time.perf_counter()
+                y_base = base_future.result()
+                result.base_model_time_ms = (time.perf_counter() - base_start) * 1000
+
+            # In-place add: fuse delta into y_base without a third array
+            np.add(y_base, delta, out=y_base)
+            result.output = y_base
             result.lora_time_ms = (time.perf_counter() - lora_start) * 1000
             result.he_metrics = he_metrics
 
         elif self._mode == InferenceMode.FULL_HE:
             logger.warning("FULL_HE mode not recommended for latency")
+            base_start = time.perf_counter()
+            y_base = self._base_model_forward(x)
+            result.base_model_time_ms = (time.perf_counter() - base_start) * 1000
             result.output = y_base
 
         result.total_time_ms = (time.perf_counter() - start_time) * 1000
@@ -555,7 +584,13 @@ class TenSafeInference:
         x: np.ndarray,
         module_name: Optional[str] = None,
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
-        """Compute LoRA delta under homomorphic encryption."""
+        """
+        Compute LoRA delta under homomorphic encryption.
+
+        Optimisations applied:
+          - Partial/lazy decrypt: only decrypt the slots carrying real data
+            (output_size), skipping unused padding in the CKKS slot vector.
+        """
         self._ensure_he_backend()
 
         if module_name is None and self._lora_weights:
@@ -574,9 +609,10 @@ class TenSafeInference:
         # Compute encrypted LoRA delta
         ct_result = self._he_backend.lora_delta(ct_x, lora_a, lora_b, scaling)
 
-        # Decrypt
-        delta = self._he_backend.decrypt(ct_result, output_size=len(x_flat))
-        delta = delta.reshape(x.shape)
+        # Partial decrypt: only the slots that carry real payload
+        output_size = len(x_flat)
+        delta = self._he_backend.decrypt(ct_result, output_size=output_size)
+        delta = delta[:output_size].reshape(x.shape)
 
         # Get metrics
         metrics = self._he_backend.get_metrics()

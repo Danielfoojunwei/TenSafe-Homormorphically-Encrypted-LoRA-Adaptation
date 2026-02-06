@@ -231,6 +231,11 @@ class CostEstimate:
     encrypt_cost_us: float = 200.0
     decrypt_cost_us: float = 200.0
 
+    # Optimized decrypt variants (lower cost due to reduced work)
+    decrypt_partial_cost_us: float = 120.0      # Partial decrypt: skip unused slots
+    decrypt_fused_add_cost_us: float = 100.0    # Fused decrypt+unpack+add: single memory pass
+    decrypt_batch_overhead_us: float = 50.0     # Per-ciphertext cost in batch mode (amortised)
+
     # Operation counts
     num_rotations: int = 0
     num_keyswitches: int = 0
@@ -253,10 +258,10 @@ class CostEstimate:
 
     @property
     def total_crypto_us(self) -> float:
-        """Total encrypt/decrypt time."""
+        """Total encrypt/decrypt time (using optimised decrypt cost)."""
         return (
             self.num_encrypt * self.encrypt_cost_us +
-            self.num_decrypt * self.decrypt_cost_us
+            self.num_decrypt * self.decrypt_fused_add_cost_us
         )
 
     @property

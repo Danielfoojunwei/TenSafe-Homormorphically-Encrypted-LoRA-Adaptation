@@ -276,9 +276,13 @@ class HELoRAAdapter:
 
         self._metrics.compute_time_ms += (time.perf_counter() - t1) * 1000
 
-        # Decrypt
+        # Partial decrypt: only the slots carrying real data
         t2 = time.perf_counter()
-        delta = self._backend.decrypt(ct_result, output_size=len(x_flat))
+        output_size = len(x_flat)
+        if hasattr(self._backend, 'decrypt_partial'):
+            delta = self._backend.decrypt_partial(ct_result, output_size)
+        else:
+            delta = self._backend.decrypt(ct_result, output_size=output_size)
         self._metrics.decrypt_time_ms += (time.perf_counter() - t2) * 1000
 
         # Get operation counts from backend
