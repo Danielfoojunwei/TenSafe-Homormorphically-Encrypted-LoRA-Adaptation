@@ -7,6 +7,7 @@ TenSafe is a complete privacy-preserving machine learning platform that protects
 [![Python 3.9+](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/License-Apache%202.0-orange.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-4.0.0-green.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-196%20passed-green.svg)]()
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Native-326CE5.svg)](https://kubernetes.io)
 [![vLLM](https://img.shields.io/badge/vLLM-Integrated-FF6B6B.svg)](https://vllm.ai)
 [![Ray](https://img.shields.io/badge/Ray-Train-00A3E0.svg)](https://ray.io)
@@ -355,6 +356,20 @@ url = hub.push_to_hub(
 
 **Key Achievement:** Zero rotations in CKKS (MOAI optimization) - constant-time encrypted matrix multiplication.
 
+### Empirical Performance (Measured)
+
+Benchmarks measured on Linux x86_64 with Python 3.11:
+
+| Operation | Mean | p95 | Throughput |
+|-----------|------|-----|------------|
+| **N2HE Encrypt 1KB** | 16.3ms | 17.3ms | 61 ops/s |
+| **N2HE Encrypt 10KB** | 170.8ms | 185.1ms | 5.9 ops/s |
+| **N2HE Decrypt 1KB** | 2.5ms | 2.6ms | 396 ops/s |
+| **Ed25519 Sign** | 0.04ms | 0.06ms | 23,800 ops/s |
+| **Ed25519 Verify** | 0.10ms | 0.12ms | 9,780 ops/s |
+| **Serialize 100KB** | 0.02ms | 0.02ms | 54,600 ops/s |
+| **LWE Serialize (100 batch)** | 0.001ms | - | 714,286 ops/s |
+
 ### vLLM Integration Performance
 
 | Metric | TenSafe + vLLM | Native vLLM | Overhead |
@@ -373,6 +388,22 @@ url = hub.push_to_hub(
 | 8 | 720 samples/s | ε=8.0 | 0.90x |
 | 16 | 1,350 samples/s | ε=8.0 | 0.84x |
 
+### Benchmark Commands
+
+```bash
+# Unit benchmarks (offline, no server required)
+make bench-unit
+
+# Performance regression tests
+make bench-test
+
+# Full API benchmark suite (requires running server)
+make bench-full
+
+# Generate analysis report
+make bench-report
+```
+
 ---
 
 ## Project Structure
@@ -389,27 +420,27 @@ tensafe/
 │       ├── platform/                 # FastAPI server
 │       │   └── tg_tinker_api/        # Training API routes
 │       │
-│       ├── backends/                 # Serving backends (NEW)
+│       ├── backends/                 # Serving backends
 │       │   └── vllm/                 # vLLM integration
 │       │       ├── engine.py         # TenSafeVLLMEngine
 │       │       ├── hooks.py          # HE-LoRA forward hooks
 │       │       ├── api.py            # OpenAI-compatible API
 │       │       └── config.py         # vLLM configuration
 │       │
-│       ├── distributed/              # Distributed training (NEW)
+│       ├── distributed/              # Distributed training
 │       │   ├── ray_trainer.py        # TenSafeRayTrainer
 │       │   └── dp_distributed.py     # Distributed DP-SGD
 │       │
-│       ├── observability/            # OpenTelemetry (NEW)
+│       ├── observability/            # OpenTelemetry
 │       │   ├── setup.py              # Metrics & tracing setup
 │       │   └── middleware.py         # Request tracing
 │       │
-│       ├── integrations/             # MLOps integrations (NEW)
+│       ├── integrations/             # MLOps integrations
 │       │   ├── wandb_callback.py     # W&B integration
 │       │   ├── mlflow_callback.py    # MLflow integration
 │       │   └── hf_hub.py             # HuggingFace Hub
 │       │
-│       ├── optimizations/            # Kernel optimizations (NEW)
+│       ├── optimizations/            # Kernel optimizations
 │       │   ├── liger_integration.py  # Liger Kernel
 │       │   └── training_optimizations.py  # Mixed precision, etc.
 │       │
@@ -417,7 +448,7 @@ tensafe/
 │       ├── n2he/                     # Homomorphic encryption
 │       └── tgsp/                     # Secure packaging
 │
-├── deploy/                           # Deployment (NEW)
+├── deploy/                           # Deployment
 │   ├── kubernetes/                   # K8s manifests
 │   └── helm/tensafe/                 # Helm chart
 │
@@ -429,12 +460,26 @@ tensafe/
 ├── tests/                            # Test suite
 ├── benchmarks/                       # Performance benchmarks
 ├── docs/                             # Documentation
-│   ├── audit/                        # Competitive analysis (NEW)
+│   ├── audit/                        # Competitive analysis
 │   ├── api-reference/                # API documentation
 │   └── guides/                       # User guides
 │
 └── scripts/                          # Utilities
 ```
+
+---
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TG_ENVIRONMENT` | `development` or `production` | `development` |
+| `TG_SECRET_KEY` | JWT signing key (required in production) | - |
+| `DATABASE_URL` | Database connection string | `sqlite:///./tensorguard.db` |
+| `TG_SIMULATION` | Enable simulation mode | `false` |
+| `TG_ALLOW_TPM_SIMULATOR` | Allow TPM simulator in production | `false` |
 
 ---
 
@@ -445,7 +490,7 @@ tensafe/
 - **[API Specification](docs/TENSAFE_SPEC.md)** - Complete API reference
 - **[TSSP Format](docs/TSSP_SPEC.md)** - Secure packaging specification
 
-### New Integration Guides
+### Integration Guides
 - **[vLLM Integration](docs/guides/vllm-integration.md)** - High-throughput serving
 - **[Ray Train Guide](docs/guides/ray-train.md)** - Distributed training
 - **[Kubernetes Deployment](docs/guides/kubernetes.md)** - Production deployment
@@ -503,6 +548,35 @@ make k8s-apply         # Apply K8s manifests
 make docker-build      # Build container image
 ```
 
+### Test Coverage
+
+```bash
+pytest tests/ --cov=tensorguard --cov-report=html
+```
+
+Current test status: **196 passed, 17 skipped** (optional dependencies)
+
+---
+
+## Security Considerations
+
+### Cryptographic Components
+
+| Component | Algorithm | Security Level |
+|-----------|-----------|----------------|
+| Symmetric Encryption | AES-256-GCM | 256-bit |
+| Key Encapsulation | X25519 + Kyber768 | 128-bit PQ |
+| Digital Signatures | Ed25519 + Dilithium3 | 128-bit PQ |
+| Password Hashing | Argon2id | OWASP recommended |
+| N2HE Encryption | LWE (n=1024, q=2^32) | 128-bit (research) |
+
+### Production Hardening
+
+1. **Key Management**: Use HSM or cloud KMS (AWS KMS, Azure Key Vault, GCP Cloud KMS)
+2. **TLS Everywhere**: All API endpoints require HTTPS in production
+3. **Rate Limiting**: Built-in rate limiting on all endpoints
+4. **Audit Logging**: Comprehensive audit trail for security events
+5. **Secret Rotation**: Automated key rotation support
 ---
 
 ## Contributing

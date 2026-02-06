@@ -2,7 +2,7 @@
 # Privacy-First ML Training API
 # ================================================================
 
-.PHONY: help install dev test lint typecheck serve clean qa bench evidence compliance compliance-smoke bench-llama3 bench-llama3-smoke build-n2he test-n2he bench-n2he bench-n2he-full n2he-smoke
+.PHONY: help install dev test lint typecheck serve clean qa bench bench-unit bench-test bench-full bench-quick bench-report bench-regression bench-ci evidence compliance compliance-smoke bench-llama3 bench-llama3-smoke build-n2he test-n2he bench-n2he bench-n2he-full n2he-smoke reports setup ci
 
 SHELL := /bin/bash
 PYTHON := python3
@@ -90,6 +90,28 @@ test-integration:
 
 test-regression:
 	$(PYTHON) -m pytest tests/regression/ -v --tb=short -m regression
+
+# Unit Benchmarks (offline, no server required) - measures ACTUAL performance
+bench-unit:
+	@echo "=== TensorGuard Unit Benchmarks (Offline) ==="
+	@echo "Measuring actual crypto and serialization performance..."
+	@mkdir -p artifacts/benchmarks
+	python -m benchmarks.unit_benchmark --iterations 50 --output artifacts/benchmarks/unit_benchmark_results.json
+	@echo "Results saved to: artifacts/benchmarks/unit_benchmark_results.json"
+
+# Performance Regression Tests - validates against empirical baselines
+bench-test:
+	@echo "=== Performance Regression Tests ==="
+	python -m pytest tests/benchmarks/test_performance_regression.py -v
+
+# Performance Benchmarking Suite (HTTP, Telemetry, Resources)
+bench-full:
+	@echo "=== TensorGuardFlow Full Performance Benchmark Suite ==="
+	@echo "This requires a running TensorGuardFlow server at http://localhost:8000"
+	@mkdir -p artifacts/benchmarks
+	python -m benchmarks.runner --load moderate --duration 60 --output artifacts/benchmarks
+	@echo "=== Generating Analysis Report ==="
+	python -c "from benchmarks.analyzer import analyze_results; analyze_results('artifacts/benchmarks/benchmark_results_latest.json', 'docs')"
 
 test-tensafe:
 	$(PYTHON) -m pytest tests/ -v --tb=short -m tensafe

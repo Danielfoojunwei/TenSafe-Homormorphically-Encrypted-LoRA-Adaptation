@@ -1,0 +1,104 @@
+{
+  "$schema": "baseline_v1",
+  "description": "TensorGuard empirical performance baseline - generated from actual measurements",
+  "generated_at": "2026-01-25T23:49:45Z",
+  "platform": {
+    "python_version": "3.12.0",
+    "platform": "Linux-4.4.0-x86_64-with-glibc2.39",
+    "notes": "Generated on standardized test environment"
+  },
+  "thresholds": {
+    "n2he_encrypt": {
+      "1kb": {
+        "mean_ms_max": 50.0,
+        "p95_ms_max": 75.0,
+        "description": "N2HE encryption of 1KB tensor"
+      },
+      "10kb": {
+        "mean_ms_max": 500.0,
+        "p95_ms_max": 750.0,
+        "description": "N2HE encryption of 10KB tensor"
+      },
+      "100kb": {
+        "mean_ms_max": 5000.0,
+        "p95_ms_max": 7500.0,
+        "description": "N2HE encryption of 100KB tensor"
+      }
+    },
+    "n2he_decrypt": {
+      "1kb": {
+        "mean_ms_max": 10.0,
+        "p95_ms_max": 15.0,
+        "description": "N2HE decryption of 1KB tensor"
+      },
+      "10kb": {
+        "mean_ms_max": 250.0,
+        "p95_ms_max": 400.0,
+        "description": "N2HE decryption of 10KB tensor"
+      }
+    },
+    "ed25519": {
+      "keygen": {
+        "mean_ms_max": 1.0,
+        "p95_ms_max": 2.0,
+        "description": "Ed25519 key generation"
+      },
+      "sign_1024b": {
+        "mean_ms_max": 1.0,
+        "p95_ms_max": 2.0,
+        "description": "Ed25519 sign 1KB message"
+      },
+      "verify_1024b": {
+        "mean_ms_max": 1.0,
+        "p95_ms_max": 2.0,
+        "description": "Ed25519 verify 1KB message"
+      }
+    },
+    "serialization": {
+      "100kb": {
+        "mean_ms_max": 5.0,
+        "p95_ms_max": 10.0,
+        "description": "UpdatePackage serialization 100KB"
+      },
+      "1000kb": {
+        "mean_ms_max": 10.0,
+        "p95_ms_max": 20.0,
+        "description": "UpdatePackage serialization 1MB"
+      }
+    },
+    "lwe_ciphertext": {
+      "batch_100": {
+        "serialize_mean_ms_max": 1.0,
+        "deserialize_mean_ms_max": 5.0,
+        "description": "LWE ciphertext batch of 100 elements"
+      },
+      "batch_1000": {
+        "serialize_mean_ms_max": 5.0,
+        "deserialize_mean_ms_max": 25.0,
+        "description": "LWE ciphertext batch of 1000 elements"
+      }
+    }
+  },
+  "measured_baseline": {
+    "n2he_encrypt_1kb_mean_ms": 16.31,
+    "n2he_encrypt_1kb_p95_ms": 17.28,
+    "n2he_encrypt_10kb_mean_ms": 170.78,
+    "n2he_encrypt_10kb_p95_ms": 185.09,
+    "n2he_decrypt_1kb_mean_ms": 2.52,
+    "n2he_decrypt_1kb_p95_ms": 2.58,
+    "ed25519_sign_1024b_mean_ms": 0.042,
+    "ed25519_sign_1024b_p95_ms": 0.059,
+    "ed25519_verify_1024b_mean_ms": 0.102,
+    "ed25519_verify_1024b_p95_ms": 0.120,
+    "serialize_100kb_mean_ms": 0.018,
+    "serialize_100kb_p95_ms": 0.022,
+    "lwe_serialize_100_mean_ms": 0.001,
+    "lwe_deserialize_100_mean_ms": 0.227
+  },
+  "regression_tolerance_percent": 50,
+  "notes": [
+    "Thresholds set with 3x headroom from measured baseline for CI stability",
+    "Hybrid PQC signatures (Dilithium3) require liboqs native library",
+    "N2HE is a research prototype - see src/tensorguard/core/crypto.py for caveats"
+  ]
+}
