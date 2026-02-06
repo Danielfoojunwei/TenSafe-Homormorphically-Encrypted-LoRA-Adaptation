@@ -94,10 +94,11 @@ print(f"Encrypted with: {checkpoint.encryption.algorithm}")
 
 ## Getting Started
 
-1. [Installation](installation.md) - Install the TenSafe SDK
-2. [Quickstart](quickstart.md) - Run your first fine-tuning job
-3. [Training Guide](guides/training.md) - Deep dive into training
-4. [API Reference](api-reference/service-client.md) - Full API documentation
+1. [How to Use TenSafe](HOW_TO_USE.md) - Comprehensive end-to-end usage guide
+2. [Installation](installation.md) - Install the TenSafe SDK
+3. [Quickstart](quickstart.md) - Run your first fine-tuning job
+4. [Training Guide](guides/training.md) - Deep dive into training
+5. [API Reference](api-reference/service-client.md) - Full API documentation
 
 ## Documentation
 
