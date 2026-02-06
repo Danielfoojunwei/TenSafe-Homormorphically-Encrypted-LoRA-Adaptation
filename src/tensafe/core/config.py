@@ -36,10 +36,10 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, Literal
+from typing import Any, Dict, List
 
 import yaml
 
@@ -82,7 +82,7 @@ class HEMode(str, Enum):
     N2HE_HEXL = "n2he_hexl"  # DEPRECATED: Maps to PRODUCTION
 
     @classmethod
-    def resolve(cls, mode: "HEMode") -> "HEMode":
+    def resolve(cls, mode: HEMode) -> HEMode:
         """
         Resolve legacy modes to their modern equivalents.
 
@@ -232,7 +232,7 @@ class ModelConfig:
 
     # Model identification
     name: str = "meta-llama/Llama-3.1-8B"
-    revision: Optional[str] = None
+    revision: str | None = None
 
     # Model loading
     torch_dtype: str = "bfloat16"  # "float16", "bfloat16", "float32"
@@ -241,7 +241,7 @@ class ModelConfig:
     load_in_4bit: bool = False
 
     # Tokenizer
-    tokenizer_name: Optional[str] = None  # Defaults to model name
+    tokenizer_name: str | None = None  # Defaults to model name
     padding_side: str = "right"
     truncation_side: str = "right"
     max_seq_length: int = 2048
@@ -348,11 +348,11 @@ class TrainingConfig:
     save_total_limit: int = 3
 
     # Data
-    dataset_name: Optional[str] = None
-    dataset_subset: Optional[str] = None
+    dataset_name: str | None = None
+    dataset_subset: str | None = None
     train_split: str = "train"
     eval_split: str = "validation"
-    max_samples: Optional[int] = None
+    max_samples: int | None = None
 
     # Reproducibility
     seed: int = 42
@@ -360,7 +360,7 @@ class TrainingConfig:
 
     # Output
     output_dir: str = "./outputs"
-    run_name: Optional[str] = None
+    run_name: str | None = None
 
     def __post_init__(self):
         if isinstance(self.mode, str):
@@ -457,8 +457,8 @@ class InferenceConfig:
     no_repeat_ngram_size: int = 0
 
     # Stopping
-    eos_token_id: Optional[int] = None
-    pad_token_id: Optional[int] = None
+    eos_token_id: int | None = None
+    pad_token_id: int | None = None
 
     # LoRA mode for inference
     lora_mode: str = "plaintext"  # "none", "plaintext", "he_only", "full_he"
@@ -494,7 +494,7 @@ class RLVRConfig:
     reward_fn: str = "keyword_contains"
     reward_kwargs: Dict[str, Any] = field(default_factory=dict)
     reward_scale: float = 1.0
-    reward_clip: Optional[float] = None
+    reward_clip: float | None = None
 
     # Algorithm parameters (REINFORCE)
     gamma: float = 1.0
@@ -549,12 +549,12 @@ class TenSafeConfig:
     dp: DPConfig = field(default_factory=DPConfig)
     he: HEConfig = field(default_factory=HEConfig)
     inference: InferenceConfig = field(default_factory=InferenceConfig)
-    rlvr: Optional[RLVRConfig] = None
+    rlvr: RLVRConfig | None = None
 
     # API/SDK settings (for remote training)
-    api_key: Optional[str] = None
+    api_key: str | None = None
     base_url: str = "https://api.tensafe.dev"
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
 
     # Runtime settings
     debug: bool = False
@@ -653,7 +653,7 @@ class TenSafeConfig:
         return convert(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TenSafeConfig":
+    def from_dict(cls, data: Dict[str, Any]) -> TenSafeConfig:
         """Create from dictionary."""
         # Parse nested configs
         model = ModelConfig(**data.get("model", {})) if "model" in data else ModelConfig()
@@ -689,7 +689,7 @@ class TenSafeConfig:
 
 
 def load_config(
-    path: Union[str, Path],
+    path: str | Path,
     env_override: bool = True,
     validate: bool = True,
 ) -> TenSafeConfig:
@@ -742,7 +742,7 @@ def load_config(
     return config
 
 
-def save_config(config: TenSafeConfig, path: Union[str, Path]) -> None:
+def save_config(config: TenSafeConfig, path: str | Path) -> None:
     """
     Save configuration to YAML or JSON file.
 

@@ -14,11 +14,7 @@ The adapter provides hooks for:
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import (
-    Any, Callable, Dict, List, Optional, Tuple, Union,
-    TYPE_CHECKING
-)
-import numpy as np
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 if TYPE_CHECKING:
     import torch

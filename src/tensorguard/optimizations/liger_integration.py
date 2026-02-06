@@ -8,9 +8,9 @@ Liger Kernel provides Triton-based optimizations that can achieve:
 This module integrates Liger with TenSafe's privacy-preserving training.
 """
 
-from typing import Optional, Dict, Any, List
-from dataclasses import dataclass, field
 import logging
+from dataclasses import dataclass
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +19,9 @@ LIGER_AVAILABLE = False
 LIGER_KIMI_AVAILABLE = False
 try:
     from liger_kernel.transformers import (
+        apply_liger_kernel_to_gemma,
         apply_liger_kernel_to_llama,
         apply_liger_kernel_to_mistral,
-        apply_liger_kernel_to_gemma,
         apply_liger_kernel_to_qwen2,
     )
     # Try to import Kimi kernel support (may not be available in all versions)
@@ -34,7 +34,6 @@ try:
 except ImportError:
     logger.info("Liger Kernel not installed. Install with: pip install liger-kernel")
 
-import torch
 import torch.nn as nn
 
 
