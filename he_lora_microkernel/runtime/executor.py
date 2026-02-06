@@ -295,47 +295,25 @@ class HELoRAExecutor:
     # TOKEN EXECUTION
     # -------------------------------------------------------------------------
 
-    def execute_token(
+    def _compute_ct_delta(
         self,
         activations: np.ndarray,
-        position: Optional[int] = None,
-    ) -> np.ndarray:
+    ) -> 'GPUCiphertext':
         """
-        Execute HE-LoRA for a single token.
+        Run the encrypt → matmul → matmul pipeline and return the
+        encrypted delta ciphertext (before decryption).
 
-        This is the main entry point for every-token execution.
-        NO SKIPPING - every token goes through HE-LoRA.
+        This is factored out so callers can choose between:
+          - execute_token() — classic decrypt → unpack → return delta
+          - execute_token_fused() — fused decrypt-unpack-add into y_base
 
         Args:
             activations: Batch activations (batch_size, hidden_size)
-            position: Optional token position for context length check
 
         Returns:
-            LoRA delta to add to base model output
-
-        Raises:
-            ValueError: If weights not loaded or context length exceeded
+            Encrypted delta ciphertext
         """
-        if not self._weights_loaded:
-            raise ValueError("Weights not loaded. Call load_weights() first.")
-
-        # Enforce context length
-        if position is not None:
-            self.enforce_context_length(position)
-
-        # Start token tracking
-        self._context.cost_tracker.begin_token()
-        start_time = time.perf_counter()
-
         layout = self._schedule.layout
-        config = self._schedule.config
-
-        # Validate input shape
-        if activations.shape != (config.batch_size, config.hidden_size):
-            raise ValueError(
-                f"Activation shape mismatch: {activations.shape} vs expected "
-                f"({config.batch_size}, {config.hidden_size})"
-            )
 
         # Step 1: Pack activations
         packed_x = pack_activations(activations, layout)
@@ -408,9 +386,57 @@ class HELoRAExecutor:
 
             ct_delta = result
 
-        # Step 5: Decrypt
+        return ct_delta
+
+    def execute_token(
+        self,
+        activations: np.ndarray,
+        position: Optional[int] = None,
+    ) -> np.ndarray:
+        """
+        Execute HE-LoRA for a single token.
+
+        This is the main entry point for every-token execution.
+        NO SKIPPING - every token goes through HE-LoRA.
+
+        Args:
+            activations: Batch activations (batch_size, hidden_size)
+            position: Optional token position for context length check
+
+        Returns:
+            LoRA delta to add to base model output
+
+        Raises:
+            ValueError: If weights not loaded or context length exceeded
+        """
+        if not self._weights_loaded:
+            raise ValueError("Weights not loaded. Call load_weights() first.")
+
+        # Enforce context length
+        if position is not None:
+            self.enforce_context_length(position)
+
+        # Start token tracking
+        self._context.cost_tracker.begin_token()
+        start_time = time.perf_counter()
+
+        layout = self._schedule.layout
+        config = self._schedule.config
+
+        # Validate input shape
+        if activations.shape != (config.batch_size, config.hidden_size):
+            raise ValueError(
+                f"Activation shape mismatch: {activations.shape} vs expected "
+                f"({config.batch_size}, {config.hidden_size})"
+            )
+
+        ct_delta = self._compute_ct_delta(activations)
+
+        # Step 5: Decrypt (partial — only the slots that carry real data)
         with self._backend.timed_section('decrypt'):
-            packed_delta = self._backend.decrypt(ct_delta)
+            packed_delta = self._backend.decrypt_partial(
+                ct_delta, layout.total_slots_used
+            )
         self._context.cost_tracker.record_decrypt()
 
         # Step 6: Unpack
@@ -423,6 +449,58 @@ class HELoRAExecutor:
         self._context.cost_tracker.end_token(config.targets)
 
         return delta
+
+    def execute_token_fused(
+        self,
+        activations: np.ndarray,
+        y_base: np.ndarray,
+        position: Optional[int] = None,
+    ) -> np.ndarray:
+        """
+        Fused HE-LoRA execution: decrypt + unpack + add into y_base in one pass.
+
+        This eliminates two intermediate allocations and two extra memory
+        passes compared to the separate execute_token() + numpy add pipeline.
+
+        Args:
+            activations: Batch activations (batch_size, hidden_size)
+            y_base: Base model output (batch_size, hidden_size), modified in-place
+            position: Optional token position for context length check
+
+        Returns:
+            y_base with decrypted delta added in-place
+        """
+        if not self._weights_loaded:
+            raise ValueError("Weights not loaded. Call load_weights() first.")
+
+        if position is not None:
+            self.enforce_context_length(position)
+
+        self._context.cost_tracker.begin_token()
+        start_time = time.perf_counter()
+
+        layout = self._schedule.layout
+        config = self._schedule.config
+
+        if activations.shape != (config.batch_size, config.hidden_size):
+            raise ValueError(
+                f"Activation shape mismatch: {activations.shape} vs expected "
+                f"({config.batch_size}, {config.hidden_size})"
+            )
+
+        ct_delta = self._compute_ct_delta(activations)
+
+        # Fused decrypt-unpack-add: single pass over output memory
+        with self._backend.timed_section('decrypt'):
+            self._backend.decrypt_fused_unpack_add(ct_delta, layout, y_base)
+        self._context.cost_tracker.record_decrypt()
+
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
+        self._context.total_he_time_ms += elapsed_ms
+        self._context.tokens_processed += 1
+        self._context.cost_tracker.end_token(config.targets)
+
+        return y_base
 
     def execute_batch(
         self,
@@ -544,6 +622,101 @@ class LoRAAdapterExecutor:
                 deltas[name] = self._executors[name].execute_token(
                     activations[name], position
                 )
+        return deltas
+
+    def execute_all_adapters_fused(
+        self,
+        activations: Dict[str, np.ndarray],
+        y_bases: Dict[str, np.ndarray],
+        position: Optional[int] = None,
+    ) -> Dict[str, np.ndarray]:
+        """
+        Execute all adapters with fused decrypt-unpack-add into y_bases.
+
+        This is the optimised path: for each adapter, the encrypted delta
+        is decrypted and added directly into the corresponding y_base buffer.
+
+        Args:
+            activations: Dict mapping adapter name to activations
+            y_bases: Dict mapping adapter name to base model output (modified in-place)
+            position: Optional token position
+
+        Returns:
+            Dict mapping adapter name to y_base (with delta added in-place)
+        """
+        results = {}
+        for name in self._adapter_names:
+            if name in activations and name in y_bases:
+                results[name] = self._executors[name].execute_token_fused(
+                    activations[name], y_bases[name], position
+                )
+        return results
+
+    def execute_all_adapters_batched_decrypt(
+        self,
+        activations: Dict[str, np.ndarray],
+        position: Optional[int] = None,
+    ) -> Dict[str, np.ndarray]:
+        """
+        Execute all adapters and batch-decrypt their results together.
+
+        This amortises per-decrypt fixed overhead (key loading, NTT setup)
+        across all adapters in the layer. Each ciphertext is decrypted by
+        its own backend (since each executor owns its key material), but
+        the decrypt calls are grouped to enable GPU stream parallelism.
+
+        Args:
+            activations: Dict mapping adapter name to activations
+            position: Optional token position
+
+        Returns:
+            Dict mapping adapter name to delta
+        """
+        # Phase 1: Compute all encrypted deltas (no decryption yet)
+        ct_deltas = {}
+        adapter_order = []
+        for name in self._adapter_names:
+            if name in activations:
+                executor = self._executors[name]
+                if not executor._weights_loaded:
+                    continue
+                if position is not None:
+                    executor.enforce_context_length(position)
+
+                executor._context.cost_tracker.begin_token()
+                config = executor._schedule.config
+
+                if activations[name].shape != (config.batch_size, config.hidden_size):
+                    raise ValueError(
+                        f"Activation shape mismatch for {name}: "
+                        f"{activations[name].shape} vs expected "
+                        f"({config.batch_size}, {config.hidden_size})"
+                    )
+
+                ct_deltas[name] = executor._compute_ct_delta(activations[name])
+                adapter_order.append(name)
+
+        # Phase 2: Batch decrypt — each ct uses its own executor's backend
+        # This groups all decrypt calls together to allow GPU stream overlap
+        deltas = {}
+        if adapter_order:
+            for name in adapter_order:
+                executor = self._executors[name]
+                layout = executor._schedule.layout
+                config = executor._schedule.config
+
+                with executor._backend.timed_section('decrypt'):
+                    packed = executor._backend.decrypt_partial(
+                        ct_deltas[name], layout.total_slots_used
+                    )
+                executor._context.cost_tracker.record_decrypt()
+
+                delta = unpack_activations(packed, layout)
+                deltas[name] = delta
+
+                executor._context.tokens_processed += 1
+                executor._context.cost_tracker.end_token(config.targets)
+
         return deltas
 
     def get_combined_statistics(self) -> Dict[str, Any]:

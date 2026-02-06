@@ -483,6 +483,88 @@ class GPUCKKSBackend(ABC):
         pass
 
     # -------------------------------------------------------------------------
+    # OPTIMIZED DECRYPT OPERATIONS
+    # -------------------------------------------------------------------------
+
+    def decrypt_partial(
+        self,
+        ciphertext: GPUCiphertext,
+        slot_count_needed: int,
+    ) -> np.ndarray:
+        """
+        Decrypt only the first `slot_count_needed` slots of a ciphertext.
+
+        For CKKS backends that support partial NTT, this avoids decrypting
+        the full N/2 slot vector when only a subset contains useful data.
+        Default implementation falls back to full decrypt + slice.
+
+        Args:
+            ciphertext: GPU-resident ciphertext
+            slot_count_needed: Number of useful slots (rest is padding)
+
+        Returns:
+            1D numpy array of length `slot_count_needed`
+        """
+        full = self.decrypt(ciphertext)
+        return full[:slot_count_needed]
+
+    def decrypt_fused_unpack_add(
+        self,
+        ciphertext: GPUCiphertext,
+        layout: Any,
+        y_base: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Fused decrypt-unpack-add: decrypt ciphertext, unpack from SIMD layout,
+        and add to y_base in a single pass over output memory.
+
+        Eliminates two intermediate allocations and two extra memory passes
+        compared to the separate decrypt → unpack → add pipeline.
+
+        Args:
+            ciphertext: Encrypted delta ciphertext
+            layout: PackingLayout describing SIMD slot arrangement
+            y_base: Base model output (batch_size, hidden_size), modified in-place
+
+        Returns:
+            y_base with decrypted delta added in-place
+        """
+        # Default: decrypt only the slots we need (partial), then fused unpack+add
+        slots_needed = layout.total_slots_used
+        packed_delta = self.decrypt_partial(ciphertext, slots_needed)
+
+        # Fused unpack + in-place add (single pass over output)
+        for block in layout.blocks:
+            for local_ch, global_ch in enumerate(block.channel_range()):
+                if global_ch >= layout.hidden_size:
+                    break
+                for b in range(layout.batch_size):
+                    slot_idx = block.slot_offset + local_ch * layout.batch_size + b
+                    if slot_idx < slots_needed:
+                        y_base[b, global_ch] += packed_delta[slot_idx]
+
+        return y_base
+
+    def batch_decrypt(
+        self,
+        ciphertexts: List[GPUCiphertext],
+    ) -> List[np.ndarray]:
+        """
+        Decrypt multiple ciphertexts in a batch.
+
+        For GPU backends, this can amortise per-decrypt fixed overhead
+        (key loading, NTT setup) across multiple ciphertexts.
+        Default implementation calls decrypt sequentially.
+
+        Args:
+            ciphertexts: List of GPU-resident ciphertexts
+
+        Returns:
+            List of decrypted 1D numpy arrays
+        """
+        return [self.decrypt(ct) for ct in ciphertexts]
+
+    # -------------------------------------------------------------------------
     # FUSED OPERATIONS (KERNEL FUSION)
     # -------------------------------------------------------------------------
 
@@ -858,3 +940,24 @@ class SimulationBackend(GPUCKKSBackend):
     def free_ciphertext(self, ct: GPUCiphertext) -> None:
         if ct.handle in self._plaintexts:
             del self._plaintexts[ct.handle]
+
+    def decrypt_partial(
+        self,
+        ciphertext: GPUCiphertext,
+        slot_count_needed: int,
+    ) -> np.ndarray:
+        """Partial decrypt: only return the first slot_count_needed values."""
+        self._counters.decryptions += 1
+        ct_id = ciphertext.handle
+        return self._plaintexts[ct_id][:slot_count_needed].copy()
+
+    def batch_decrypt(
+        self,
+        ciphertexts: List[GPUCiphertext],
+    ) -> List[np.ndarray]:
+        """Batch decrypt: amortise overhead across multiple ciphertexts."""
+        results = []
+        for ct in ciphertexts:
+            self._counters.decryptions += 1
+            results.append(self._plaintexts[ct.handle].copy())
+        return results
