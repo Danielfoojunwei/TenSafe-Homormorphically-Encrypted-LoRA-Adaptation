@@ -445,9 +445,12 @@ class HASServer:
         self._shm_manager = SharedMemoryManager()
 
         # Initialize keys (would use executor backend)
+        # MOAI column packing guarantees 0 rotations for Ct×Pt LoRA matmul,
+        # so no Galois (rotation) keys are needed. Generating them would waste
+        # ~5.5 MB of memory and ~17ms of startup time per key (at N=16384).
         self._key_manager.initialize(
             backend=None,  # Mock for now
-            galois_steps=[1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024],
+            galois_steps=[],
         )
 
         # Create servicer
