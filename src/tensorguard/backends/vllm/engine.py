@@ -9,6 +9,7 @@ import asyncio
 import time
 import logging
 import os
+import uuid
 
 import torch
 
@@ -17,6 +18,9 @@ from .hooks import HELoRAHook, HELoRAHookManager, HELoRAConfig
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+# Default async generation timeout in seconds
+DEFAULT_ASYNC_TIMEOUT = 300.0
 
 # Conditional vLLM imports
 VLLM_AVAILABLE = False
@@ -29,10 +33,7 @@ try:
 except ImportError:
     logger.warning("vLLM not installed. Install with: pip install vllm")
 
-# TenSafe imports
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-
+# TenSafe imports (no sys.path manipulation — use proper package installs)
 try:
     from tensorguard.tgsp.service import TSGPService
     from tensorguard.tgsp.format import TSGPPackage
@@ -164,8 +165,35 @@ class TenSafeVLLMEngine:
                 verification_status="PASSED",
             )
 
+    def _get_model_config(self) -> Dict[str, Any]:
+        """Extract model configuration (hidden_size, num_layers) dynamically.
+
+        Tries to read from model config.json, falling back to common defaults.
+        """
+        model_config = {"hidden_size": 4096, "num_hidden_layers": 32}
+
+        try:
+            import json
+            config_path = os.path.join(self.config.model_path, "config.json")
+            if os.path.exists(config_path):
+                with open(config_path) as f:
+                    cfg = json.load(f)
+                model_config["hidden_size"] = cfg.get("hidden_size", 4096)
+                model_config["num_hidden_layers"] = cfg.get("num_hidden_layers", 32)
+                logger.info(
+                    f"Model config: hidden_size={model_config['hidden_size']}, "
+                    f"num_layers={model_config['num_hidden_layers']}"
+                )
+        except Exception as e:
+            logger.warning(f"Could not read model config, using defaults: {e}")
+
+        return model_config
+
     def _extract_lora_weights(self) -> Dict[str, tuple]:
         """Extract LoRA weights from TSSP package.
+
+        Reads model dimensions dynamically from model config rather than
+        hardcoding Llama-3-8B values.
 
         Returns:
             Dict mapping layer names to (lora_a, lora_b) tuples
@@ -173,21 +201,22 @@ class TenSafeVLLMEngine:
         if not self.tssp_package:
             return {}
 
+        # Read model dimensions dynamically
+        model_cfg = self._get_model_config()
+        hidden_size = model_cfg["hidden_size"]
+        num_layers = model_cfg["num_hidden_layers"]
+
         weights = {}
 
         # This would normally decrypt and extract weights from TSSP
         # For now, create placeholder weights for testing
         for target in self.config.lora_target_modules:
-            # Create random weights for simulation
-            # In production, these come from encrypted TSSP payload
-            hidden_size = 4096  # Default for Llama-3-8B
             rank = 16
 
             lora_a = torch.randn(rank, hidden_size) * 0.01
             lora_b = torch.zeros(hidden_size, rank)
 
-            # Find all layers with this target
-            for layer_idx in range(32):  # Typical transformer layers
+            for layer_idx in range(num_layers):
                 layer_name = f"model.layers.{layer_idx}.self_attn.{target}"
                 weights[layer_name] = (lora_a.clone(), lora_b.clone())
 
@@ -233,8 +262,10 @@ class TenSafeVLLMEngine:
         if not self._lora_weights:
             return
 
+        model_cfg = self._get_model_config()
+
         he_config = HELoRAConfig(
-            hidden_size=4096,
+            hidden_size=model_cfg["hidden_size"],
             rank=16,
             alpha=32.0,
             scheme=self.config.he_scheme.value,
@@ -334,15 +365,20 @@ class TenSafeVLLMEngine:
         self,
         prompts: List[str],
         sampling_params: Optional['SamplingParams'] = None,
+        timeout: Optional[float] = None,
     ) -> List[GenerationResult]:
-        """Generate completions asynchronously.
+        """Generate completions asynchronously with timeout protection.
 
         Args:
             prompts: List of prompts
             sampling_params: Sampling parameters
+            timeout: Maximum seconds to wait (default: DEFAULT_ASYNC_TIMEOUT)
 
         Returns:
             List of generation results
+
+        Raises:
+            asyncio.TimeoutError: If generation exceeds timeout
         """
         if not VLLM_AVAILABLE:
             return self._simulate_generation(prompts, sampling_params)
@@ -354,35 +390,40 @@ class TenSafeVLLMEngine:
                 temperature=0.7,
             )
 
-        engine = await self._get_async_engine()
+        effective_timeout = timeout or DEFAULT_ASYNC_TIMEOUT
 
-        # Submit all requests
-        request_ids = []
-        for i, prompt in enumerate(prompts):
-            request_id = f"req-{i}-{time.time()}"
-            await engine.add_request(request_id, prompt, sampling_params)
-            request_ids.append(request_id)
+        async def _do_generate():
+            engine = await self._get_async_engine()
 
-        # Collect results
-        results = []
-        async for output in engine.generate(None):
-            if output.finished:
-                idx = request_ids.index(output.request_id)
-                result = GenerationResult(
-                    request_id=output.request_id,
-                    prompt=prompts[idx],
-                    outputs=[{
-                        "text": o.text,
-                        "finish_reason": o.finish_reason,
-                    } for o in output.outputs],
-                    metrics={},
-                )
-                results.append(result)
+            # Submit all requests with UUID-based IDs for uniqueness
+            request_ids = []
+            for i, prompt in enumerate(prompts):
+                request_id = f"req-{uuid.uuid4().hex[:12]}"
+                await engine.add_request(request_id, prompt, sampling_params)
+                request_ids.append(request_id)
 
-                if len(results) == len(prompts):
-                    break
+            # Collect results
+            results = []
+            async for output in engine.generate(None):
+                if output.finished:
+                    idx = request_ids.index(output.request_id)
+                    result = GenerationResult(
+                        request_id=output.request_id,
+                        prompt=prompts[idx],
+                        outputs=[{
+                            "text": o.text,
+                            "finish_reason": o.finish_reason,
+                        } for o in output.outputs],
+                        metrics={},
+                    )
+                    results.append(result)
 
-        return results
+                    if len(results) == len(prompts):
+                        break
+
+            return results
+
+        return await asyncio.wait_for(_do_generate(), timeout=effective_timeout)
 
     async def generate_stream(
         self,
@@ -412,7 +453,7 @@ class TenSafeVLLMEngine:
             )
 
         engine = await self._get_async_engine()
-        request_id = f"stream-{time.time()}"
+        request_id = f"stream-{uuid.uuid4().hex[:12]}"
 
         await engine.add_request(request_id, prompt, sampling_params)
 

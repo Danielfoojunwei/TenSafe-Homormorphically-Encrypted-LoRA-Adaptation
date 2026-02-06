@@ -374,13 +374,19 @@ class UnifiedHEBackend(HEBackendInterface):
         """Decrypt a ciphertext."""
         self.validate_ready()
 
+        # Handle _SimulatedCiphertext (from simulation fallback in add/multiply)
+        # before trying the backend, since the backend won't know this type
+        if isinstance(ciphertext, _SimulatedCiphertext):
+            data = ciphertext.data
+            if output_size > 0:
+                return np.asarray(data)[:output_size]
+            return np.asarray(data)
+
         if self._backend is not None:
             return self._backend.decrypt(ciphertext, output_size)
 
-        # Pure simulation fallback
-        if isinstance(ciphertext, _SimulatedCiphertext):
-            data = ciphertext.data
-        elif isinstance(ciphertext, dict):
+        # Pure simulation fallback for dict/other types
+        if isinstance(ciphertext, dict):
             data = ciphertext.get("data", ciphertext)
         else:
             data = ciphertext
@@ -398,8 +404,8 @@ class UnifiedHEBackend(HEBackendInterface):
             return self._backend.add(ct1, ct2)
 
         # Pure simulation fallback
-        d1 = ct1.data if isinstance(ct1, _SimulatedCiphertext) else ct1
-        d2 = ct2.data if isinstance(ct2, _SimulatedCiphertext) else ct2
+        d1 = ct1.data if isinstance(ct1, _SimulatedCiphertext) else (ct1.get("data", ct1) if isinstance(ct1, dict) else ct1)
+        d2 = ct2.data if isinstance(ct2, _SimulatedCiphertext) else (ct2.get("data", ct2) if isinstance(ct2, dict) else ct2)
         return _SimulatedCiphertext(np.asarray(d1) + np.asarray(d2))
 
     def multiply_plain(self, ct: Any, plaintext: np.ndarray) -> Any:
@@ -412,7 +418,7 @@ class UnifiedHEBackend(HEBackendInterface):
             return self._backend.multiply_plain(ct, plaintext)
 
         # Pure simulation fallback
-        data = ct.data if isinstance(ct, _SimulatedCiphertext) else ct
+        data = ct.data if isinstance(ct, _SimulatedCiphertext) else (ct.get("data", ct) if isinstance(ct, dict) else ct)
         scalar = plaintext.flatten()[0] if plaintext.size == 1 else plaintext
         return _SimulatedCiphertext(np.asarray(data) * scalar)
 
@@ -440,7 +446,7 @@ class UnifiedHEBackend(HEBackendInterface):
             return self._backend.matmul(ct, weight)
 
         # Pure simulation fallback
-        data = ct.data if isinstance(ct, _SimulatedCiphertext) else ct
+        data = ct.data if isinstance(ct, _SimulatedCiphertext) else (ct.get("data", ct) if isinstance(ct, dict) else ct)
         result = np.asarray(data) @ weight.T
         return _SimulatedCiphertext(result)
 

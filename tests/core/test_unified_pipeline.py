@@ -142,7 +142,7 @@ class TestUnifiedConfiguration:
         assert config.training.mode == TrainingMode.RLVR
         assert config.model.name == "test-model"
         assert config.dp.enabled is True
-        assert config.he.mode == HEMode.N2HE_HEXL
+        assert config.he.mode == HEMode.PRODUCTION
 
 
 # ==============================================================================
@@ -305,7 +305,7 @@ class TestHEBackendInterface:
         """Test creating toy HE backend."""
         from tensafe.core.he_interface import ToyHEBackend, HEParams
 
-        backend = ToyHEBackend(HEParams(), _force_enable=True)
+        backend = ToyHEBackend(HEParams())
         backend.setup()
 
         assert backend.is_setup
@@ -315,7 +315,7 @@ class TestHEBackendInterface:
         """Test encrypt/decrypt with toy backend."""
         from tensafe.core.he_interface import ToyHEBackend, HEParams
 
-        backend = ToyHEBackend(HEParams(), _force_enable=True)
+        backend = ToyHEBackend(HEParams())
         backend.setup()
 
         plaintext = np.array([1.0, 2.0, 3.0, 4.0])
@@ -328,7 +328,7 @@ class TestHEBackendInterface:
         """Test LoRA delta computation with toy backend."""
         from tensafe.core.he_interface import ToyHEBackend, HEParams
 
-        backend = ToyHEBackend(HEParams(), _force_enable=True)
+        backend = ToyHEBackend(HEParams())
         backend.setup()
 
         # Create test data
@@ -357,8 +357,8 @@ class TestHEBackendInterface:
 
         available = list_available_backends()
         assert isinstance(available, list)
-        # Toy should be available in test env
-        assert "toy" in available
+        # Simulation should be available in test env (replaces legacy "toy")
+        assert "simulation" in available
 
 
 # ==============================================================================

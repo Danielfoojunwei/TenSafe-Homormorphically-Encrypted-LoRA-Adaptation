@@ -435,14 +435,29 @@ class ProductionPRVAccountant(PrivacyAccountant):
         return spent.epsilon
 
     def _step_external(self) -> None:
-        """Step using dp-accounting PLD."""
+        """Step using dp-accounting PLD with proper Poisson subsampling.
+
+        The correct approach is to create a PLD for the base Gaussian mechanism
+        and then apply Poisson subsampling, NOT to divide sigma by the
+        sampling rate (which overestimates privacy loss).
+        """
         from dp_accounting.pld import privacy_loss_distribution
 
-        # Account for subsampling
-        subsampled_pld = privacy_loss_distribution.from_gaussian_mechanism(
-            standard_deviation=self.config.noise_multiplier / self.config.sample_rate,
+        # Create base Gaussian mechanism PLD (without subsampling baked in)
+        base_pld = privacy_loss_distribution.from_gaussian_mechanism(
+            standard_deviation=self.config.noise_multiplier,
             sensitivity=1.0,
         )
+
+        # Apply Poisson subsampling to get the subsampled mechanism PLD
+        try:
+            subsampled_pld = base_pld.to_pessimistic_subsampled(
+                sampling_probability=self.config.sample_rate
+            )
+        except AttributeError:
+            # Fallback for older dp-accounting versions that don't have
+            # to_pessimistic_subsampled: use the conservative base PLD
+            subsampled_pld = base_pld
 
         if self._composed_pld is None:
             self._composed_pld = subsampled_pld
@@ -588,9 +603,14 @@ class ProductionGDPAccountant(PrivacyAccountant):
                 - math.exp(eps) * stats.norm.cdf(-eps / mu - mu / 2)
             )
 
-        # Binary search for epsilon
+        # Binary search for epsilon with adaptive upper bound
         eps_lo, eps_hi = 0.0, 100.0
-        while eps_hi - eps_lo > 1e-6:
+        # Expand upper bound if needed (for extreme parameters)
+        while compute_delta(eps_hi) > delta and eps_hi < 1e6:
+            eps_hi *= 2.0
+        for _ in range(100):  # Max iterations to guarantee convergence
+            if eps_hi - eps_lo <= 1e-6:
+                break
             eps_mid = (eps_lo + eps_hi) / 2
             if compute_delta(eps_mid) > delta:
                 eps_lo = eps_mid

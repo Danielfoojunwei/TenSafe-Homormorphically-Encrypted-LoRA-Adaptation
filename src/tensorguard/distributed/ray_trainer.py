@@ -1,7 +1,7 @@
 """TenSafe Ray Train Distributed Trainer.
 
 Provides distributed training with:
-- DP-SGD privacy guarantees
+- DP-SGD privacy guarantees (using production RDP accountant)
 - Secure gradient aggregation
 - Multi-node HE key distribution
 - Integration with DeepSpeed/FSDP
@@ -30,12 +30,9 @@ try:
 except ImportError:
     logger.warning("Ray not installed. Install with: pip install ray[train]")
 
-# TenSafe imports
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-
+# Use the canonical DPConfig from tensafe core
 try:
-    from tensorguard.platform.tg_tinker_api.dp import DPConfig
+    from tensafe.core.config import DPConfig
     DP_AVAILABLE = True
 except ImportError:
     DP_AVAILABLE = False
@@ -164,21 +161,31 @@ class TenSafeRayTrainer:
         train_dataset: Dataset,
         eval_dataset: Optional[Dataset] = None,
         collate_fn: Optional[Callable] = None,
+        train_dataset_factory: Optional[Callable[[], Dataset]] = None,
+        eval_dataset_factory: Optional[Callable[[], Dataset]] = None,
     ):
         """Initialize distributed trainer.
 
         Args:
             config: Training configuration
             model_init_fn: Function that returns a fresh model instance
-            train_dataset: Training dataset
+            train_dataset: Training dataset (used for single-process fallback)
             eval_dataset: Optional evaluation dataset
             collate_fn: Optional collation function for DataLoader
+            train_dataset_factory: Factory function to create train dataset on workers
+                                   (avoids serializing full dataset to workers)
+            eval_dataset_factory: Factory function to create eval dataset on workers
         """
         self.config = config
         self.model_init_fn = model_init_fn
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.collate_fn = collate_fn
+
+        # Dataset factory functions for distributed workers
+        # If not provided, fall back to returning the dataset directly
+        self._dataset_factory = train_dataset_factory or (lambda: train_dataset)
+        self._eval_dataset_factory = eval_dataset_factory or (lambda: eval_dataset)
 
         # Privacy tracking
         self._total_epsilon = 0.0
@@ -189,11 +196,16 @@ class TenSafeRayTrainer:
             ray.init(ignore_reinit_error=True)
 
     def _create_train_func(self):
-        """Create training function for Ray workers."""
+        """Create training function for Ray workers.
+
+        Uses a dataset factory pattern to avoid serializing the full dataset
+        into each worker's closure. Instead, only the config and factory
+        function are captured.
+        """
         config = self.config
         model_init_fn = self.model_init_fn
-        train_dataset = self.train_dataset
-        eval_dataset = self.eval_dataset
+        dataset_factory = self._dataset_factory
+        eval_dataset_factory = self._eval_dataset_factory
         collate_fn = self.collate_fn
 
         def train_func_per_worker(train_loop_config: Dict[str, Any]):
@@ -220,16 +232,19 @@ class TenSafeRayTrainer:
                     device_ids=[device.index] if device.type == "cuda" else None,
                 )
 
+            # Reconstruct dataset on the worker (avoids serializing full dataset)
+            worker_train_dataset = dataset_factory()
+
             # Create data loader with distributed sampler
             sampler = DistributedSampler(
-                train_dataset,
+                worker_train_dataset,
                 num_replicas=world_size,
                 rank=worker_rank,
                 shuffle=True,
             )
 
             train_loader = DataLoader(
-                train_dataset,
+                worker_train_dataset,
                 batch_size=config.batch_size_per_worker,
                 sampler=sampler,
                 collate_fn=collate_fn,
@@ -244,9 +259,24 @@ class TenSafeRayTrainer:
                 weight_decay=config.weight_decay,
             )
 
-            # Privacy accountant
+            # Privacy accountant (use production RDP accountant)
             privacy_epsilon = 0.0
             privacy_delta = config.dp_config.target_delta if config.dp_config.enabled else 0.0
+            rdp_accountant = None
+            if config.dp_config.enabled:
+                from tensafe.privacy.accountants import (
+                    ProductionRDPAccountant,
+                    DPConfig as AccountantDPConfig,
+                )
+                sample_rate = (config.batch_size_per_worker * world_size) / len(worker_train_dataset)
+                rdp_accountant = ProductionRDPAccountant(
+                    AccountantDPConfig(
+                        noise_multiplier=config.dp_config.noise_multiplier,
+                        max_grad_norm=config.dp_config.max_grad_norm,
+                        target_delta=config.dp_config.target_delta,
+                        sample_rate=sample_rate,
+                    )
+                )
 
             # Training loop
             global_step = 0
@@ -274,7 +304,7 @@ class TenSafeRayTrainer:
                     loss.backward()
 
                     if (batch_idx + 1) % config.gradient_accumulation_steps == 0:
-                        # DP: Clip gradients per-sample
+                        # DP: Clip gradients (per-sample sensitivity bound)
                         if config.dp_config.enabled:
                             _clip_gradients(model, config.dp_config.max_grad_norm)
 
@@ -295,15 +325,11 @@ class TenSafeRayTrainer:
                         optimizer.zero_grad()
                         global_step += 1
 
-                        # Update privacy budget
-                        if config.dp_config.enabled:
-                            privacy_epsilon = _compute_epsilon(
-                                global_step,
-                                config.batch_size_per_worker * world_size,
-                                len(train_dataset),
-                                config.dp_config.noise_multiplier,
-                                config.dp_config.target_delta,
-                            )
+                        # Update privacy budget using production RDP accountant
+                        if config.dp_config.enabled and rdp_accountant is not None:
+                            rdp_accountant.step()
+                            spent = rdp_accountant.get_privacy_spent()
+                            privacy_epsilon = spent.epsilon
 
                     epoch_loss += loss.item() * config.gradient_accumulation_steps
                     num_batches += 1
@@ -477,8 +503,6 @@ def _add_dp_noise(model: nn.Module, noise_multiplier: float, max_grad_norm: floa
 
 
 def _compute_epsilon(steps: int, batch_size: int, dataset_size: int, noise_multiplier: float, delta: float) -> float:
-    """Compute epsilon using RDP accountant (simplified)."""
-    # Simplified epsilon computation
-    # In production, use Opacus or TensorFlow Privacy accountant
-    sampling_rate = batch_size / dataset_size
-    return steps * sampling_rate ** 2 / (2 * noise_multiplier ** 2)
+    """Compute epsilon using production RDP accountant."""
+    from tensorguard.distributed.dp_distributed import compute_dp_sgd_privacy
+    return compute_dp_sgd_privacy(steps, batch_size, dataset_size, noise_multiplier, delta)

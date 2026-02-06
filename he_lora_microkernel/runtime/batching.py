@@ -81,6 +81,9 @@ class BatchManager:
     schedules for common sizes, and triggers recompilation when needed.
     """
 
+    # Maximum number of cached schedules to prevent unbounded memory growth
+    MAX_CACHE_SIZE = 64
+
     def __init__(
         self,
         base_config: LoRAConfig,
@@ -102,7 +105,7 @@ class BatchManager:
         self._current_batch_size = base_config.batch_size
         self._current_schedule: Optional[ExecutionSchedule] = None
 
-        # Pre-compiled schedules cache
+        # Pre-compiled schedules cache (bounded)
         self._schedule_cache: Dict[int, ExecutionSchedule] = {}
 
         # Cost estimates for each batch size
@@ -177,6 +180,12 @@ class BatchManager:
         if batch_size in self._schedule_cache:
             self._current_schedule = self._schedule_cache[batch_size]
         else:
+            # Evict oldest entry if cache is full
+            if len(self._schedule_cache) >= self.MAX_CACHE_SIZE:
+                oldest_key = next(iter(self._schedule_cache))
+                del self._schedule_cache[oldest_key]
+                self._cost_estimates.pop(oldest_key, None)
+
             # Compile new schedule
             self._current_schedule = self._compile_for_size(batch_size)
             self._schedule_cache[batch_size] = self._current_schedule
@@ -369,6 +378,7 @@ class DynamicBatchExecutor:
       - Automatic batch size adjustment
       - Activation padding for partial batches
       - Schedule recompilation on size change
+      - Weight persistence across executor re-creation
     """
 
     def __init__(
@@ -399,8 +409,15 @@ class DynamicBatchExecutor:
         self._executor = None
         self._executor_batch_size = None
 
+        # Stored weights for re-loading after executor re-creation
+        self._stored_weights: Optional[tuple] = None  # (A, B, alpha)
+
     def _get_executor(self, batch_size: int):
-        """Get or create executor for batch size."""
+        """Get or create executor for batch size.
+
+        When the batch size changes and a new executor is created,
+        previously loaded weights are automatically re-loaded.
+        """
         from .executor import HELoRAExecutor
         from ..backend.gpu_ckks_backend import BackendType
 
@@ -410,6 +427,11 @@ class DynamicBatchExecutor:
             backend_type = BackendType[self._backend_type]
             self._executor = HELoRAExecutor(schedule, backend_type)
             self._executor_batch_size = batch_size
+
+            # Re-load weights into the new executor
+            if self._stored_weights is not None:
+                A, B, alpha = self._stored_weights
+                self._executor.load_weights(A, B, alpha)
 
         return self._executor
 
@@ -463,7 +485,8 @@ class DynamicBatchExecutor:
         return actual_batch
 
     def load_weights(self, A: np.ndarray, B: np.ndarray, alpha: float) -> None:
-        """Load weights into current executor."""
+        """Load weights into current executor and store for future re-creation."""
+        self._stored_weights = (A.copy(), B.copy(), alpha)
         if self._executor is not None:
             self._executor.load_weights(A, B, alpha)
 

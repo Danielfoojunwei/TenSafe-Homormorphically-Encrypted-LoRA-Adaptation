@@ -467,53 +467,57 @@ class TenSafeConfig:
         """
         Validate configuration and return list of warnings/errors.
 
+        Each issue is prefixed with a severity level for structured parsing:
+          "error: ..."  — configuration is invalid, training should not proceed
+          "warning: ..." — configuration is risky but may be intentional
+
         Returns:
-            List of warning/error messages (empty if valid)
+            List of issue messages (empty if valid)
         """
         issues = []
 
         # Check LoRA configuration
         if self.lora.enabled:
             if self.lora.rank > 128:
-                issues.append(f"Warning: LoRA rank {self.lora.rank} is very high, consider lower rank")
+                issues.append(f"warning: LoRA rank {self.lora.rank} is very high, consider lower rank")
             if not self.lora.target_modules:
-                issues.append("Error: LoRA enabled but no target modules specified")
+                issues.append("error: LoRA enabled but no target modules specified")
 
         # Check DP configuration
         if self.dp.enabled:
             if self.dp.target_epsilon < 1.0:
-                issues.append(f"Warning: Very tight epsilon={self.dp.target_epsilon} may severely impact utility")
+                issues.append(f"warning: Very tight epsilon={self.dp.target_epsilon} may severely impact utility")
             if self.dp.noise_multiplier == 0:
-                issues.append("Error: DP enabled but noise_multiplier is 0")
+                issues.append("error: DP enabled but noise_multiplier is 0")
 
         # Check HE configuration
         if self.he.mode != HEMode.DISABLED:
             resolved_mode = HEMode.resolve(self.he.mode)
             if resolved_mode == HEMode.SIMULATION:
                 issues.append(
-                    "Warning: HE SIMULATION mode is NOT cryptographically secure. "
+                    "warning: HE SIMULATION mode is NOT cryptographically secure. "
                     "Use PRODUCTION mode for deployment."
                 )
             if self.he.mode.is_legacy:
                 issues.append(
-                    f"Warning: HEMode.{self.he.mode.value} is deprecated. "
+                    f"warning: HEMode.{self.he.mode.value} is deprecated. "
                     f"Use HEMode.{resolved_mode.value} instead."
                 )
             if self.he.security_level < 128:
-                issues.append(f"Warning: HE security level {self.he.security_level} is below recommended 128-bit")
+                issues.append(f"warning: HE security level {self.he.security_level} is below recommended 128-bit")
 
         # Check training configuration
         if self.training.total_steps < 10:
-            issues.append("Warning: Very few training steps, this may be a test run")
+            issues.append("warning: Very few training steps, this may be a test run")
         if self.training.learning_rate > 1e-2:
-            issues.append(f"Warning: Learning rate {self.training.learning_rate} is very high")
+            issues.append(f"warning: Learning rate {self.training.learning_rate} is very high")
 
         # Check RLVR configuration
         if self.training.mode == TrainingMode.RLVR:
             if self.rlvr is None:
-                issues.append("Error: RLVR mode but no RLVR config provided")
+                issues.append("error: RLVR mode but no RLVR config provided")
             elif self.rlvr.algorithm not in ("reinforce", "ppo"):
-                issues.append(f"Error: Unknown RLVR algorithm: {self.rlvr.algorithm}")
+                issues.append(f"error: Unknown RLVR algorithm: {self.rlvr.algorithm}")
 
         return issues
 
@@ -622,7 +626,7 @@ def load_config(
     if validate:
         issues = config.validate()
         for issue in issues:
-            if issue.startswith("Error:"):
+            if issue.startswith("error:"):
                 raise ValueError(issue)
             else:
                 logger.warning(issue)
@@ -681,24 +685,28 @@ def _apply_env_overrides(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _coerce_value(value: str) -> Any:
-    """Coerce string value to appropriate type."""
-    # Boolean
-    if value.lower() in ("true", "yes", "1"):
-        return True
-    if value.lower() in ("false", "no", "0"):
-        return False
+    """Coerce string value to appropriate type.
 
+    Number check comes before boolean to avoid treating "0" as False
+    and "1" as True when an integer is intended.
+    """
     # None
     if value.lower() in ("none", "null", ""):
         return None
 
-    # Number
+    # Number (checked before boolean so "0" → 0, not False)
     try:
         if "." in value:
             return float(value)
         return int(value)
     except ValueError:
         pass
+
+    # Boolean (only unambiguous string forms)
+    if value.lower() in ("true", "yes"):
+        return True
+    if value.lower() in ("false", "no"):
+        return False
 
     # JSON array/object
     if value.startswith(("[", "{")):
