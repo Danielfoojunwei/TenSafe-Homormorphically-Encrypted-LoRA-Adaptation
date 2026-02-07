@@ -39,9 +39,11 @@ class AttentionProjectionHook:
     layer_idx: int
     projection_type: str  # "q", "k", "v", "o"
     module: Any  # The original nn.Module
-    original_forward: Callable  # Saved original forward method
     delta_callback: Optional[Callable] = None
     enabled: bool = True
+
+    # Original forward method - set in __post_init__, not passed to __init__
+    original_forward: Callable = field(init=False, default=None)
 
     # Statistics
     call_count: int = 0
@@ -50,6 +52,7 @@ class AttentionProjectionHook:
     def __post_init__(self):
         # Save original forward
         self.original_forward = self.module.forward
+
 
     def hooked_forward(self, hidden_states: 'torch.Tensor', *args, **kwargs) -> 'torch.Tensor':
         """

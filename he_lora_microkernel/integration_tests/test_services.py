@@ -115,7 +115,7 @@ class TestHASService:
         )
 
         # Compute delta
-        hidden_states = np.random.randn(2, 1, 4096).astype(np.float16)
+        hidden_states = np.random.randn(2, 1, 1024).astype(np.float16)
         delta, timing = executor.apply_token_step(
             request_id="req-001",
             layer_idx=0,
@@ -165,7 +165,7 @@ class TestHASService:
         region = manager.create_region(
             name="test_region",
             batch_size=4,
-            hidden_size=4096,
+            hidden_size=1024,
         )
 
         assert region is not None
@@ -173,7 +173,7 @@ class TestHASService:
 
         # Write and read data
         import numpy as np
-        data = np.random.randn(4, 1, 4096).astype(np.float16)
+        data = np.random.randn(4, 1, 1024).astype(np.float16)
 
         manager.write_hidden_states(region, data)
         read_data = manager.read_hidden_states(region, shape=data.shape)
@@ -350,8 +350,9 @@ class TestTelemetry:
         assert metrics.decode_tokens == 1
 
         # Get aggregated
-        aggregated = collector.get_aggregated_metrics()
+        aggregated = collector.get_aggregated_metrics(force_refresh=True)
         assert aggregated['total_requests'] > 0
+
 
     def test_kpi_enforcement(self):
         """Test KPI enforcement."""

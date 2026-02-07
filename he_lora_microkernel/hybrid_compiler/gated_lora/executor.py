@@ -124,18 +124,55 @@ class GatedLoRAExecutor:
         self,
         x: np.ndarray,
         base_output: np.ndarray,
+        client_gate_bit: Optional[int] = None,
     ) -> ExecutionResult:
         """
         Execute gated LoRA on input.
+
+        This is a convenience method that runs both phases synchronously.
+        For client-aided mode, use execute_phase_one() and execute_phase_two().
+
+        Args:
+            x: Input activation [hidden_size]
+            base_output: Base model output Wx [hidden_size]
+            client_gate_bit: If provided, use this gate bit instead of computing.
+
+        Returns:
+            ExecutionResult with output and metrics
+        """
+        # Phase 1: Compute linears, get gate signal
+        phase_one_result = self.execute_phase_one(x, base_output)
+
+        # Get gate bit (either from client or simulated)
+        if client_gate_bit is not None:
+            gate_bit = client_gate_bit
+        else:
+            # Fallback for testing: Simulate client-side gate evaluation
+            gate_signal = phase_one_result['gate_signal']
+            gate_bit = 1 if float(gate_signal) >= 0 else 0
+
+        # Phase 2: Complete with client-provided gate
+        return self.execute_phase_two(gate_bit)
+
+    def execute_phase_one(
+        self,
+        x: np.ndarray,
+        base_output: np.ndarray,
+    ) -> Dict[str, Any]:
+        """
+        Execute Phase 1 of gated LoRA (server-side).
+
+        Computes: LoRA delta (B @ A @ x) and gate pre-activation (w_g @ x + b_g).
+        Returns the gate signal for the client to evaluate.
 
         Args:
             x: Input activation [hidden_size]
             base_output: Base model output Wx [hidden_size]
 
         Returns:
-            ExecutionResult with output and metrics
+            Dictionary with 'gate_signal' for client-side evaluation.
         """
-        start_time = time.perf_counter()
+        self._start_time = time.perf_counter()
 
         # Initialize values
         self._values = {
@@ -143,47 +180,53 @@ class GatedLoRAExecutor:
             'base_output': base_output.astype(np.float64),
         }
 
-        result = ExecutionResult(output=np.zeros_like(x))
-
-        # Execute by phase
-        ckks_start = time.perf_counter()
-
         # Phase 1: LoRA Delta
         self._execute_lora_delta()
-        result.intermediates['delta'] = self._values.get('delta_rs', np.zeros(1))
 
         # Phase 2: Gate pre-activation
         self._execute_gate_preact()
 
-        result.ckks_time_ms = (time.perf_counter() - ckks_start) * 1000
-        result.ckks_ops = 4  # 2 matmuls + 2 rescales for delta, 1+1 for gate
+        # Return the gate signal for client
+        gate_signal = self._values['z']
+        gate_scalar = float(gate_signal[0]) if hasattr(gate_signal, '__len__') else float(gate_signal)
 
-        # Phase 3-5: Bridge and TFHE
-        bridge_start = time.perf_counter()
-        self._execute_bridge_to_tfhe()
-        result.bridge_time_ms = (time.perf_counter() - bridge_start) * 1000
+        return {
+            'gate_signal': gate_scalar,
+            'gate_signal_bytes': np.array([gate_scalar]).tobytes(),
+        }
 
-        tfhe_start = time.perf_counter()
-        self._execute_gate_lut()
-        result.tfhe_time_ms = (time.perf_counter() - tfhe_start) * 1000
-        result.tfhe_ops = 1
-        result.bootstraps = 1
+    def execute_phase_two(
+        self,
+        client_gate_bit: int,
+    ) -> ExecutionResult:
+        """
+        Execute Phase 2 of gated LoRA (server-side, after client callback).
 
-        bridge_start = time.perf_counter()
-        self._execute_bridge_to_ckks()
-        result.bridge_time_ms += (time.perf_counter() - bridge_start) * 1000
+        Completes the gated LoRA computation using the gate bit provided by the client.
 
-        # Phase 6-7: Apply gate and final
-        ckks_start = time.perf_counter()
+        Args:
+            client_gate_bit: The non-linear gate decision (0 or 1) from the client.
+
+        Returns:
+            ExecutionResult with output and metrics.
+        """
+        result = ExecutionResult(output=np.zeros_like(self._values['x']))
+
+        # Store client-provided gate
+        self._values['g_ckks'] = np.array([float(client_gate_bit)])
+        result.gate_value = float(client_gate_bit)
+
+        # Phase 6-7: Apply gate and final add
         self._execute_apply_gate()
         self._execute_final_add()
-        result.ckks_time_ms += (time.perf_counter() - ckks_start) * 1000
-        result.ckks_ops += 2  # multiply + add
 
         # Collect results
-        result.output = self._values.get('y', np.zeros_like(x))
-        result.gate_value = float(self._values.get('g_ckks', np.array([0]))[0])
-        result.total_time_ms = (time.perf_counter() - start_time) * 1000
+        result.output = self._values.get('y', np.zeros_like(self._values['x']))
+        result.total_time_ms = (time.perf_counter() - self._start_time) * 1000
+        result.ckks_ops = 6  # 2 matmuls + 2 rescales + apply_gate + final_add
+        # No TFHE ops on server, client computed the gate
+        result.tfhe_ops = 0
+        result.bootstraps = 0
 
         return result
 
@@ -216,43 +259,11 @@ class GatedLoRAExecutor:
         self._values['z_pre'] = z
         self._values['z'] = z  # Simulated rescale
 
-    def _execute_bridge_to_tfhe(self) -> None:
-        """Bridge CKKS -> TFHE with quantization."""
-        z = self._values['z']
+    # NOTE: The following server-side bridge methods have been REMOVED.
+    # They are replaced by the Client-Aided Bridge (GateLinkProtocol).
+    # _execute_bridge_to_tfhe, _execute_gate_lut, _execute_bridge_to_ckks
+    # are no longer part of the server execution path.
 
-        # Quantize
-        z_scalar = float(z[0]) if hasattr(z, '__len__') else float(z)
-        z_q, q_error = self.bridge.quantize_ckks_value(z_scalar)
-
-        self._values['z_q'] = np.array([z_q])
-
-        # Convert to TFHE representation
-        tfhe_ct = self.bridge.ckks_to_tfhe(np.array([z_scalar]))
-        self._values['z_tfhe'] = tfhe_ct
-
-    def _execute_gate_lut(self) -> None:
-        """Execute TFHE gate LUT."""
-        tfhe_input = self._values['z_tfhe']
-
-        # Get step LUT
-        step_entries = self.lut_library.get_entries('step')
-        if step_entries is None:
-            # Fallback: simple step function
-            z_val = tfhe_input['values'][0]
-            g = 1 if z_val >= 0 else 0
-            self._values['g_tfhe'] = {'values': [g], 'params': {'bits': 1}}
-        else:
-            # Apply LUT
-            result = self.bridge.apply_lut_simulation(tfhe_input, step_entries)
-            self._values['g_tfhe'] = result
-
-    def _execute_bridge_to_ckks(self) -> None:
-        """Bridge TFHE -> CKKS."""
-        g_tfhe = self._values['g_tfhe']
-
-        # Convert back to CKKS
-        g_values = self.bridge.tfhe_to_ckks(g_tfhe)
-        self._values['g_ckks'] = g_values
 
     def _execute_apply_gate(self) -> None:
         """Apply gate to LoRA delta: gated_delta = g * delta."""

@@ -102,6 +102,7 @@ class BatchConfig:
     """Batch configuration for inference."""
     max_batch_size: int = 8
     max_context_length: int = 2048
+    max_generation_length: int = 512  # Added for test compatibility
     dtype: str = "float16"  # Must be FP16 - no quantization
 
 
@@ -431,21 +432,21 @@ def register_adapter(backend_name: str):
 
 def get_adapter(
     backend_name: str,
-    model_id: str,
-    batch_config: BatchConfig,
+    model_id: Optional[str] = None,
+    batch_config: Optional[BatchConfig] = None,
     device: str = "cuda:0",
-) -> BaseRuntimeAdapter:
+) -> Union[type, BaseRuntimeAdapter]:
     """
-    Get an adapter instance for the specified backend.
+    Get an adapter class or instance for the specified backend.
 
     Args:
         backend_name: "vllm", "tensorrt_llm", or "sglang"
-        model_id: Model identifier
-        batch_config: Batch configuration
+        model_id: Model identifier (optional, returns class if not provided)
+        batch_config: Batch configuration (optional)
         device: Device string
 
     Returns:
-        Adapter instance
+        Adapter class if model_id is None, otherwise adapter instance
 
     Raises:
         ValueError: If backend not registered
@@ -458,6 +459,14 @@ def get_adapter(
         )
 
     adapter_cls = _ADAPTER_REGISTRY[backend_key]
+    
+    # Return class if no model_id provided (for tests that just want the class)
+    if model_id is None:
+        return adapter_cls
+    
+    # Return instance if model_id provided
+    if batch_config is None:
+        batch_config = BatchConfig()
     return adapter_cls(model_id, batch_config, device)
 
 

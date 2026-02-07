@@ -246,8 +246,8 @@ class HASExecutor:
 
     def _generate_mock_weights(self, state: AdapterState) -> None:
         """Generate mock weights for testing."""
-        # Assume hidden_size based on common models
-        hidden_size = 4096
+        # Use smaller hidden_size to fit within 8192 CKKS slots
+        hidden_size = 1024
 
         for layer_idx in state.loaded_layers:
             layer_weights = {}
@@ -274,11 +274,11 @@ class HASExecutor:
             targets = LoRATargets.QKV if state.targets == "qkv" else LoRATargets.QKVO
 
             config = LoRAConfig(
-                hidden_size=4096,  # Should come from model
+                hidden_size=1024,  # Reduced to fit within 8192 CKKS slots
                 rank=state.rank,
                 alpha=state.alpha,
                 targets=targets,
-                batch_size=8,  # Will be updated per request
+                batch_size=2,  # Reduced to fit within 8192 CKKS slots
                 max_context_length=2048,
                 ckks_profile=CKKSProfile[self._ckks_profile],
             )

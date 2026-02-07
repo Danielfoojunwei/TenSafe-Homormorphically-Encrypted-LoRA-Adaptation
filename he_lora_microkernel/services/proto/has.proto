@@ -101,6 +101,12 @@ message ApplyTokenStepRequest {
     string projection_type = 3;  // "q", "k", "v", "o"
     int32 token_idx = 4;
     // Hidden states passed via shared memory
+
+    // --- Client-Aided Bridge Fields ---
+    // If true, this request is a callback providing the gate bit.
+    bool is_gate_callback = 10;
+    // The gate decision (0 or 1) provided by the client.
+    int32 client_gate_bit = 11;
 }
 
 message ApplyTokenStepResponse {
@@ -112,7 +118,14 @@ message ApplyTokenStepResponse {
     int64 encrypt_time_us = 5;
     int64 compute_time_us = 6;
     int64 decrypt_time_us = 7;
+
+    // --- Client-Aided Bridge Fields ---
+    // If true, the client must compute the gate and call back.
+    bool gate_required = 10;
+    // The encrypted rank-r gate signal (Ax) for the client to evaluate.
+    bytes encrypted_gate_signal = 11;
 }
+
 
 message ApplyBatchedTokenStepRequest {
     string request_id = 1;

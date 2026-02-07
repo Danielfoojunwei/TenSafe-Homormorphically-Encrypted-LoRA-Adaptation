@@ -127,7 +127,7 @@ class RequestRouter:
         **kwargs,
     ) -> Any:
         """Create a backend adapter instance."""
-        from ..backend.base_adapter import BatchConfig, get_adapter
+        from he_lora_microkernel.backend.base_adapter import BatchConfig, get_adapter
 
         batch_config = BatchConfig(
             max_batch_size=self._config.max_batch_size,
@@ -136,23 +136,25 @@ class RequestRouter:
         )
 
         # Get adapter class
-        adapter_cls = get_adapter(backend.value)
+        try:
+            adapter_cls = get_adapter(backend.value)
+        except ValueError:
+            adapter_cls = None
+
         if adapter_cls is None:
             # Fall back to mock
-            from ..backend.base_adapter import BaseRuntimeAdapter
+            from he_lora_microkernel.backend.base_adapter import BaseRuntimeAdapter, ModelMetadata
             logger.warning(f"Backend {backend.value} not found, using mock")
-            backend = BackendType.MOCK
 
             # Create mock adapter
             class MockAdapter(BaseRuntimeAdapter):
                 def init(self):
-                    from ..backend.base_adapter import ModelMetadata
                     self._metadata = ModelMetadata(
                         model_id=model_id,
                         num_layers=32,
-                        hidden_size=4096,
+                        hidden_size=1024,  # Match executor hidden_size
                         num_attention_heads=32,
-                        head_dim=128,
+                        head_dim=32,  # 1024 / 32 = 32
                         vocab_size=32000,
                         max_position_embeddings=4096,
                         architecture='mock',
@@ -185,6 +187,7 @@ class RequestRouter:
             return MockAdapter(model_id, batch_config, **kwargs)
 
         return adapter_cls(model_id, batch_config, **kwargs)
+
 
     def shutdown(self) -> None:
         """Shutdown router and release resources."""

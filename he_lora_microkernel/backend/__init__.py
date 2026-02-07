@@ -44,6 +44,36 @@ from .gpu_ckks_backend import (
     SimulationBackend,
 )
 
+from .base_adapter import (
+    BatchConfig,
+    InsertionConfig,
+    ModelMetadata,
+    LoRATargets,
+    InsertionPoint,
+    LayerDeltas,
+    BaseRuntimeAdapter,
+    get_adapter,
+    list_available_adapters,
+    register_adapter,
+)
+
+# Import adapter implementations to auto-register them
+# These imports trigger the @register_adapter decorators
+try:
+    from .vllm_adapter import adapter as _vllm
+except ImportError:
+    pass
+
+try:
+    from .tensorrt_llm_adapter import adapter as _trt
+except ImportError:
+    pass
+
+try:
+    from .sglang_adapter import adapter as _sglang
+except ImportError:
+    pass
+
 __all__ = [
     'BackendType',
     'GPUCKKSBackend',
@@ -54,4 +84,16 @@ __all__ = [
     'get_available_backends',
     'register_backend',
     'SimulationBackend',
+    # Adapter exports
+    'BatchConfig',
+    'InsertionConfig',
+    'ModelMetadata',
+    'LoRATargets',
+    'InsertionPoint',
+    'LayerDeltas',
+    'BaseRuntimeAdapter',
+    'get_adapter',
+    'list_available_adapters',
+    'register_adapter',
 ]
+

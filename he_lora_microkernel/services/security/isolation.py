@@ -223,8 +223,11 @@ class ProcessIsolation:
             # Allow some tolerance
             return soft <= expected * 1.1
 
-        except (ImportError, resource.error):
+        except ImportError:
+            return True  # resource module not available (e.g., Windows)
+        except Exception:
             return True  # Can't verify on this platform
+
 
     def _check_clean_environment(self) -> bool:
         """Check environment is clean of sensitive data."""

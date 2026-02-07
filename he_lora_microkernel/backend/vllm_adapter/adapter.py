@@ -176,9 +176,9 @@ class VLLMAdapter(BaseRuntimeAdapter):
                     MockLayer(hidden_size) for _ in range(num_layers)
                 ])
 
-        # Default mock configuration
+        # Default mock configuration - must match HAS executor's hidden_size
         num_layers = 32
-        hidden_size = 4096
+        hidden_size = 1024  # Match executor hidden_size for E2E test compatibility
         num_heads = 32
 
         self._model = MockModel(num_layers, hidden_size)
@@ -202,6 +202,7 @@ class VLLMAdapter(BaseRuntimeAdapter):
             architecture='mock_llama',
             has_output_projection=True,
         )
+
 
         self._initialized = True
         return self._metadata

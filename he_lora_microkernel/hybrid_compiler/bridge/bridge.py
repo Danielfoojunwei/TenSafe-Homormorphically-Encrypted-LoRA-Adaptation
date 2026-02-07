@@ -1,16 +1,23 @@
 """
-CKKS-TFHE Bridge Implementation
+CKKS-TFHE Bridge Implementation (DEPRECATED for Server-Side Use)
 
-Handles scheme conversion with:
+This module provides utilities for CKKS-TFHE conversion, including:
 - Quantization for CKKS->TFHE
 - Re-encoding for TFHE->CKKS
-- Client-server protocol for secure conversion
 
-Security Model:
-- Server never sees plaintext during conversion
-- Client performs decrypt/re-encrypt (or uses threshold/proxy schemes)
-- All operations verifiable
+==================== SECURITY MODEL ====================
+As of the Client-Aided Bridge architecture, the server NEVER performs
+scheme switching directly. The `ckks_to_tfhe` and `tfhe_to_ckks` methods
+in this module are used for:
+1. **Client-Side SDK**: The client decrypts CKKS, quantizes, and re-encrypts.
+2. **Unit Testing**: Simulating the client's behavior for integration tests.
+
+For production gated LoRA, the `GateLinkProtocol` (defined in has.proto) is
+the secure mechanism. The server sends the encrypted gate signal to the client,
+and the client returns the gate bit.
+====================================================
 """
+
 
 from dataclasses import dataclass, field
 from typing import Optional, Tuple, List, Dict, Any

@@ -280,7 +280,9 @@ class SharedMemoryManager:
         import numpy as np
 
         # Create temporary file
-        tmp_path = os.path.join(tempfile.gettempdir(), f"{name}.shm")
+        # Sanitize name for file system (remove slashes that would make it absolute)
+        safe_name = name.replace('/', '_').replace('\\', '_').strip('_')
+        tmp_path = os.path.join(tempfile.gettempdir(), f"{safe_name}.shm")
         fd = os.open(tmp_path, os.O_CREAT | os.O_RDWR)
         os.ftruncate(fd, layout.total_size)
 
