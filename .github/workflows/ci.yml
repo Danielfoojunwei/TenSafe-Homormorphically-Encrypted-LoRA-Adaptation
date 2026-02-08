@@ -60,6 +60,15 @@ jobs:
     - name: Compile check
       run: python -m compileall src/
 
+    - name: Verify all packages importable from wheel
+      run: |
+        python -c "
+        import tensafe, tensorguard, tg_tinker, crypto_backend, he_lora_microkernel
+        from crypto_backend.ckks_moai import MOAIContext
+        assert tensorguard.__version__ == tensafe.__version__ == tg_tinker.__version__
+        print(f'All packages OK at v{tensorguard.__version__}')
+        "
+
     - name: Run tests (skip GPU-heavy suites)
       env:
         TENSAFE_ENV: dev
