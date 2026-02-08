@@ -95,7 +95,8 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down TG-Tinker Platform...")
 
 
-API_VERSION = "4.1.0"
+from tensorguard.version import tensafe_version
+API_VERSION = tensafe_version()
 API_TITLE = "TenSafe API"
 API_DESCRIPTION = """
 # TenSafe - Privacy-Preserving ML Platform
