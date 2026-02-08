@@ -9,15 +9,15 @@ from __future__ import annotations
 import logging
 import random
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol
 
-from .config import RLVRConfig
-from .rollout import MockRolloutSampler, RolloutSampler, Trajectory, TrajectoryBatch
-from .reward import RewardFn, resolve_reward
-from .buffers import RolloutCollector, TrajectoryBuffer
-from .algorithms.base import AlgorithmConfig, RLAlgorithm, UpdateResult
+from .algorithms.base import RLAlgorithm
 from .algorithms.reinforce import REINFORCE, REINFORCEConfig
+from .buffers import RolloutCollector, TrajectoryBuffer
+from .config import RLVRConfig
+from .reward import RewardFn, resolve_reward
+from .rollout import MockRolloutSampler, RolloutSampler, TrajectoryBatch
 
 logger = logging.getLogger(__name__)
 

@@ -17,7 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from tensorguard.evidence.canonical import canonical_bytes, canonical_json
+from tensorguard.evidence.canonical import canonical_bytes
 
 if TYPE_CHECKING:
     from .audit import AuditLogger

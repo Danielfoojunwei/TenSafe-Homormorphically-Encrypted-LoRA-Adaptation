@@ -3,18 +3,18 @@
 High-throughput LLM inference with privacy-preserving LoRA computation.
 """
 
-from typing import Optional, List, Dict, Any, AsyncIterator
-from dataclasses import dataclass
 import asyncio
-import time
 import logging
 import os
+import time
 import uuid
+from dataclasses import dataclass
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 import torch
 
-from .config import TenSafeVLLMConfig, HESchemeType
-from .hooks import HELoRAHook, HELoRAHookManager, HELoRAConfig
+from .config import TenSafeVLLMConfig
+from .hooks import HELoRAConfig, HELoRAHookManager
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -35,8 +35,8 @@ except ImportError:
 
 # TenSafe imports (no sys.path manipulation — use proper package installs)
 try:
-    from tensorguard.tgsp.service import TSGPService
     from tensorguard.tgsp.format import TSGPPackage
+    from tensorguard.tgsp.service import TSGPService
     TSSP_AVAILABLE = True
 except ImportError:
     TSSP_AVAILABLE = False
@@ -96,8 +96,8 @@ class TenSafeVLLMEngine:
         self._initialized = False
 
         # TSSP package
-        self.tssp_package: Optional['TSGPPackage'] = None
-        self.tssp_service: Optional['TSGPService'] = None
+        self.tssp_package: Optional[TSGPPackage] = None
+        self.tssp_service: Optional[TSGPService] = None
 
         # HE-LoRA
         self.he_lora_manager: Optional[HELoRAHookManager] = None
@@ -107,8 +107,8 @@ class TenSafeVLLMEngine:
         self.audit_logger = None
 
         # vLLM engine (lazy initialization)
-        self._llm: Optional['LLM'] = None
-        self._async_engine: Optional['AsyncLLMEngine'] = None
+        self._llm: Optional[LLM] = None
+        self._async_engine: Optional[AsyncLLMEngine] = None
 
         # Metrics
         self._total_requests = 0

@@ -8,19 +8,18 @@ DEPRECATED: This module exists for backward compatibility only.
 Use tensafe.core.inference instead.
 """
 
+from tensafe.core.config import InferenceConfig
 from tensafe.core.inference import (
-    # Core classes
-    TenSafeInference,
-    InferenceMode,
-    InferenceResult,
     BatchInferenceResult,
     GenerationConfig,
+    InferenceMode,
+    InferenceResult,
+    # Core classes
+    TenSafeInference,
     TGSPEnforcementError,
     # Factory function
     create_inference,
 )
-
-from tensafe.core.config import InferenceConfig
 
 # Backward compatibility alias
 LoRAMode = InferenceMode

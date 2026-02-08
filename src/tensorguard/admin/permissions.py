@@ -15,14 +15,14 @@ import os
 import secrets
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional
 from uuid import uuid4
 
-from fastapi import Depends, Header, HTTPException, Request, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import jwt
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import PyJWTError as JWTError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +116,7 @@ class AdminUserContext(BaseModel):
     name: str
     role: AdminRole
     tenant_id: Optional[str] = None  # Only set for org_admin
-    permissions: List[str] = []
+    permissions: List[str] = Field(default_factory=list)
     session_id: str
     ip_address: Optional[str] = None
 

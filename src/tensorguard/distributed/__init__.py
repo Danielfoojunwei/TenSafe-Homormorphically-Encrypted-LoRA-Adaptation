@@ -8,8 +8,8 @@ with privacy-preserving features including:
 - Privacy budget tracking across workers
 """
 
-from .ray_trainer import TenSafeRayTrainer, TenSafeRayConfig
 from .dp_distributed import DistributedDPOptimizer, SecureGradientAggregator
+from .ray_trainer import TenSafeRayConfig, TenSafeRayTrainer
 
 __all__ = [
     "TenSafeRayTrainer",

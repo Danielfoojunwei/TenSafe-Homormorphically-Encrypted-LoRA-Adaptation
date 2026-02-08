@@ -1,11 +1,13 @@
-import pytest
 import numpy as np
+import pytest
 import torch
+
+from he_lora_microkernel.backend.gpu_ckks_backend import BackendType, get_backend
+from he_lora_microkernel.backend.vllm_adapter.hooks import create_projection_hooks
+from he_lora_microkernel.client.sdk import TenSafeClientSDK
 from he_lora_microkernel.services.has.executor import HASExecutor
 from he_lora_microkernel.services.has.server import HASServicer
-from he_lora_microkernel.client.sdk import TenSafeClientSDK
-from he_lora_microkernel.backend.gpu_ckks_backend import BackendType, get_backend
-from he_lora_microkernel.backend.vllm_adapter.hooks import create_projection_hooks, reset_hook_statistics
+
 
 class MockHASStub:
     def __init__(self, servicer):
@@ -45,7 +47,7 @@ def test_tee_attestation_verification():
 
 def test_zero_rotation_enforcement():
     """Verify that rotations are blocked when enforcement is enabled."""
-    from he_lora_microkernel.compiler.ckks_params import get_profile, CKKSProfile
+    from he_lora_microkernel.compiler.ckks_params import CKKSProfile, get_profile
     params = get_profile(CKKSProfile.FAST)
     backend = get_backend(BackendType.SIMULATION, params)
     

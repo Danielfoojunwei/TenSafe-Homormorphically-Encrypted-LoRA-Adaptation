@@ -30,7 +30,10 @@ Example:
     >>> print(f"Saved: {checkpoint.artifact_id}")
 """
 
-__version__ = "1.0.0"
+from tensorguard.version import tensafe_version as _tv
+
+__version__ = _tv()
+del _tv
 
 # Client
 from .client import ServiceClient

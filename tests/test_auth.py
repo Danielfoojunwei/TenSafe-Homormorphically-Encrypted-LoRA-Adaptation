@@ -10,7 +10,6 @@ Verifies that:
 """
 
 import sys
-import os
 from datetime import datetime, timedelta
 
 import pytest

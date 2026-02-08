@@ -10,19 +10,19 @@ Supported attestation methods:
 - Software attestation (development only)
 """
 
+from .factory import AttestationConfig, create_attestation_provider
 from .provider import (
-    AttestationProvider,
     AttestationError,
+    AttestationProvider,
     AttestationQuote,
     AttestationResult,
     AttestationType,
     QuoteType,
     VerificationPolicy,
 )
-from .tpm import TPMAttestationProvider
-from .tdx import TDXAttestationProvider, TDXVerificationPolicy
 from .sev import SEVSNPAttestationProvider, SNPVerificationPolicy
-from .factory import create_attestation_provider, AttestationConfig
+from .tdx import TDXAttestationProvider, TDXVerificationPolicy
+from .tpm import TPMAttestationProvider
 
 __all__ = [
     "AttestationProvider",

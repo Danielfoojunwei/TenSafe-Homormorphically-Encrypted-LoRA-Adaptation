@@ -4,21 +4,20 @@ Google Cloud KMS Provider.
 Production-grade key management using Google Cloud Key Management Service.
 """
 
-import base64
 import logging
 import time
 from datetime import datetime
 from typing import Optional
 
 from ..provider import (
-    KMSProvider,
-    KMSError,
-    KMSKeyNotFoundError,
-    KMSAuthenticationError,
-    KMSOperationError,
-    KeyType,
     KeyAlgorithm,
     KeyMetadata,
+    KeyType,
+    KMSAuthenticationError,
+    KMSError,
+    KMSKeyNotFoundError,
+    KMSOperationError,
+    KMSProvider,
 )
 
 logger = logging.getLogger(__name__)
@@ -86,7 +85,6 @@ class GCPKMSProvider(KMSProvider):
     def _ensure_key_ring(self) -> None:
         """Create key ring if it doesn't exist."""
         from google.api_core import exceptions
-        from google.cloud import kms
 
         try:
             self._client.get_key_ring(request={"name": self._key_ring_path})
@@ -143,7 +141,6 @@ class GCPKMSProvider(KMSProvider):
         """Generate a new key in GCP KMS."""
         from google.api_core import exceptions
         from google.cloud import kms
-        from google.protobuf import duration_pb2
 
         try:
             purpose = self._key_type_to_purpose(key_type)

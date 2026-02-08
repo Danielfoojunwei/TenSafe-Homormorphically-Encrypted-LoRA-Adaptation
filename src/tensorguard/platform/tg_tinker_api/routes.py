@@ -17,14 +17,6 @@ from sqlmodel import Session
 from ..database import get_session
 from .audit import get_audit_logger
 from .dp import DPConfig, DPTrainer
-from .models import (
-    TinkerArtifact,
-    TinkerFuture,
-    TinkerTrainingClient,
-    generate_artifact_id,
-    generate_future_id,
-    generate_tc_id,
-)
 from .queue import get_job_queue
 from .repository import ArtifactRepository, FutureRepository, TrainingClientRepository
 from .storage import EncryptedArtifactStore, KeyManager, LocalStorageBackend
@@ -939,8 +931,9 @@ async def health_check() -> Dict[str, str]:
 _tgsp_registries: Dict[str, Any] = {}
 
 # Request ID counter for audit correlation (SOC 2 CC4.1)
-import uuid
 import threading
+import uuid
+
 _request_id_counter = 0
 _request_id_lock = threading.Lock()
 
@@ -955,8 +948,8 @@ def generate_request_id() -> str:
 
 # Simple rate limiter for TGSP inference (SOC 2 CC6.1)
 import threading
-from collections import defaultdict
 import time
+from collections import defaultdict
 
 _rate_limit_buckets: Dict[str, List[float]] = defaultdict(list)
 _rate_limit_lock = threading.Lock()
@@ -1312,6 +1305,7 @@ async def tgsp_encrypted_inference(
         Decrypted LoRA deltas for each input in the batch
     """
     import time
+
     import numpy as np
 
     # Generate request ID for audit correlation (SOC 2 CC4.1)
@@ -1516,11 +1510,11 @@ async def convert_lora_to_tgsp(
     for encrypted inference.
     """
     try:
-        from tensafe.lora_to_tgsp_converter import LoRAToTGSPConverter
-
         # Determine output path
         import os
         from pathlib import Path
+
+        from tensafe.lora_to_tgsp_converter import LoRAToTGSPConverter
 
         if request.output_path:
             output_path = request.output_path

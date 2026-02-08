@@ -140,7 +140,7 @@ class TestNoiseBudgetExhaustion:
     @pytest.mark.skipif(not backend_available(), reason="Backend required")
     def test_explicit_failure_on_exhaustion(self):
         """Test that exhaustion causes explicit failure, not silent corruption."""
-        from tensafe.he_lora.noise_tracker import NoiseTracker, NoiseBudgetExhaustedError
+        from tensafe.he_lora.noise_tracker import NoiseBudgetExhaustedError, NoiseTracker
 
         # Create tracker with very limited budget
         tracker = NoiseTracker(

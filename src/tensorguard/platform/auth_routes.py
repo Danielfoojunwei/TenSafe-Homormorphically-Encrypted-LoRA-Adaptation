@@ -19,23 +19,22 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlmodel import Session, select
 
 from .auth import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    PasswordValidationError,
     create_access_token,
     create_refresh_token,
     get_current_user,
     get_password_hash,
     verify_password,
-    PasswordValidationError,
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-    REFRESH_TOKEN_EXPIRE_DAYS,
 )
 from .database import get_session
-from .models.core import User, Tenant, UserRole
+from .models.core import Tenant, User, UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -328,7 +327,8 @@ async def refresh_token(
     """
     import jwt
     from jwt.exceptions import PyJWTError as JWTError
-    from .auth import SECRET_KEY, ALGORITHM, TOKEN_AUDIENCE, TOKEN_ISSUER
+
+    from .auth import ALGORITHM, SECRET_KEY, TOKEN_AUDIENCE, TOKEN_ISSUER
 
     try:
         payload = jwt.decode(

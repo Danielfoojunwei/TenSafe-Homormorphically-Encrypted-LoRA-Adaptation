@@ -22,14 +22,14 @@ Usage:
 """
 
 from tensafe.core.he_interface import (
-    HEBackendType,
-    HEScheme,
-    HEParams,
-    HEMetrics,
     HEBackendInterface,
-    ToyHEBackend,
-    N2HEBackendWrapper,
+    HEBackendType,
+    HEMetrics,
+    HEParams,
+    HEScheme,
     HEXLBackendWrapper,
+    N2HEBackendWrapper,
+    ToyHEBackend,
     get_backend,
     is_backend_available,
     list_available_backends,

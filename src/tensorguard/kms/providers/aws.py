@@ -4,21 +4,20 @@ AWS KMS Provider.
 Production-grade key management using AWS Key Management Service.
 """
 
-import base64
 import logging
 import time
 from datetime import datetime
 from typing import Optional
 
 from ..provider import (
-    KMSProvider,
-    KMSError,
-    KMSKeyNotFoundError,
-    KMSAuthenticationError,
-    KMSOperationError,
-    KeyType,
     KeyAlgorithm,
     KeyMetadata,
+    KeyType,
+    KMSAuthenticationError,
+    KMSError,
+    KMSKeyNotFoundError,
+    KMSOperationError,
+    KMSProvider,
 )
 
 logger = logging.getLogger(__name__)

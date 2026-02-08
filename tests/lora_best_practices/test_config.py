@@ -2,15 +2,16 @@
 Tests for LoRA best practices configuration.
 """
 
-import pytest
 import math
 
+import pytest
+
 from tensafe.lora_best_practices.config import (
+    TARGET_MODULE_PRESETS,
     LoRABestPracticesConfig,
     LoRAScalingMethod,
     LoRAVariant,
     TargetModulePreset,
-    TARGET_MODULE_PRESETS,
     create_optimal_config,
 )
 

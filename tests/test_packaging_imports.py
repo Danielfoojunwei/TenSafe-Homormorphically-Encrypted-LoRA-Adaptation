@@ -11,7 +11,6 @@ Use: scripts/ci_smoke.sh for full validation.
 """
 
 import importlib
-import sys
 
 import pytest
 
@@ -90,9 +89,7 @@ class TestPackagingImports:
     @SKIP_CRYPTO_CONFLICT
     def test_tensafe_core_modules_importable(self):
         """Test that tensafe core modules are importable."""
-        from tensafe.core import orchestrator
-        from tensafe.core import pipeline
-        from tensafe.core import registry
+        from tensafe.core import orchestrator, pipeline, registry
         assert orchestrator is not None
         assert pipeline is not None
         assert registry is not None
@@ -100,8 +97,7 @@ class TestPackagingImports:
     def test_tensafe_cookbook_modules_importable(self):
         """Test that tensafe cookbook modules are importable."""
         from tensafe.cookbook import eval as cookbook_eval
-        from tensafe.cookbook import recipes
-        from tensafe.cookbook import renderers
+        from tensafe.cookbook import recipes, renderers
         assert cookbook_eval is not None
         assert recipes is not None
         assert renderers is not None
@@ -109,8 +105,7 @@ class TestPackagingImports:
     @SKIP_CRYPTO_CONFLICT
     def test_tensafe_tgsp_modules_importable(self):
         """Test that TGSP modules are importable."""
-        from tensafe import tgsp_adapter_registry
-        from tensafe import lora_to_tgsp_converter
+        from tensafe import lora_to_tgsp_converter, tgsp_adapter_registry
         assert tgsp_adapter_registry is not None
         assert lora_to_tgsp_converter is not None
 
@@ -134,7 +129,7 @@ class TestPackagingImports:
             except ImportError as e:
                 errors.append(f"{pkg}: {e}")
 
-        assert not errors, f"Import errors:\n" + "\n".join(errors)
+        assert not errors, "Import errors:\n" + "\n".join(errors)
 
 
 if __name__ == "__main__":

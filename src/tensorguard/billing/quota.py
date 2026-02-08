@@ -28,10 +28,10 @@ Usage:
 import asyncio
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Optional
 
 from .billing_models import (
     OperationType,
@@ -343,7 +343,7 @@ class QuotaManager:
                     remaining=0,
                     limit=limit,
                     reset_time=quota.period_end,
-                    warning_message=f"Token quota exceeded. Overage charges apply.",
+                    warning_message="Token quota exceeded. Overage charges apply.",
                     overage_cost=self._calculate_overage_cost(
                         quota.tier_type,
                         projected - limit,
@@ -837,7 +837,6 @@ class QuotaManager:
         resource_type: str,
     ) -> Decimal:
         """Calculate overage cost."""
-        from .pricing import get_tier
 
         tier = get_tier(tier_type)
         multiplier = Decimal(str(self.config.overage_multiplier))

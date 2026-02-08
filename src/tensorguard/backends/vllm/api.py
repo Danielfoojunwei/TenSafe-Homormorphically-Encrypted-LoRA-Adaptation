@@ -4,16 +4,14 @@ Provides REST API endpoints compatible with OpenAI's API format,
 enabling drop-in replacement for existing OpenAI integrations.
 """
 
-from typing import Optional, List, Dict, Any, Union
-from dataclasses import dataclass, field
+import logging
 import time
 import uuid
-import logging
+from typing import Any, List, Optional, Union
 
-from fastapi import APIRouter, HTTPException, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-import asyncio
 
 logger = logging.getLogger(__name__)
 

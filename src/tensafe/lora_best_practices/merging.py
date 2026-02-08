@@ -14,12 +14,11 @@ Based on research from:
 - "DARE: Language Models are Super Mario"
 """
 
+import copy
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Any, Union
 from pathlib import Path
-import copy
-import math
+from typing import Any, Dict, List, Optional, Union
 
 
 class MergeMethod(Enum):

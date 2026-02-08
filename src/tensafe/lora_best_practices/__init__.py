@@ -19,40 +19,40 @@ Key improvements over standard LoRA:
 7. FFA-LoRA for privacy-preserving federated scenarios
 """
 
+from .adaptive_rank import (
+    AdaptiveRankSelector,
+    RankSelectionStrategy,
+    estimate_optimal_rank,
+)
 from .config import (
     LoRABestPracticesConfig,
     LoRAScalingMethod,
     LoRAVariant,
     TargetModulePreset,
 )
-from .presets import (
-    get_preset_config,
-    PresetType,
-    PRESET_CONFIGS,
+from .merging import (
+    LoRAMerger,
+    MergeMethod,
+    merge_lora_adapters,
 )
 from .optimizer import (
     LoRAPlusOptimizer,
     create_lora_plus_optimizer,
     get_lora_param_groups,
 )
-from .adaptive_rank import (
-    AdaptiveRankSelector,
-    estimate_optimal_rank,
-    RankSelectionStrategy,
-)
-from .merging import (
-    LoRAMerger,
-    MergeMethod,
-    merge_lora_adapters,
+from .presets import (
+    PRESET_CONFIGS,
+    PresetType,
+    get_preset_config,
 )
 from .privacy import (
     FFALoRAConfig,
     PrivacyPreservingLoRA,
 )
 from .scaling import (
-    compute_lora_scaling,
     RSLoRAScaling,
     StandardLoRAScaling,
+    compute_lora_scaling,
 )
 
 __all__ = [

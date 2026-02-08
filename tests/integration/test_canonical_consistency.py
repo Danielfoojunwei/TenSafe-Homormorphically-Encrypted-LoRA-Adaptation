@@ -14,12 +14,13 @@ Tests cover:
 """
 
 import hashlib
-import pytest
 from datetime import datetime
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
+
+import pytest
 
 # Import canonical serialization
-from tensorguard.evidence.canonical import canonical_json, canonical_bytes, verify_canonical_hash
+from tensorguard.evidence.canonical import canonical_bytes, canonical_json, verify_canonical_hash
 
 
 class TestCanonicalSerialization:
@@ -183,8 +184,9 @@ class TestEvidenceCanonicalConsistency:
 
     def test_evidence_includes_canonical_hash(self):
         """Test that evidence includes a canonical hash."""
+        from unittest.mock import Mock
+
         from tensorguard.platform.tg_tinker_api.tgsp_bridge import TinkerTGSPBridge
-        from unittest.mock import Mock, MagicMock
 
         # Create mock artifact store and audit logger
         artifact_store = Mock()
@@ -329,7 +331,7 @@ class TestCrossModuleHashVerification:
 
     def test_evidence_store_canonical_compatibility(self):
         """Test that evidence store uses same canonical format."""
-        from tensorguard.evidence.store import EvidenceStore, EvidenceRecord
+        from tensorguard.evidence.store import EvidenceStore
 
         store = EvidenceStore()
 
@@ -361,14 +363,16 @@ class TestHELoRAIntegrationGaps:
 
     def test_noise_budget_validation(self):
         """Test that noise budget is validated during computation."""
+        from unittest.mock import Mock
+
+        import numpy as np
+
         from tensorguard.n2he.adapter import (
-            EncryptedLoRARuntime,
             AdapterEncryptionConfig,
             AdapterMode,
             EncryptedActivation,
+            EncryptedLoRARuntime,
         )
-        from unittest.mock import Mock, MagicMock
-        import numpy as np
 
         config = AdapterEncryptionConfig(
             mode=AdapterMode.ENCRYPTED,
@@ -406,13 +410,14 @@ class TestHELoRAIntegrationGaps:
 
     def test_adapter_manifest_claims(self):
         """Test that manifest claims match actual adapter capabilities."""
+        import numpy as np
+
         from tensorguard.n2he.adapter import (
-            EncryptedLoRARuntime,
             AdapterEncryptionConfig,
             AdapterMode,
+            EncryptedLoRARuntime,
             HESchemeParams,
         )
-        import numpy as np
 
         he_params = HESchemeParams.default_lora_params()
 

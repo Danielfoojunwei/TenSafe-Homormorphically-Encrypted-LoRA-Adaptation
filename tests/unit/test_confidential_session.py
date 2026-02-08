@@ -8,23 +8,19 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timedelta
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from tensorguard.confidential.session import (
-    ConfidentialSession,
-    ConfidentialSessionManager,
-    DEFAULT_SESSION_TTL_SECONDS,
     MAX_SESSION_TTL_SECONDS,
+    ConfidentialSessionManager,
 )
 from tensorguard.tgsp.hpke_v03 import (
     generate_keypair,
-    hpke_seal,
     hpke_open,
-    public_key_to_bytes,
+    hpke_seal,
 )
 
 

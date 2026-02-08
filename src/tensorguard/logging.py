@@ -25,7 +25,6 @@ import sys
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-
 # Sensitive field patterns to filter from logs
 SENSITIVE_PATTERNS = frozenset(
     {
@@ -239,7 +238,7 @@ class LogContext:
 
     def __init__(self, **kwargs: Any):
         self.context = kwargs
-        self._previous: Optional["LogContext"] = None
+        self._previous: Optional[LogContext] = None
 
     def __enter__(self) -> "LogContext":
         self._previous = LogContext._current

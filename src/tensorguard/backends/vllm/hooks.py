@@ -4,29 +4,31 @@ This module provides PyTorch forward hooks that inject HE-LoRA computation
 into the vLLM inference pipeline while preserving privacy guarantees.
 """
 
-from typing import Optional, Dict, Any, Callable, List, Tuple
-from dataclasses import dataclass, field
-import time
-import threading
-import torch
-import torch.nn as nn
+import os
 
 # Import TenSafe HE components
 import sys
-import os
+import threading
+import time
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
+
+import torch
+import torch.nn as nn
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 
 try:
     from tensorguard.n2he.core import HESchemeParams, N2HEScheme, ToyN2HEScheme
-    from tensorguard.n2he.keys import SecretKey, PublicKey, EvaluationKey
+    from tensorguard.n2he.keys import EvaluationKey, PublicKey, SecretKey
     HE_AVAILABLE = True
 except ImportError:
     HE_AVAILABLE = False
 
 try:
     # Import HE-LoRA microkernel if available
-    from he_lora_microkernel.runtime.executor import HELoRAExecutor
     from he_lora_microkernel.backend.gpu_ckks_backend import GPUCKKSBackend
+    from he_lora_microkernel.runtime.executor import HELoRAExecutor
     HELORA_MICROKERNEL_AVAILABLE = True
 except ImportError:
     HELORA_MICROKERNEL_AVAILABLE = False

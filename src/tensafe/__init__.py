@@ -43,7 +43,10 @@ Usage:
     $ tensafe inference --model ./checkpoint --prompt "Hello"
 """
 
-__version__ = "3.0.0"
+from tensorguard.version import tensafe_version as _tv
+
+__version__ = _tv()
+del _tv
 
 # Lazy imports to avoid requiring all dependencies at import time
 # This allows importing tensafe even if numpy isn't installed

@@ -25,10 +25,10 @@ Example:
     ```
 """
 
+from .api import create_openai_router
 from .config import TenSafeVLLMConfig
 from .engine import TenSafeVLLMEngine
 from .hooks import HELoRAHook, HELoRAHookManager
-from .api import create_openai_router
 
 __all__ = [
     "TenSafeVLLMConfig",

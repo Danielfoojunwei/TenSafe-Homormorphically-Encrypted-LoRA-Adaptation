@@ -7,19 +7,18 @@ Provides privacy-preserving distributed training with:
 - Privacy budget accounting via production RDP accountant
 """
 
-from typing import Optional, Dict, Any, List
-from dataclasses import dataclass
-import math
 import logging
+from dataclasses import dataclass
+from typing import Dict, List
 
 import torch
-import torch.nn as nn
 from torch.optim import Optimizer
 
 from tensafe.privacy.accountants import (
-    ProductionRDPAccountant,
     DPConfig as AccountantDPConfig,
-    PrivacySpent,
+)
+from tensafe.privacy.accountants import (
+    ProductionRDPAccountant,
 )
 
 logger = logging.getLogger(__name__)

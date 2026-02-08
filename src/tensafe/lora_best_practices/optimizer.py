@@ -14,9 +14,9 @@ Benefits:
 - Same computational cost as standard LoRA
 """
 
-from typing import Dict, List, Optional, Tuple, Any, Iterator
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 
 @dataclass

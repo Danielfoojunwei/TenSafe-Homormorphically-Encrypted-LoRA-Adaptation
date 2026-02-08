@@ -8,7 +8,7 @@ registered in the loss registry.
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Union
 
 from .base import LossReturn
 

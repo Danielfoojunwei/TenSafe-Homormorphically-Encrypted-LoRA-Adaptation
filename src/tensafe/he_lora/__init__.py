@@ -30,10 +30,10 @@ from enum import Enum
 
 # Import everything from the new microkernel
 from he_lora_microkernel.compat import (
+    HEBackend,
     HELoRAAdapter,
     HELoRAConfig,
     HELoRAMetrics,
-    HEBackend,
 )
 
 

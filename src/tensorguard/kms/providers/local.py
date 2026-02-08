@@ -6,7 +6,6 @@ NOT FOR PRODUCTION USE - keys are stored encrypted but locally.
 """
 
 import base64
-import hashlib
 import json
 import logging
 import os
@@ -19,13 +18,12 @@ from typing import Optional
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from ..provider import (
-    KMSProvider,
-    KMSError,
-    KMSKeyNotFoundError,
-    KMSOperationError,
-    KeyType,
     KeyAlgorithm,
     KeyMetadata,
+    KeyType,
+    KMSKeyNotFoundError,
+    KMSOperationError,
+    KMSProvider,
 )
 
 logger = logging.getLogger(__name__)

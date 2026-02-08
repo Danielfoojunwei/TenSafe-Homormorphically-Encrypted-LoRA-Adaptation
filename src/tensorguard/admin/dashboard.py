@@ -11,7 +11,6 @@ Provides aggregated metrics and analytics for the admin dashboard:
 
 import logging
 import random
-from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -25,7 +24,6 @@ from .models import (
     TopTenantMetric,
     UsageTrend,
 )
-from .permissions import AdminUserContext
 
 logger = logging.getLogger(__name__)
 
