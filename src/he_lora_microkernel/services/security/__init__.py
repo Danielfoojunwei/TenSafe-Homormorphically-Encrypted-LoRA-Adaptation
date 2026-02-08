@@ -9,9 +9,9 @@ Provides security hardening for the Model Serving Service:
 - Attestation support
 """
 
-from .isolation import ProcessIsolation, IsolationConfig
+from .audit import AuditEvent, SecurityAuditLog
+from .isolation import IsolationConfig, ProcessIsolation
 from .validation import RequestValidator, ValidationResult
-from .audit import SecurityAuditLog, AuditEvent
 
 __all__ = [
     'ProcessIsolation',

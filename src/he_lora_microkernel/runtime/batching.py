@@ -14,22 +14,19 @@ recompiled to maintain deterministic performance.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List, Tuple, Callable
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 
 from ..compiler import (
-    LoRAConfig,
-    LoRATargets,
-    CKKSProfile,
     CKKSParams,
-    get_profile,
-    compile_schedule,
-    ExecutionSchedule,
-    PackingLayout,
-    estimate_costs,
     CostEstimate,
+    ExecutionSchedule,
+    LoRAConfig,
+    compile_schedule,
+    estimate_costs,
+    get_profile,
 )
-
 
 # =============================================================================
 # BATCH CONFIGURATION
@@ -418,8 +415,8 @@ class DynamicBatchExecutor:
         When the batch size changes and a new executor is created,
         previously loaded weights are automatically re-loaded.
         """
-        from .executor import HELoRAExecutor
         from ..backend.gpu_ckks_backend import BackendType
+        from .executor import HELoRAExecutor
 
         if self._executor is None or self._executor_batch_size != batch_size:
             schedule = self._batch_manager.set_batch_size(batch_size)

@@ -27,19 +27,17 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
-from tensorguard.attestation.tdx import TDXAttestationProvider, TDXVerificationPolicy
 from tensorguard.attestation.sev import SEVSNPAttestationProvider, SNPVerificationPolicy
-from tensorguard.attestation.provider import VerificationPolicy
-from tensorguard.confidential.session import ConfidentialSessionManager
+from tensorguard.attestation.tdx import TDXAttestationProvider, TDXVerificationPolicy
 from tensorguard.confidential.middleware import ConfidentialInferenceMiddleware
 from tensorguard.confidential.receipt import PrivacyReceiptGenerator
+from tensorguard.confidential.session import ConfidentialSessionManager
 from tensorguard.tgsp.hpke_v03 import (
     generate_keypair,
-    hpke_seal,
     hpke_open,
+    hpke_seal,
     public_key_to_bytes,
 )
-
 
 # ---- Fixtures ----
 
@@ -409,8 +407,8 @@ class TestAttestationFactoryIntegration:
 
     def test_factory_creates_tdx(self):
         from tensorguard.attestation.factory import (
-            create_attestation_provider,
             AttestationConfig,
+            create_attestation_provider,
         )
 
         config = AttestationConfig(provider="tdx", is_production=False)
@@ -421,8 +419,8 @@ class TestAttestationFactoryIntegration:
 
     def test_factory_creates_sev(self):
         from tensorguard.attestation.factory import (
-            create_attestation_provider,
             AttestationConfig,
+            create_attestation_provider,
         )
 
         config = AttestationConfig(provider="sev-snp", is_production=False)
@@ -438,8 +436,8 @@ class TestConfidentialAPIE2E:
     def test_api_session_and_inference(self, tdx_provider, client_keypair):
         """Test the API endpoints end-to-end."""
         try:
-            from fastapi.testclient import TestClient
             from fastapi import FastAPI
+            from fastapi.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi not installed")
 
@@ -532,8 +530,8 @@ class TestConfidentialAPIE2E:
     def test_api_attestation_endpoint(self, tdx_provider):
         """Test the attestation convenience endpoint."""
         try:
-            from fastapi.testclient import TestClient
             from fastapi import FastAPI
+            from fastapi.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi not installed")
 
@@ -559,8 +557,8 @@ class TestConfidentialAPIE2E:
     def test_api_stats_endpoint(self, tdx_provider):
         """Test statistics endpoint."""
         try:
-            from fastapi.testclient import TestClient
             from fastapi import FastAPI
+            from fastapi.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi not installed")
 
@@ -583,8 +581,8 @@ class TestConfidentialAPIE2E:
     def test_api_invalid_session(self, tdx_provider):
         """Test error handling for invalid session."""
         try:
-            from fastapi.testclient import TestClient
             from fastapi import FastAPI
+            from fastapi.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi not installed")
 

@@ -12,18 +12,17 @@ Key optimizations:
 - Cost-aware scheduling based on operation estimates
 """
 
-from .scheduler import (
-    HybridScheduler,
-    ScheduleConfig,
-    ExecutionPlan,
-    SchedulePhase,
-    schedule_gated_lora,
-)
-
 from .cost_model import (
     CostModel,
     OpCost,
     estimate_program_cost,
+)
+from .scheduler import (
+    ExecutionPlan,
+    HybridScheduler,
+    ScheduleConfig,
+    SchedulePhase,
+    schedule_gated_lora,
 )
 
 __all__ = [

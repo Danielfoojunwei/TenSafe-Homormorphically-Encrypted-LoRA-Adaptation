@@ -5,10 +5,11 @@ Executes HE-LoRA computation within the HAS service.
 Integrates with the HE-LoRA microkernel compiler and runtime.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
 import logging
 import time
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -309,9 +310,9 @@ class HASExecutor:
     def _compile_schedule(self, state: AdapterState) -> Optional[Any]:
         """Compile HE execution schedule for adapter."""
         try:
+            from ...compiler.ckks_params import CKKSProfile, get_profile
             from ...compiler.lora_ir import LoRAConfig, LoRATargets
             from ...compiler.scheduler import compile_schedule
-            from ...compiler.ckks_params import CKKSProfile, get_profile
 
             # Create LoRA config
             targets = LoRATargets.QKV if state.targets == "qkv" else LoRATargets.QKVO

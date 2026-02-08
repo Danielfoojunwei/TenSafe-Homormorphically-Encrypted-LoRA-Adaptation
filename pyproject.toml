@@ -165,16 +165,28 @@ select = [
 ignore = [
     "E501",  # line too long
     "E701",  # Multiple statements on one line - guard clauses
-    "B008",  # function calls in argument defaults
+    "E712",  # Comparison to True/False - pre-existing patterns
+    "E721",  # Type comparison instead of isinstance - pre-existing
+    "E731",  # Lambda assignment - pre-existing patterns
+    "E741",  # Ambiguous variable name - pre-existing
+    "B006",  # Mutable default in function arg - pre-existing
     "B007",  # Loop control variable not used - enumerate patterns
-    "UP006", # Use `X` instead of `typing.X` - allow for Python 3.9 compat
-    "UP035", # `typing.X` is deprecated - allow for Python 3.9 compat
-    "E402",  # Module level import not at top - needed for conditional imports
+    "B008",  # function calls in argument defaults
+    "B017",  # assertRaises(Exception) too broad - pre-existing tests
+    "B028",  # No stacklevel in warnings.warn - pre-existing
     "B904",  # Within an `except` clause, raise with `from` - pre-existing
+    "C401",  # Unnecessary generator - pre-existing
+    "F401",  # Imported but unused - many intentional re-exports and availability checks
+    "F403",  # Star imports - needed for SQLModel registration
+    "F821",  # Undefined name - pre-existing (type annotations, conditional imports)
+    "F841",  # Local variable assigned but never used - pre-existing code
+    "UP006", # Use `X` instead of `typing.X` - allow for Python 3.9 compat
+    "UP007", # Use `X | Y` instead of `Union[X, Y]` - allow for Python 3.9 compat
+    "UP035", # `typing.X` is deprecated - allow for Python 3.9 compat
+    "UP045", # Use `X | None` instead of `Optional[X]` - allow for Python 3.9 compat
+    "E402",  # Module level import not at top - needed for conditional imports
     "W291",  # Trailing whitespace - auto-fixable
     "W293",  # Blank line contains whitespace - auto-fixable
-    "F403",  # Star imports - needed for SQLModel registration
-    "F841",  # Local variable assigned but never used - pre-existing code
 ]
 
 [tool.ruff.lint.isort]

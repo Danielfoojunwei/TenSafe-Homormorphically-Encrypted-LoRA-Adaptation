@@ -5,12 +5,12 @@ Provides production-grade privacy accounting for differential privacy.
 """
 
 from tensafe.privacy.accountants import (
-    PrivacyAccountant,
-    ProductionRDPAccountant,
-    ProductionPRVAccountant,
-    get_privacy_accountant,
     DPConfig,
+    PrivacyAccountant,
     PrivacySpent,
+    ProductionPRVAccountant,
+    ProductionRDPAccountant,
+    get_privacy_accountant,
 )
 
 __all__ = [

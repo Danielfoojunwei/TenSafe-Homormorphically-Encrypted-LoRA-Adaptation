@@ -20,10 +20,9 @@ import hashlib
 import logging
 import os
 import struct
-import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from .provider import (
     AttestationError,
@@ -31,7 +30,6 @@ from .provider import (
     AttestationQuote,
     AttestationResult,
     AttestationType,
-    AttestationVerificationError,
     QuoteType,
     VerificationPolicy,
 )
@@ -521,7 +519,7 @@ class TDXAttestationProvider(AttestationProvider):
         if self._use_simulation:
             return "sim-1.5.0"
         try:
-            with open("/sys/firmware/tdx/version", "r") as f:
+            with open("/sys/firmware/tdx/version") as f:
                 return f.read().strip()
         except (FileNotFoundError, PermissionError):
             return "unknown"

@@ -14,21 +14,21 @@ All artifacts are deterministically generated from the input configuration,
 enabling reproducible builds and CI verification.
 """
 
-import json
 import hashlib
+import json
 import struct
-from dataclasses import dataclass, asdict
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
-import numpy as np
+from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional, Union
+
+import numpy as np
 
 from .ckks_params import CKKSParams
-from .packer import PackingLayout, PackedLoRAWeights
+from .cost_model import CostBudget, CostEstimate
 from .lora_ir import LoRAConfig, LoRAIRModule
+from .packer import PackedLoRAWeights, PackingLayout
 from .scheduler import ExecutionSchedule, RotationSchedule
-from .cost_model import CostEstimate, CostBudget
-
 
 # =============================================================================
 # ARTIFACT TYPES
@@ -456,20 +456,20 @@ def load_artifacts(
     artifact_dir = Path(artifact_dir)
 
     # Load metadata
-    with open(artifact_dir / "metadata.json", 'r') as f:
+    with open(artifact_dir / "metadata.json") as f:
         metadata_dict = json.load(f)
     metadata = ArtifactMetadata(**metadata_dict)
 
     # Load schedule JSON (raw dict for now)
-    with open(artifact_dir / "schedule.json", 'r') as f:
+    with open(artifact_dir / "schedule.json") as f:
         schedule_dict = json.load(f, object_hook=artifact_decoder)
 
     # Load layout
-    with open(artifact_dir / "layout.json", 'r') as f:
+    with open(artifact_dir / "layout.json") as f:
         layout_dict = json.load(f)
 
     # Load IR module
-    with open(artifact_dir / "ir_module.json", 'r') as f:
+    with open(artifact_dir / "ir_module.json") as f:
         ir_dict = json.load(f)
 
     # Load weights if present

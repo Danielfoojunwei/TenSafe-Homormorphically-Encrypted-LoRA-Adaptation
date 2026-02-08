@@ -10,11 +10,11 @@ The builder:
   3. Outputs engine file + sidecar config for delta injection
 """
 
+import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-import json
-import logging
 
 logger = logging.getLogger(__name__)
 

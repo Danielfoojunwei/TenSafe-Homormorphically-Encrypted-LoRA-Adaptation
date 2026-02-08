@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .provider import AttestationProvider, AttestationError, AttestationType
+from .provider import AttestationError, AttestationProvider
 
 logger = logging.getLogger(__name__)
 
@@ -125,10 +125,9 @@ def create_attestation_provider(
 
 def _auto_detect_provider(config: AttestationConfig) -> AttestationProvider:
     """Auto-detect the best available attestation provider."""
-    from .tpm import TPMAttestationProvider
-
     # Try TDX first (most common for confidential AI on cloud)
     from .tdx import TDXAttestationProvider
+    from .tpm import TPMAttestationProvider
 
     tdx_provider = TDXAttestationProvider(use_simulation=False)
     if tdx_provider.is_available:

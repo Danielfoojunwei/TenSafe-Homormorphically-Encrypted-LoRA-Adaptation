@@ -15,23 +15,22 @@ from fastapi.middleware.gzip import GZipMiddleware
 from sqlmodel import SQLModel
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from .database import check_db_health, engine
-from .tg_tinker_api import router as tinker_router
-from .auth_routes import router as auth_router
-from .sso.routes import router as sso_router
-
-# Security modules
-from ..security.rate_limiter import RateLimitMiddleware, RateLimitConfig
-from ..security.csp import CSPMiddleware, ContentSecurityPolicy
-from ..security.sanitization import ValidationMiddleware
-
 # Unified environment resolver
 from ..config.runtime import (
     ENVIRONMENT,
-    is_production,
     is_local_or_dev,
+    is_production,
     validate_no_demo_mode,
 )
+from ..security.csp import ContentSecurityPolicy, CSPMiddleware
+
+# Security modules
+from ..security.rate_limiter import RateLimitConfig, RateLimitMiddleware
+from ..security.sanitization import ValidationMiddleware
+from .auth_routes import router as auth_router
+from .database import check_db_health, engine
+from .sso.routes import router as sso_router
+from .tg_tinker_api import router as tinker_router
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +95,7 @@ async def lifespan(app: FastAPI):
 
 
 from tensorguard.version import tensafe_version
+
 API_VERSION = tensafe_version()
 API_TITLE = "TenSafe API"
 API_DESCRIPTION = """

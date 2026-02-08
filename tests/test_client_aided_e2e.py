@@ -2,10 +2,12 @@
 Integration test for the Client-Aided Bridge (Two-Phase Flow).
 Verifies that the HAS service correctly triggers gating and accepts client callbacks.
 """
-import pytest
 import numpy as np
-from he_lora_microkernel.services.has.executor import HASExecutor
+import pytest
+
 from he_lora_microkernel.client.gate_evaluator import GateEvaluator
+from he_lora_microkernel.services.has.executor import HASExecutor
+
 
 class TestClientAidedFlow:
     """Tests the two-phase gated LoRA execution."""

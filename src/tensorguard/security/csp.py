@@ -10,10 +10,9 @@ Provides comprehensive CSP header management:
 
 import hashlib
 import logging
-import os
 import secrets
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware

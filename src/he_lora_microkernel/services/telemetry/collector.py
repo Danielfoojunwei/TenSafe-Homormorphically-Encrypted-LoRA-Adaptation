@@ -4,13 +4,12 @@ Service Telemetry Collector
 Collects and aggregates telemetry data from MSS and HAS services.
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
 import logging
 import threading
 import time
-from collections import defaultdict
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

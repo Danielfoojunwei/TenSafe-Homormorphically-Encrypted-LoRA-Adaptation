@@ -15,6 +15,8 @@ from sqlmodel import Session, create_engine
 logger = logging.getLogger(__name__)
 
 # Import all models to register them with SQLModel
+# Unified environment resolver
+from ..config.runtime import is_production
 from .models.continuous_models import AdapterLifecycleState, CandidateEvent, Feed, Policy, Route  # noqa: F401
 from .models.core import AuditLog, Fleet, Job, Tenant, User  # noqa: F401
 from .models.enablement_models import *  # noqa: F401
@@ -33,9 +35,6 @@ from .models.peft_models import IntegrationConfig, PeftRun, PeftWizardDraft  # n
 from .models.settings_models import KMSKey, KMSRotationLog, SystemSetting  # noqa: F401
 from .models.tgflow_core_models import *  # noqa: F401
 from .models.vla_models import VLABenchmarkResult, VLADeploymentLog, VLAModel, VLASafetyCheck  # noqa: F401
-
-# Unified environment resolver
-from ..config.runtime import is_production, is_local_or_dev
 
 # Environment configuration
 DATABASE_URL = os.getenv("DATABASE_URL")

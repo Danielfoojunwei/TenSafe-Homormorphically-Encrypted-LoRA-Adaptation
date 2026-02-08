@@ -4,14 +4,14 @@ Tests for LoRA configuration presets.
 
 import pytest
 
+from tensafe.lora_best_practices.config import TargetModulePreset
 from tensafe.lora_best_practices.presets import (
-    PresetType,
     PRESET_CONFIGS,
+    PresetType,
     get_preset_config,
     list_presets,
     recommend_preset,
 )
-from tensafe.lora_best_practices.config import TargetModulePreset
 
 
 class TestPresetConfigs:

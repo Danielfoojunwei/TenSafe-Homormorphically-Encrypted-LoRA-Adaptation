@@ -8,19 +8,17 @@ Tests for the gated LoRA compiler and executor including:
 4. Scheme transition correctness
 """
 
-import pytest
 import numpy as np
-from typing import Tuple, Optional
 
-from ..ir import validate_program, Scheme
 from ..gated_lora import (
-    GatedLoRAConfig,
     GatedLoRACompiler,
+    GatedLoRAConfig,
     GatedLoRAExecutor,
     compile_gated_lora,
     plaintext_gated_lora,
 )
-from ..tfhe_lut import LUTLibrary, step_lut, sign_lut
+from ..ir import validate_program
+from ..tfhe_lut import LUTLibrary, sign_lut
 
 
 class TestGatedLoRAConfig:

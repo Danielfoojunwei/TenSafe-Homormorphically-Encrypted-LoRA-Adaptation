@@ -6,7 +6,6 @@ import pytest
 
 from tensafe.lora_best_practices.adaptive_rank import (
     AdaptiveRankSelector,
-    RankSelectionStrategy,
     estimate_optimal_rank,
 )
 

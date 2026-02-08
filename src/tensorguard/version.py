@@ -12,7 +12,7 @@ _FALLBACK = "4.1.0"
 def tensafe_version() -> str:
     """Return the installed package version, or a dev fallback."""
     try:
-        from importlib.metadata import version, PackageNotFoundError
+        from importlib.metadata import version
         return version("tensafe")
     except Exception:
         return _FALLBACK

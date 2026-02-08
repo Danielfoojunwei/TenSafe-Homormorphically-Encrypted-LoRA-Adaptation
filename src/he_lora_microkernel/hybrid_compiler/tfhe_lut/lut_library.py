@@ -16,9 +16,8 @@ Standard LUTs:
 - relu(x): max(0, x)
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Callable, Any
-import numpy as np
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional
 
 
 @dataclass

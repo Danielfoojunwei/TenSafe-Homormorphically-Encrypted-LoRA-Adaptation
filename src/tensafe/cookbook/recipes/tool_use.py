@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Protocol, Union
+from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from ..hyperparam_utils import LoRAConfig
 from ..model_info import get_recommended_renderer_name
@@ -68,7 +68,7 @@ class ToolDefinition:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ToolDefinition":
+    def from_dict(cls, data: Dict[str, Any]) -> ToolDefinition:
         """Create from dictionary."""
         return cls(
             name=data["name"],
@@ -95,7 +95,7 @@ class ToolCall:
         }
 
     @classmethod
-    def from_string(cls, s: str) -> Optional["ToolCall"]:
+    def from_string(cls, s: str) -> Optional[ToolCall]:
         """Parse tool call from string format."""
         try:
             # Try JSON format first
@@ -281,7 +281,7 @@ class ToolUseDataset:
     def _load_from_path(self) -> None:
         """Load dataset from file."""
         try:
-            with open(self.dataset_path, "r") as f:
+            with open(self.dataset_path) as f:
                 data = json.load(f)
 
             self._data = [
@@ -483,8 +483,8 @@ class ToolUseTrainer:
         Returns:
             Training batch item
         """
-        from ..tokenizer_utils import get_tokenizer
         from ..renderers import get_renderer
+        from ..tokenizer_utils import get_tokenizer
 
         tokenizer = get_tokenizer(self.config.model_name)
         renderer = get_renderer(self.config.renderer_name, tokenizer)

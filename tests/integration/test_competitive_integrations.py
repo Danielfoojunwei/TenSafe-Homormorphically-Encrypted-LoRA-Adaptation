@@ -9,11 +9,12 @@ Tests the new integrations implemented in the competitive analysis:
 - Kernel optimizations (Liger)
 """
 
-import pytest
-import sys
 import os
-from unittest.mock import Mock, patch, MagicMock
+import sys
 from dataclasses import dataclass
+from unittest.mock import Mock
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../src'))
@@ -28,7 +29,7 @@ class TestVLLMBackendConfig:
 
     def test_config_defaults(self):
         """Test default configuration values."""
-        from tensorguard.backends.vllm.config import TenSafeVLLMConfig, HESchemeType, CKKSProfile
+        from tensorguard.backends.vllm.config import CKKSProfile, HESchemeType, TenSafeVLLMConfig
 
         config = TenSafeVLLMConfig(model_path="test-model")
 
@@ -84,8 +85,9 @@ class TestHELoRAHooks:
 
     def test_hook_creation(self):
         """Test creating HE-LoRA hook."""
-        from tensorguard.backends.vllm.hooks import HELoRAHook, HELoRAConfig
         import torch
+
+        from tensorguard.backends.vllm.hooks import HELoRAConfig, HELoRAHook
 
         config = HELoRAConfig(
             hidden_size=4096,
@@ -108,8 +110,9 @@ class TestHELoRAHooks:
 
     def test_hook_application(self):
         """Test applying HE-LoRA hook."""
-        from tensorguard.backends.vllm.hooks import HELoRAHook, HELoRAConfig
         import torch
+
+        from tensorguard.backends.vllm.hooks import HELoRAConfig, HELoRAHook
 
         config = HELoRAConfig(hidden_size=64, rank=4, alpha=8.0)
 
@@ -138,9 +141,10 @@ class TestHELoRAHooks:
 
     def test_hook_manager(self):
         """Test HE-LoRA hook manager."""
-        from tensorguard.backends.vllm.hooks import HELoRAHookManager, HELoRAConfig
         import torch
         import torch.nn as nn
+
+        from tensorguard.backends.vllm.hooks import HELoRAConfig, HELoRAHookManager
 
         config = HELoRAConfig(hidden_size=64, rank=4)
         manager = HELoRAHookManager(config, target_modules=["linear"])
@@ -175,8 +179,8 @@ class TestVLLMEngine:
 
     def test_engine_initialization(self):
         """Test engine initialization."""
-        from tensorguard.backends.vllm.engine import TenSafeVLLMEngine
         from tensorguard.backends.vllm.config import TenSafeVLLMConfig
+        from tensorguard.backends.vllm.engine import TenSafeVLLMEngine
 
         config = TenSafeVLLMConfig(model_path="test-model")
 
@@ -187,8 +191,8 @@ class TestVLLMEngine:
 
     def test_simulated_generation(self):
         """Test simulated generation (no vLLM)."""
-        from tensorguard.backends.vllm.engine import TenSafeVLLMEngine
         from tensorguard.backends.vllm.config import TenSafeVLLMConfig
+        from tensorguard.backends.vllm.engine import TenSafeVLLMEngine
 
         config = TenSafeVLLMConfig(model_path="test-model")
         engine = TenSafeVLLMEngine(config)
@@ -201,8 +205,8 @@ class TestVLLMEngine:
 
     def test_engine_metrics(self):
         """Test engine metrics collection."""
-        from tensorguard.backends.vllm.engine import TenSafeVLLMEngine
         from tensorguard.backends.vllm.config import TenSafeVLLMConfig
+        from tensorguard.backends.vllm.engine import TenSafeVLLMEngine
 
         config = TenSafeVLLMConfig(model_path="test-model")
         engine = TenSafeVLLMEngine(config)
@@ -237,7 +241,6 @@ class TestRayTrainConfig:
     def test_config_with_dp(self):
         """Test configuration with differential privacy."""
         from tensorguard.distributed.ray_trainer import TenSafeRayConfig
-        from tensorguard.distributed.dp_distributed import DPAccountingResult
 
         # Create DP config
         @dataclass
@@ -262,8 +265,9 @@ class TestDistributedDP:
 
     def test_dp_optimizer(self):
         """Test DP optimizer wrapper."""
-        from tensorguard.distributed.dp_distributed import DistributedDPOptimizer
         import torch
+
+        from tensorguard.distributed.dp_distributed import DistributedDPOptimizer
 
         # Create simple model and optimizer
         model = torch.nn.Linear(10, 5)
@@ -291,8 +295,9 @@ class TestDistributedDP:
 
     def test_secure_aggregator(self):
         """Test secure gradient aggregation."""
-        from tensorguard.distributed.dp_distributed import SecureGradientAggregator
         import torch
+
+        from tensorguard.distributed.dp_distributed import SecureGradientAggregator
 
         aggregator = SecureGradientAggregator(num_workers=3)
 
@@ -331,7 +336,7 @@ class TestObservabilitySetup:
 
     def test_metrics_creation(self):
         """Test creating TenSafe metrics."""
-        from tensorguard.observability.setup import TenSafeMetrics, ObservabilityConfig
+        from tensorguard.observability.setup import ObservabilityConfig, TenSafeMetrics
 
         config = ObservabilityConfig(
             service_name="test-service",
@@ -447,7 +452,7 @@ class TestHFHubIntegration:
 
     def test_integration_creation(self):
         """Test creating HF Hub integration."""
-        from tensorguard.integrations.hf_hub import TenSafeHFHubIntegration, TenSafeHFHubConfig
+        from tensorguard.integrations.hf_hub import TenSafeHFHubConfig, TenSafeHFHubIntegration
 
         config = TenSafeHFHubConfig(private=True)
         hub = TenSafeHFHubIntegration(config)
@@ -504,8 +509,9 @@ class TestLigerIntegration:
 
     def test_model_type_detection(self):
         """Test model type detection."""
-        from tensorguard.optimizations.liger_integration import _detect_model_type
         import torch.nn as nn
+
+        from tensorguard.optimizations.liger_integration import _detect_model_type
 
         class LlamaModel(nn.Module):
             pass
@@ -522,8 +528,9 @@ class TestTrainingOptimizations:
 
     def test_gradient_checkpointing(self):
         """Test gradient checkpointing application."""
-        from tensorguard.optimizations.training_optimizations import apply_gradient_checkpointing
         import torch.nn as nn
+
+        from tensorguard.optimizations.training_optimizations import apply_gradient_checkpointing
 
         class MockModel(nn.Module):
             def __init__(self):
@@ -540,13 +547,14 @@ class TestTrainingOptimizations:
 
     def test_optimized_trainer(self):
         """Test optimized trainer creation."""
+        import torch
+        import torch.nn as nn
+        from torch.utils.data import TensorDataset
+
         from tensorguard.optimizations.training_optimizations import (
             TenSafeOptimizedTrainer,
             TrainingOptimizationConfig,
         )
-        import torch
-        import torch.nn as nn
-        from torch.utils.data import TensorDataset
 
         # Create simple model and dataset
         model = nn.Linear(10, 5)
@@ -579,8 +587,8 @@ class TestEndToEndIntegration:
 
     def test_full_inference_pipeline(self):
         """Test full inference pipeline with privacy features."""
-        from tensorguard.backends.vllm.engine import TenSafeVLLMEngine
         from tensorguard.backends.vllm.config import TenSafeVLLMConfig
+        from tensorguard.backends.vllm.engine import TenSafeVLLMEngine
         from tensorguard.observability.setup import TenSafeMetrics
 
         # Setup
@@ -603,9 +611,10 @@ class TestEndToEndIntegration:
 
     def test_privacy_aware_training_simulation(self):
         """Test privacy-aware training simulation."""
+        import torch
+
         from tensorguard.distributed.dp_distributed import DistributedDPOptimizer
         from tensorguard.integrations.wandb_callback import TenSafeWandbCallback
-        import torch
 
         # Setup model
         model = torch.nn.Linear(10, 5)

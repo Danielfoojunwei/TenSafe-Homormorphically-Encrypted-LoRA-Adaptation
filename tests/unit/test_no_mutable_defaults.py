@@ -10,7 +10,6 @@ This test uses AST parsing so it works without importing every module
 """
 
 import ast
-import sys
 from pathlib import Path
 
 import pytest

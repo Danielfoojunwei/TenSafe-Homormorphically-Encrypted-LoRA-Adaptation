@@ -29,7 +29,7 @@ def test_moai_context_importable():
 @needs_numpy
 def test_moai_context_is_ckks_backend():
     """MOAIContext should be the same class as CKKSMOAIBackend."""
-    from crypto_backend.ckks_moai import MOAIContext, CKKSMOAIBackend
+    from crypto_backend.ckks_moai import CKKSMOAIBackend, MOAIContext
     assert MOAIContext is CKKSMOAIBackend
 
 

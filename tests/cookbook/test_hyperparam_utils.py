@@ -1,6 +1,5 @@
 """Tests for cookbook hyperparameter utilities."""
 
-import pytest
 
 
 class TestLoRAConfig:

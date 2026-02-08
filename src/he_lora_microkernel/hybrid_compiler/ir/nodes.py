@@ -12,10 +12,9 @@ Direct scheme mixing is a compile-time error.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any, Tuple
-from .types import Scheme, ValueType, Shape, IRValue, CKKSMetadata, TFHEMetadata
-import numpy as np
+from typing import Any, Dict, List, Optional, Tuple
 
+from .types import CKKSMetadata, IRValue, Scheme, Shape, TFHEMetadata, ValueType
 
 # =============================================================================
 # BASE IR NODE

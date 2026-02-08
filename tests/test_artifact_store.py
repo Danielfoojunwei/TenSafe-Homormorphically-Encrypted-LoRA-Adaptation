@@ -10,7 +10,6 @@ Verifies that the artifact store can:
 
 import os
 import tempfile
-import shutil
 from pathlib import Path
 
 import pytest
@@ -116,8 +115,8 @@ class TestEncryptedArtifactStore:
         """Test saving and loading an artifact."""
         from tensorguard.platform.tg_tinker_api.storage import (
             EncryptedArtifactStore,
-            LocalStorageBackend,
             KeyManager,
+            LocalStorageBackend,
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -151,8 +150,8 @@ class TestEncryptedArtifactStore:
         """Test that artifacts can be loaded after 'restart' (new store instance)."""
         from tensorguard.platform.tg_tinker_api.storage import (
             EncryptedArtifactStore,
-            LocalStorageBackend,
             KeyManager,
+            LocalStorageBackend,
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -185,8 +184,8 @@ class TestEncryptedArtifactStore:
         """Test that tampered ciphertext is detected."""
         from tensorguard.platform.tg_tinker_api.storage import (
             EncryptedArtifactStore,
-            LocalStorageBackend,
             KeyManager,
+            LocalStorageBackend,
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:

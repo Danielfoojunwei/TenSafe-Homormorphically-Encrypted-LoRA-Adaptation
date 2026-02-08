@@ -11,13 +11,10 @@ MockMLBackend is available ONLY for testing (not in production paths).
 from __future__ import annotations
 
 import logging
-import os
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 
@@ -393,7 +390,7 @@ class TorchMLBackend(MLBackendInterface):
     def _apply_lora(self, config: MLBackendConfig) -> None:
         """Apply LoRA to the model."""
         try:
-            from peft import LoraConfig, get_peft_model, TaskType
+            from peft import LoraConfig, TaskType, get_peft_model
 
             lora_config = LoraConfig(
                 r=config.lora_rank,
@@ -449,7 +446,6 @@ class TorchMLBackend(MLBackendInterface):
         dp_config: Optional[DPConfig] = None,
     ) -> ForwardBackwardResult:
         """Execute forward-backward pass."""
-        import torch
 
         if not self.is_initialized:
             raise RuntimeError("Model not initialized. Call initialize() first.")
@@ -516,7 +512,6 @@ class TorchMLBackend(MLBackendInterface):
 
     def _compute_grad_norm(self) -> float:
         """Compute total gradient norm."""
-        import torch
 
         total_norm = 0.0
         for p in self._model.parameters():
@@ -540,8 +535,6 @@ class TorchMLBackend(MLBackendInterface):
         dp_config: Optional[DPConfig] = None,
     ) -> OptimStepResult:
         """Execute optimizer step."""
-        import torch
-        import math
 
         if not self.is_initialized:
             raise RuntimeError("Model not initialized")
@@ -578,8 +571,9 @@ class TorchMLBackend(MLBackendInterface):
 
     def _apply_dp_noise(self, dp_config: DPConfig) -> float:
         """Apply DP noise to gradients and return epsilon spent."""
-        import torch
         import math
+
+        import torch
 
         noise_scale = dp_config.noise_multiplier * dp_config.max_grad_norm
 
@@ -664,8 +658,9 @@ class TorchMLBackend(MLBackendInterface):
 
     def save_state(self, include_optimizer: bool = True) -> bytes:
         """Serialize model state."""
-        import torch
         import io
+
+        import torch
 
         if not self.is_initialized:
             raise RuntimeError("Model not initialized")
@@ -685,8 +680,9 @@ class TorchMLBackend(MLBackendInterface):
 
     def load_state(self, state_bytes: bytes) -> int:
         """Load model state from bytes."""
-        import torch
         import io
+
+        import torch
 
         if not self.is_initialized:
             raise RuntimeError("Model not initialized")

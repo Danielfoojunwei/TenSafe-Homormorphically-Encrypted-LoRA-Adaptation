@@ -17,12 +17,13 @@ The backend handles:
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional, List, Dict, Any, Callable
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 
+from .faster_ntt import get_ntt_backend
+from .lut_activation import LUTActivationEngine, LUTConfig
 from .n2he_params import N2HEParams, N2HEProfile, get_n2he_profile
-from .faster_ntt import FasterNTTBackend, get_ntt_backend
-from .lut_activation import LUTActivationEngine, LUTConfig, ActivationLUT
 
 
 class N2HEBackendType(Enum):

@@ -7,23 +7,17 @@ to the TGSP (TensorGuard Secure Package) format.
 
 import json
 import os
-import shutil
 import struct
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 # Import converter components
 from tensafe.lora_to_tgsp_converter import (
-    ConversionError,
     ConversionResult,
     LoRAConfig,
     LoRAFormat,
     LoRAToTGSPConverter,
     MissingKeyError,
-    ValidationError,
     convert_lora_to_tgsp,
 )
 

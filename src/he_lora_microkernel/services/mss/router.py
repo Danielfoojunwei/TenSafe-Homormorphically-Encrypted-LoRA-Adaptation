@@ -5,25 +5,25 @@ Routes inference requests to appropriate backend adapters
 and coordinates with HAS for delta injection.
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import logging
 import time
 import uuid
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple, Union
 
+from .has_client import HASClient, HASConfig, RequestContext
 from .schemas import (
-    CompletionRequest,
-    ChatCompletionRequest,
-    CompletionResponse,
-    ChatCompletionResponse,
-    InsertionPointSchema,
-    Choice,
     ChatChoice,
+    ChatCompletionRequest,
+    ChatCompletionResponse,
     ChatMessage,
+    Choice,
+    CompletionRequest,
+    CompletionResponse,
+    InsertionPointSchema,
     Usage,
 )
-from .has_client import HASClient, HASConfig, RequestContext
 
 logger = logging.getLogger(__name__)
 
@@ -386,7 +386,7 @@ class RequestRouter:
 
         # Configure adapter insertion points
         if self._default_adapter:
-            from ..backend.base_adapter import InsertionConfig, LoRATargets, InsertionPoint
+            from ..backend.base_adapter import InsertionConfig, InsertionPoint, LoRATargets
 
             # Map schema to adapter config
             targets = LoRATargets.QKV if config.targets.value == "qkv" else LoRATargets.QKVO

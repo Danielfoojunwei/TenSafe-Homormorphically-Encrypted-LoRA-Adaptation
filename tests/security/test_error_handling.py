@@ -42,7 +42,6 @@ from tensorguard.logging import (
     DevelopmentFormatter,
     LogContext,
     StructuredFormatter,
-    configure_logging,
     get_logger,
 )
 

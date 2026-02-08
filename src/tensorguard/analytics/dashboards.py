@@ -6,11 +6,11 @@ Real-time visibility into business health, user behavior, and operations.
 
 import json
 import logging
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass, asdict
 
-from .metrics import BusinessMetrics, UserMetrics, OperationalMetrics
+from .metrics import BusinessMetrics, OperationalMetrics, UserMetrics
 
 logger = logging.getLogger(__name__)
 

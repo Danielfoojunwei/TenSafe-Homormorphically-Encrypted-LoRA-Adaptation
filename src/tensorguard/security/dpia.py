@@ -21,13 +21,12 @@ Usage:
     )
 """
 
-import hashlib
 import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -656,7 +655,7 @@ class DPIAManager:
             raise ValueError(f"DPIA {dpia_id} not found")
 
         if assessment.status != DPIAStatus.DRAFT:
-            raise ValueError(f"DPIA must be in draft status to submit for review")
+            raise ValueError("DPIA must be in draft status to submit for review")
 
         # Validate completeness
         errors = self._validate_completeness(assessment)

@@ -12,15 +12,16 @@ The executor provides:
 - Performance metrics collection
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Tuple
-import numpy as np
-import time
 import logging
+import time
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional
 
-from ..ir import IRProgram, IRNode, Scheme
-from ..scheduler import ExecutionPlan, SchedulePhase
-from ..bridge import CKKSTFHEBridge, BridgeConfig, QuantizationParams
+import numpy as np
+
+from ..bridge import CKKSTFHEBridge
+from ..ir import IRProgram
+from ..scheduler import ExecutionPlan
 from ..tfhe_lut import LUTLibrary
 
 logger = logging.getLogger(__name__)

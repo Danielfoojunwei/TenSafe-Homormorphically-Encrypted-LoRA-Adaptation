@@ -14,29 +14,28 @@ Benchmarks are run across:
   - Multiple ranks
 """
 
-import time
 import json
-from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional
+import os
+import sys
+import time
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 
-import sys
-import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+from he_lora_microkernel.backend.gpu_ckks_backend import BackendType
 from he_lora_microkernel.compiler import (
+    CKKSProfile,
     LoRAConfig,
     LoRATargets,
-    CKKSProfile,
-    get_profile,
     compile_schedule,
+    get_profile,
 )
 from he_lora_microkernel.runtime import (
     HELoRAExecutor,
-    TelemetryCollector,
-    PerformanceReporter,
 )
-from he_lora_microkernel.backend.gpu_ckks_backend import BackendType
 
 
 @dataclass

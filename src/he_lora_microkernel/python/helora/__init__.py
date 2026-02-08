@@ -31,6 +31,15 @@ Quick start:
 """
 
 # Configuration
+# Compilation
+from .compile import (
+    CompilationResult,
+    compare_configurations,
+    compile_and_save,
+    compile_lora,
+    recompile_for_batch_size,
+    validate_compilation,
+)
 from .config import (
     HELoRAConfig,
     PerformanceProfile,
@@ -40,24 +49,13 @@ from .config import (
     mistral_7b_config,
 )
 
-# Compilation
-from .compile import (
-    CompilationResult,
-    compile_lora,
-    compile_and_save,
-    validate_compilation,
-    recompile_for_batch_size,
-    compare_configurations,
-)
-
 # Execution
 from .run import (
     HELoRARunner,
+    benchmark_configuration,
     create_executor,
     run_inference,
-    benchmark_configuration,
 )
-
 
 __all__ = [
     # Configuration

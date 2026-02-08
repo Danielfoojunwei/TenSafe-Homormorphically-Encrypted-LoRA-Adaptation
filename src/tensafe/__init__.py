@@ -44,6 +44,7 @@ Usage:
 """
 
 from tensorguard.version import tensafe_version as _tv
+
 __version__ = _tv()
 del _tv
 

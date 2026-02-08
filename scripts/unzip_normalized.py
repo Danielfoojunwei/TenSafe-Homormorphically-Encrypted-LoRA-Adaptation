@@ -15,7 +15,6 @@ Usage:
 """
 
 import argparse
-import os
 import sys
 import zipfile
 from pathlib import Path, PurePosixPath

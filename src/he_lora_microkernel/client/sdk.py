@@ -2,15 +2,14 @@
 TenSafe Client SDK for HE-LoRA Microkernel.
 Handles gRPC communication with HEAdapterService and automates the Two-Phase flow.
 """
+import logging
+from typing import Any, Dict, List, Optional
+
 import grpc
 import numpy as np
-import logging
-import time
-from typing import Dict, List, Optional, Any
 
-from he_lora_microkernel.services.proto import has_pb2
-from he_lora_microkernel.services.proto import has_pb2_grpc
 from he_lora_microkernel.client.gate_evaluator import GateEvaluator
+from he_lora_microkernel.services.proto import has_pb2, has_pb2_grpc
 
 logger = logging.getLogger(__name__)
 

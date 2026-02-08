@@ -6,20 +6,21 @@ Tests:
 2. Speculative Batching (Paper 2)
 """
 
-import unittest
-import numpy as np
 import logging
-import sys
 import os
+import sys
+import unittest
+
+import numpy as np
 
 # Add parent directory to path to allow importing modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from services.has.executor import HASExecutor
 from client.gate_evaluator import GateEvaluator
 from hybrid_compiler.gated_lora.executor import GatedLoRAExecutor
 from hybrid_compiler.ir import IRProgram
 from hybrid_compiler.scheduler import ExecutionPlan
+from services.has.executor import HASExecutor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

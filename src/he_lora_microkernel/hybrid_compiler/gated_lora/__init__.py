@@ -14,10 +14,9 @@ from .compiler import (
     GatedLoRAConfig,
     compile_gated_lora,
 )
-
 from .executor import (
-    GatedLoRAExecutor,
     ExecutionResult,
+    GatedLoRAExecutor,
     execute_gated_lora,
     plaintext_gated_lora,
 )

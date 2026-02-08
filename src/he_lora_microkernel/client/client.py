@@ -1,19 +1,18 @@
 """
 TenSafe Client
 """
-import grpc
-import time
-import numpy as np
-from typing import Optional, List, Dict, Any
 import logging
+from typing import Any
+
+import grpc
 
 # Import proto modules - need to be careful with imports
 try:
     from ..services.proto import has_pb2, has_pb2_grpc
 except ImportError:
     # Fallback for when running as script
-    import sys
     import os
+    import sys
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
     from he_lora_microkernel.services.proto import has_pb2, has_pb2_grpc
 

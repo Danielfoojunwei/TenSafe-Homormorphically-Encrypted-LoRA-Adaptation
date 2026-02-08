@@ -21,7 +21,7 @@ import hashlib
 import logging
 import os
 import struct
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -31,7 +31,6 @@ from .provider import (
     AttestationQuote,
     AttestationResult,
     AttestationType,
-    AttestationVerificationError,
     QuoteType,
     VerificationPolicy,
 )
@@ -493,7 +492,7 @@ class SEVSNPAttestationProvider(AttestationProvider):
         if self._use_simulation:
             return "sim-1.55.0"
         try:
-            with open("/sys/kernel/debug/sev/firmware_version", "r") as f:
+            with open("/sys/kernel/debug/sev/firmware_version") as f:
                 return f.read().strip()
         except (FileNotFoundError, PermissionError):
             return "unknown"

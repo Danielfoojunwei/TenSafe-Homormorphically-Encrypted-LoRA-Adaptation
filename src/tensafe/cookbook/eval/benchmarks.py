@@ -13,7 +13,7 @@ import logging
 import re
 from typing import Any, Dict, List
 
-from .base import BenchmarkConfig, BenchmarkEvaluator, BenchmarkResult, Evaluator
+from .base import BenchmarkEvaluator, BenchmarkResult, Evaluator
 
 logger = logging.getLogger(__name__)
 

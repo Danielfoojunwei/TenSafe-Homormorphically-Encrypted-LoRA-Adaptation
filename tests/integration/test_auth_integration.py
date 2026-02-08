@@ -54,6 +54,7 @@ def client(test_env):
 
     # Now import with test environment set
     from fastapi.testclient import TestClient
+
     from tensorguard.platform.main import app
 
     with TestClient(app) as test_client:

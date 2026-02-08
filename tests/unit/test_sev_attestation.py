@@ -8,24 +8,21 @@ in simulation mode.
 import hashlib
 import os
 import sys
-import time
 from datetime import timedelta
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
-from tensorguard.attestation.sev import (
-    SEVSNPAttestationProvider,
-    SNPReportBody,
-    SNPVerificationPolicy,
-    SNP_POLICY_DEBUG_ALLOWED,
-)
 from tensorguard.attestation.provider import (
     AttestationError,
     AttestationType,
     QuoteType,
     VerificationPolicy,
+)
+from tensorguard.attestation.sev import (
+    SEVSNPAttestationProvider,
+    SNPVerificationPolicy,
 )
 
 

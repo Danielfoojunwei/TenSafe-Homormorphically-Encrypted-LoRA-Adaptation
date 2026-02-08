@@ -13,18 +13,17 @@ These wrap the existing OpenAI-compatible endpoints with HPKE
 encryption and privacy receipts.
 """
 
-import json
 import logging
 import time
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from .session import ConfidentialSessionManager
 from .middleware import ConfidentialInferenceMiddleware
 from .receipt import PrivacyReceiptGenerator
+from .session import ConfidentialSessionManager
 
 logger = logging.getLogger(__name__)
 

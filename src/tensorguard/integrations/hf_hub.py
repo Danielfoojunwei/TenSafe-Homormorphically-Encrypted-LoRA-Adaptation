@@ -6,12 +6,11 @@ Provides model hosting with TSSP integration:
 - Generate privacy-aware model cards
 """
 
-from typing import Optional, Dict, Any, List
-from dataclasses import dataclass
+import json
 import logging
 import os
-import json
-from pathlib import Path
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +24,7 @@ except ImportError:
 
 # TenSafe imports
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 try:
@@ -248,7 +248,7 @@ class TenSafeHFHubIntegration:
         if os.path.exists(manifest_path) and self.tssp_service and verify:
             try:
                 # In production, this would reconstruct and verify the TSSP package
-                with open(manifest_path, 'r') as f:
+                with open(manifest_path) as f:
                     manifest_data = json.load(f)
                 logger.info("TSSP manifest loaded")
                 return manifest_data

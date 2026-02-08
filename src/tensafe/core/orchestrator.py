@@ -48,16 +48,13 @@ Usage:
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import os
 import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -233,7 +230,7 @@ class TenSafeOrchestrator:
     # Lifecycle Methods
     # ===========================================================================
 
-    def initialize(self) -> "TenSafeOrchestrator":
+    def initialize(self) -> TenSafeOrchestrator:
         """
         Initialize all backend components.
 
@@ -306,7 +303,7 @@ class TenSafeOrchestrator:
 
     def _init_he_backend(self) -> None:
         """Initialize HE backend."""
-        from tensafe.core.he_interface import get_backend, HEParams, HEBackendType
+        from tensafe.core.he_interface import HEBackendType, HEParams, get_backend
 
         params = HEParams(
             poly_modulus_degree=self.config.he_poly_modulus_degree,

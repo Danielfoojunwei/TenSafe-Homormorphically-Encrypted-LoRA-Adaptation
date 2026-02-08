@@ -17,7 +17,6 @@ import json
 import secrets
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Optional, Tuple
 
@@ -113,7 +112,7 @@ def compute_signature(
         secret_bytes = secret.encode("utf-8")
 
     # Create signed payload: timestamp.payload
-    signed_payload = f"{timestamp}.".encode("utf-8") + payload
+    signed_payload = f"{timestamp}.".encode() + payload
 
     # Select hash function
     hash_funcs = {

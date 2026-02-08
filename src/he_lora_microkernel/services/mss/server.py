@@ -12,12 +12,12 @@ Endpoints:
 - GET /health - Health check
 """
 
+import json
+import logging
+import os
+import time
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional, Union
-import logging
-import json
-import time
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -46,15 +46,13 @@ def create_app(
         logger.error("FastAPI not installed. Install with: pip install fastapi uvicorn")
         raise ImportError("FastAPI required for MSS server")
 
+    from .router import BackendType, RequestRouter, RouterConfig
     from .schemas import (
-        CompletionRequest,
         ChatCompletionRequest,
-        CompletionResponse,
-        ChatCompletionResponse,
-        InsertionPointSchema,
+        CompletionRequest,
         ErrorResponse,
+        InsertionPointSchema,
     )
-    from .router import RequestRouter, RouterConfig, BackendType
 
     # Global router instance
     router: Optional[RequestRouter] = None

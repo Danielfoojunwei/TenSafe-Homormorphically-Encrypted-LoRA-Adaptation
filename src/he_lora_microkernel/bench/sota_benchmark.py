@@ -10,28 +10,24 @@ It generates an empirical performance report by projecting operation counts
 onto calibrated HE Cost Models for A100, H100, and Groq (Projected).
 """
 
-import time
-import numpy as np
 import logging
-import sys
 import os
-from typing import Dict, Any
+import sys
+import time
 from dataclasses import dataclass
+from typing import Dict
+
+import numpy as np
 
 # Add parent directory to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from he_lora_microkernel.runtime.executor import LoRAAdapterExecutor, ExecutionMode
-from he_lora_microkernel.compiler.lora_ir import LoRAConfig, LoRATargets
-from he_lora_microkernel.compiler.ckks_params import CKKSProfile, get_profile
-from he_lora_microkernel.compiler.scheduler import compile_schedule
 from he_lora_microkernel.backend.gpu_ckks_backend import BackendType
-
+from he_lora_microkernel.compiler.ckks_params import CKKSProfile, get_profile
+from he_lora_microkernel.compiler.lora_ir import LoRAConfig, LoRATargets
+from he_lora_microkernel.compiler.scheduler import compile_schedule
+from he_lora_microkernel.runtime.executor import LoRAAdapterExecutor
 from he_lora_microkernel.services.has.executor import HASExecutor
-from he_lora_microkernel.hybrid_compiler.gated_lora.executor import GatedLoRAExecutor
-from he_lora_microkernel.hybrid_compiler.ir import IRProgram
-from he_lora_microkernel.hybrid_compiler.scheduler import ExecutionPlan
-from he_lora_microkernel.client.gate_evaluator import GateEvaluator
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("benchmark")
@@ -416,7 +412,7 @@ class BenchmarkRunner:
         ts_groq_linear = tps_results.get('Groq LPU (Projected)', {}).get('Linear_TPS', 0)
         ts_groq_nonlinear = tps_results.get('Groq LPU (Projected)', {}).get('NonLinear_Pipelined_TPS', 0)
         
-        report = f"""# Benchmark Report: TenSafe Comparative Analysis
+        report = rf"""# Benchmark Report: TenSafe Comparative Analysis
 **Date**: {time.strftime("%Y-%m-%d")}
 **Metric**: Tokens per Second (tok/s)
 **Config**: Rank r=32, Batch=2 (Zero-Rotation), Learning Rate LR=2e-4 (LoRA Without Regret)

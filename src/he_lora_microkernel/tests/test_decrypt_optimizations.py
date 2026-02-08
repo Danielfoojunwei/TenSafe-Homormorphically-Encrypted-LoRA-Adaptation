@@ -12,29 +12,25 @@ Each test compares optimized output against the FP64 reference to ensure
 numerical correctness is preserved while the optimization is exercised.
 """
 
-import pytest
-import numpy as np
-import time
-from typing import Tuple
-
-import sys
 import os
+import sys
+
+import numpy as np
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "src"))
 
+from he_lora_microkernel.backend.gpu_ckks_backend import BackendType, SimulationBackend
 from he_lora_microkernel.compiler import (
+    CKKSProfile,
     LoRAConfig,
     LoRATargets,
-    CKKSProfile,
-    get_profile,
     compile_schedule,
-    pack_activations,
-    unpack_activations,
+    get_profile,
 )
 from he_lora_microkernel.runtime import HELoRAExecutor
 from he_lora_microkernel.runtime.executor import LoRAAdapterExecutor
-from he_lora_microkernel.backend.gpu_ckks_backend import BackendType, SimulationBackend
-
 
 # =============================================================================
 # REFERENCE IMPLEMENTATION
@@ -205,8 +201,8 @@ class TestAsyncOverlap:
 
     def test_inference_plaintext_inplace(self, config, weights, activations):
         """Plaintext mode uses in-place add and produces correct output."""
-        from tensafe.core.inference import TenSafeInference, InferenceMode
         from tensafe.core.config import LoRAConfig as InferenceLoRAConfig
+        from tensafe.core.inference import InferenceMode, TenSafeInference
 
         A, B = weights
         lora_a = B   # (rank, hidden)
@@ -239,7 +235,7 @@ class TestPartialDecrypt:
 
     def test_partial_decrypt_correctness(self):
         """Partial decrypt returns correct subset of slots."""
-        from he_lora_microkernel.compiler.ckks_params import get_profile, CKKSProfile
+        from he_lora_microkernel.compiler.ckks_params import CKKSProfile, get_profile
 
         ckks_params = get_profile(CKKSProfile.FAST)
         backend = SimulationBackend(ckks_params)
@@ -258,7 +254,7 @@ class TestPartialDecrypt:
 
     def test_partial_decrypt_smaller_than_full(self):
         """Partial decrypt returns fewer elements than full decrypt."""
-        from he_lora_microkernel.compiler.ckks_params import get_profile, CKKSProfile
+        from he_lora_microkernel.compiler.ckks_params import CKKSProfile, get_profile
 
         ckks_params = get_profile(CKKSProfile.FAST)
         backend = SimulationBackend(ckks_params)
@@ -299,7 +295,7 @@ class TestBatchedDecrypt:
 
     def test_batch_decrypt_correctness(self):
         """batch_decrypt returns same results as individual decrypts."""
-        from he_lora_microkernel.compiler.ckks_params import get_profile, CKKSProfile
+        from he_lora_microkernel.compiler.ckks_params import CKKSProfile, get_profile
 
         ckks_params = get_profile(CKKSProfile.FAST)
         backend = SimulationBackend(ckks_params)
@@ -420,8 +416,8 @@ class TestInPlaceBufferReuse:
 
     def test_inference_plaintext_no_extra_alloc(self, config, weights, activations):
         """Plaintext mode output shares buffer with base output."""
-        from tensafe.core.inference import TenSafeInference, InferenceMode
         from tensafe.core.config import LoRAConfig as InferenceLoRAConfig
+        from tensafe.core.inference import InferenceMode, TenSafeInference
 
         A, B = weights
         lora_a = B   # (rank, hidden)

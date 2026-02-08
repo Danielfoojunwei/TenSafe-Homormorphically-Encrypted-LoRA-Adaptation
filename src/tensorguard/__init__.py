@@ -10,6 +10,7 @@ A complete privacy-preserving machine learning training system featuring:
 """
 
 from tensorguard.version import tensafe_version as _tv
+
 __version__ = _tv()
 del _tv
 __author__ = "Daniel Foo & The TG-Tinker Team"

@@ -9,11 +9,10 @@ The adapter supports two modes:
   2. Hybrid mode: Attention projections in PyTorch, rest in TensorRT
 """
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
-import logging
 import json
+import logging
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 if TYPE_CHECKING:
     import torch
@@ -21,15 +20,14 @@ if TYPE_CHECKING:
 from ..base_adapter import (
     BaseRuntimeAdapter,
     BatchConfig,
-    ModelMetadata,
     InsertionConfig,
-    LoRATargets,
     LayerDeltas,
-    DeltaCallback,
+    LoRATargets,
+    ModelMetadata,
     register_adapter,
 )
+from .engine_builder import EngineConfig, TRTEngineBuilder
 from .plugin import HELoRAProjectionPlugin, PluginConfig
-from .engine_builder import TRTEngineBuilder, EngineConfig
 
 logger = logging.getLogger(__name__)
 
@@ -248,7 +246,6 @@ class TensorRTLLMAdapter(BaseRuntimeAdapter):
         attention_mask: Optional['torch.Tensor'] = None,
     ) -> Any:
         """Run prefill phase."""
-        import torch
 
         batch_size = input_ids.shape[0]
         seq_len = input_ids.shape[1]
@@ -343,7 +340,6 @@ class TensorRTLLMAdapter(BaseRuntimeAdapter):
         deltas: LayerDeltas,
     ) -> None:
         """Apply deltas through plugins."""
-        import numpy as np
 
         delta_map = {
             'q': deltas.dq,

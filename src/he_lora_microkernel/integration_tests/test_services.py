@@ -4,9 +4,10 @@ Integration Tests for MSS and HAS Services
 Tests the complete service stack with mock backends.
 """
 
-import pytest
-import numpy as np
 import time
+
+import numpy as np
+import pytest
 
 
 class TestHASService:
@@ -259,8 +260,6 @@ class TestMSSService:
         """Test insertion point schema parsing."""
         from he_lora_microkernel.services.mss.schemas import (
             InsertionPointSchema,
-            LayerSelection,
-            LayerSelectionMode,
             LoRATargetType,
         )
 
@@ -328,7 +327,6 @@ class TestTelemetry:
         """Test telemetry collection."""
         from he_lora_microkernel.services.telemetry.collector import (
             ServiceTelemetryCollector,
-            TelemetryEventType,
         )
 
         collector = ServiceTelemetryCollector()
@@ -358,8 +356,6 @@ class TestTelemetry:
         """Test KPI enforcement."""
         from he_lora_microkernel.services.telemetry.kpi import (
             KPIEnforcer,
-            ServiceKPIs,
-            KPISeverity,
         )
 
         enforcer = KPIEnforcer()
@@ -407,9 +403,9 @@ class TestSecurityHardening:
     def test_process_isolation(self):
         """Test process isolation verification."""
         from he_lora_microkernel.services.security.isolation import (
-            ProcessIsolation,
             IsolationConfig,
             IsolationLevel,
+            ProcessIsolation,
         )
 
         config = IsolationConfig(level=IsolationLevel.PROCESS)
@@ -424,10 +420,9 @@ class TestSecurityHardening:
     def test_audit_logging(self):
         """Test security audit logging."""
         from he_lora_microkernel.services.security.audit import (
-            SecurityAuditLog,
             AuditEvent,
             AuditEventType,
-            AuditSeverity,
+            SecurityAuditLog,
         )
 
         audit_log = SecurityAuditLog(
@@ -465,6 +460,7 @@ class TestEndToEnd:
     def test_full_inference_pipeline(self):
         """Test complete inference pipeline with HE-LoRA."""
         import torch
+
         from he_lora_microkernel.backend.base_adapter import (
             BatchConfig,
             InsertionConfig,
@@ -472,7 +468,6 @@ class TestEndToEnd:
             get_adapter,
         )
         from he_lora_microkernel.services.has.executor import HASExecutor
-        from he_lora_microkernel.services.mss.has_client import HASClient, HASConfig
 
         # Initialize HAS executor
         executor = HASExecutor(backend_type="SIMULATION")

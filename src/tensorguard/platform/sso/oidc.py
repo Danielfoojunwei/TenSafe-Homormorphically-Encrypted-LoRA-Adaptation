@@ -18,21 +18,20 @@ Security Features:
 
 import base64
 import hashlib
-import json
 import logging
-import os
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urlencode, urlparse
+from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlencode
 
 import httpx
 import jwt
 from jwt import PyJWK
-from jwt.exceptions import PyJWTError as JWTError, InvalidKeyError as JWKError
+from jwt.exceptions import InvalidKeyError as JWKError
+from jwt.exceptions import PyJWTError as JWTError
 
-from .models import OIDCConfig, SSOSession, SSOUser, SSOProviderType
+from .models import OIDCConfig, SSOProviderType, SSOSession, SSOUser
 
 logger = logging.getLogger(__name__)
 

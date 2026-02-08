@@ -5,10 +5,11 @@ Data models for component status, incidents, maintenance windows, and uptime met
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, EmailStr
-from sqlmodel import Field as SQLField, SQLModel
+from pydantic import BaseModel, EmailStr, Field
+from sqlmodel import Field as SQLField
+from sqlmodel import SQLModel
 
 
 class ComponentState(str, Enum):

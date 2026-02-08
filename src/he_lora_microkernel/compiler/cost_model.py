@@ -14,15 +14,13 @@ The cost model is critical for MOAI-style optimization - rotation
 minimization only matters if we can measure and enforce it.
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Dict, List, Optional, Any, Tuple
 import math
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
 
-from .ckks_params import CKKSParams, CKKSProfile
-from .packer import PackingLayout
+from .ckks_params import CKKSProfile
 from .lora_ir import LoRAConfig, LoRATargets
-
+from .packer import PackingLayout
 
 # =============================================================================
 # COST BUDGETS

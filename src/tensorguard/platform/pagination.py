@@ -13,7 +13,7 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Generic, List, Optional, TypeVar
+from typing import Any, Generic, List, Optional, TypeVar
 
 from fastapi import Query
 from pydantic import BaseModel, Field

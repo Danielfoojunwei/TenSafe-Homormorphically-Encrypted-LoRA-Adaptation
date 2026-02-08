@@ -8,28 +8,25 @@ in simulation mode.
 import hashlib
 import os
 import sys
-import time
 from datetime import timedelta
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
-from tensorguard.attestation.tdx import (
-    TDXAttestationProvider,
-    TDXQuoteBody,
-    TDXVerificationPolicy,
-    RTMR_FIRMWARE,
-    RTMR_OS_KERNEL,
-    RTMR_APPLICATION,
-    RTMR_USER,
-)
 from tensorguard.attestation.provider import (
     AttestationError,
-    AttestationQuote,
     AttestationType,
     QuoteType,
     VerificationPolicy,
+)
+from tensorguard.attestation.tdx import (
+    RTMR_APPLICATION,
+    RTMR_FIRMWARE,
+    RTMR_OS_KERNEL,
+    RTMR_USER,
+    TDXAttestationProvider,
+    TDXVerificationPolicy,
 )
 
 

@@ -12,7 +12,6 @@ Note: Basic correctness tests are in test_n2he_core.py
 import os
 
 import numpy as np
-import pytest
 
 # Ensure toy mode is enabled for tests
 os.environ["TENSAFE_TOY_HE"] = "1"
@@ -20,7 +19,6 @@ os.environ["TENSAFE_TOY_HE"] = "1"
 from tensorguard.n2he.core import (
     HESchemeParams,
     HESchemeType,
-    ToyModeNotEnabledError,
     ToyN2HEScheme,
 )
 
@@ -159,7 +157,6 @@ class TestToyModeGating:
 
     def test_toy_mode_warning_logged(self):
         """ToyN2HEScheme should log a warning about security."""
-        import logging
 
         params = HESchemeParams(
             scheme_type=HESchemeType.LWE,

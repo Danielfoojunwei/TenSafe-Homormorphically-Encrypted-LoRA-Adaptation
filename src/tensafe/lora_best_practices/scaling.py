@@ -10,10 +10,10 @@ Reference:
   (Kalajdzievski, 2023) https://arxiv.org/abs/2312.03732
 """
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
-import math
 
 
 class LoRAScaling(ABC):

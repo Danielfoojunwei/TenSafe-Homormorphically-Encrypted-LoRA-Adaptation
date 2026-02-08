@@ -8,10 +8,9 @@ Defines the type system for scheme-aware IR values including:
 - Scheme-specific metadata (precision, noise budgets)
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional, Tuple, Union, List, Dict, Any
-import math
+from typing import Any, Dict, Optional, Tuple
 
 
 class Scheme(Enum):

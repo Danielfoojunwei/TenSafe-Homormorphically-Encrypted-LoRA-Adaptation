@@ -17,11 +17,12 @@ Usage:
     delta = adapter.forward(x_plain, "q_proj")
 """
 
+import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
-import logging
+
 import numpy as np
-import time
 
 logger = logging.getLogger(__name__)
 

@@ -5,15 +5,16 @@ This backend provides the interface to the N2HE (Native-Node Homomorphic Encrypt
 CUDA library, implementing the rotation-minimal Zero-MOAI kernels.
 """
 
+from typing import Any, Dict
+
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
+
 from .gpu_ckks_backend import (
-    GPUCKKSBackend, 
-    GPUCiphertext, 
-    PlaintextPacked, 
-    register_backend, 
     BackendType,
-    OperationCounters
+    GPUCiphertext,
+    GPUCKKSBackend,
+    PlaintextPacked,
+    register_backend,
 )
 
 try:
