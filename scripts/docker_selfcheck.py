@@ -63,10 +63,10 @@ def check_he_backend():
     except ImportError:
         backends_tried.append("tenseal")
 
-    # Try crypto_backend.ckks_moai
+    # Try crypto_backend.ckks_moai (MOAIContext is the canonical entry point)
     try:
-        import crypto_backend.ckks_moai  # noqa: F401
-        print("  OK: crypto_backend.ckks_moai available")
+        from crypto_backend.ckks_moai import MOAIContext  # noqa: F401
+        print("  OK: crypto_backend.ckks_moai (MOAIContext) available")
         return []
     except ImportError:
         backends_tried.append("crypto_backend.ckks_moai")

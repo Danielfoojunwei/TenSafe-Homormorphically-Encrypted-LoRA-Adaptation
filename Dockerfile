@@ -1,6 +1,9 @@
 # TenSafe Production Dockerfile
 # Multi-stage build for optimized image size
 # Uses wheel installation (not editable) for proper package resolution
+#
+# crypto_backend/ and he_lora_microkernel/ now live under src/ and are
+# included in the wheel, so no manual COPY is needed.
 
 # =============================================================================
 # Build stage: Build wheel and install dependencies
@@ -30,8 +33,8 @@ COPY src/ ./src/
 # Build the wheel
 RUN python -m build --wheel --outdir /wheels
 
-# Install the wheel with HE extras + runtime deps.
-# tensafe[he] pulls in tenseal; fall back gracefully if it can't build.
+# Install the wheel + runtime deps.
+# Try installing tenseal for HE support; fall back gracefully if unavailable.
 RUN pip install --no-cache-dir /wheels/*.whl && \
     pip install --no-cache-dir gunicorn uvicorn[standard] && \
     pip install --no-cache-dir tenseal>=0.3.0 2>/dev/null || true
@@ -51,15 +54,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy virtual environment from builder (includes installed wheel)
+# Copy virtual environment from builder (includes installed wheel with
+# tensorguard, tensafe, tg_tinker, crypto_backend, he_lora_microkernel)
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-
-# Copy additional modules not in the wheel
-# he_lora_microkernel is used at runtime for HE operations
-COPY --chown=tensafe:tensafe he_lora_microkernel/ ./he_lora_microkernel/
-# crypto_backend contains CKKS MOAI and other HE native paths
-COPY --chown=tensafe:tensafe crypto_backend/ ./crypto_backend/
 
 # Copy gunicorn config (needed for CMD)
 COPY --chown=tensafe:tensafe src/tensorguard/platform/gunicorn_config.py ./gunicorn_config.py
@@ -81,8 +79,7 @@ ENV TENSAFE_ENV=production \
     MAX_REQUESTS=10000 \
     MAX_REQUESTS_JITTER=1000 \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app
+    PYTHONDONTWRITEBYTECODE=1
 
 # Health check — use new /healthz endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
@@ -96,7 +93,7 @@ EXPOSE 8000 9090
 # Switch to non-root user
 USER tensafe
 
-# Run self-check before starting (validates HE backend availability)
+# Run self-check at build time (validates core imports + HE backend)
 # Set TENSAFE_SKIP_HE_CHECK=1 to explicitly disable HE and skip the check
 RUN python docker_selfcheck.py || echo "WARN: HE self-check returned non-zero (see logs above)"
 
