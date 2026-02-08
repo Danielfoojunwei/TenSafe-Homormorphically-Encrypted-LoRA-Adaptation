@@ -194,6 +194,9 @@ known-first-party = ["tensorguard", "tg_tinker", "tensafe", "crypto_backend", "h
 
 [tool.mypy]
 python_version = "3.9"
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
