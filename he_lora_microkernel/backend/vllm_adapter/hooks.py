@@ -29,6 +29,13 @@ class HookContext:
 
 
 @dataclass
+class HookSharedState:
+    """Shared state for a group of hooks (e.g. Q, K, V in one layer)."""
+    layer_idx: int
+    cached_deltas: Dict[str, Any] = field(default_factory=dict)
+    last_hidden_id: Optional[int] = None
+
+@dataclass
 class AttentionProjectionHook:
     """
     Hook for an attention projection module.
@@ -41,6 +48,9 @@ class AttentionProjectionHook:
     module: Any  # The original nn.Module
     delta_callback: Optional[Callable] = None
     enabled: bool = True
+    
+    # Shared state for batched RPC optimization (Paper 2)
+    shared_state: Optional[HookSharedState] = None
 
     # Original forward method - set in __post_init__, not passed to __init__
     original_forward: Callable = field(init=False, default=None)
@@ -73,11 +83,35 @@ class AttentionProjectionHook:
             import time
             start = time.perf_counter()
 
-            delta = self.delta_callback(
-                self.layer_idx,
-                self.projection_type,
-                hidden_states,
-            )
+            delta = None
+            
+            # Paper 2: Speculative Batching Optimization (Shared State)
+            # If multiple hooks are shared in one layer, they can use this state
+            # to coordinate batched gRPC calls via the callback.
+            if self.shared_state is not None:
+                hidden_id = id(hidden_states)
+                if self.shared_state.last_hidden_id != hidden_id:
+                    # New activation pass, clear cache for this layer
+                    self.shared_state.cached_deltas.clear()
+                    self.shared_state.last_hidden_id = hidden_id
+                
+                if self.projection_type in self.shared_state.cached_deltas:
+                    delta = self.shared_state.cached_deltas[self.projection_type]
+                else:
+                    # Call the callback (which might perform batched computation internally)
+                    delta = self.delta_callback(
+                        self.layer_idx,
+                        self.projection_type,
+                        hidden_states,
+                    )
+                    self.shared_state.cached_deltas[self.projection_type] = delta
+            else:
+                # Standard per-projection callback
+                delta = self.delta_callback(
+                    self.layer_idx,
+                    self.projection_type,
+                    hidden_states,
+                )
 
             # Detect speculative batching for logging
             if hidden_states.numel() > 0:
@@ -117,6 +151,7 @@ def create_projection_hooks(
     layer_indices: List[int],
     projections: List[str],  # ["q", "k", "v"] or ["q", "k", "v", "o"]
     delta_callback: Optional[Callable] = None,
+    use_shared_state: bool = True,
 ) -> Dict[Tuple[int, str], AttentionProjectionHook]:
     """
     Create hooks for attention projections in a model.
@@ -176,6 +211,9 @@ def create_projection_hooks(
         if attn is None:
             raise ValueError(f"Could not find attention module in layer {layer_idx}")
 
+        # Paper 2: Shared state for batched RPCs
+        shared_state = HookSharedState(layer_idx=layer_idx) if use_shared_state else None
+
         # Create hooks for requested projections
         for proj_type in projections:
             proj_module = None
@@ -203,6 +241,7 @@ def create_projection_hooks(
                 projection_type=proj_type,
                 module=proj_module,
                 delta_callback=delta_callback,
+                shared_state=shared_state,
             )
             hooks[(layer_idx, proj_type)] = hook
 

@@ -60,6 +60,11 @@ class TenSafeClientSDK:
             logger.error(f"Server error: {response.error_message}")
             return None
 
+        # Verify TEE Attestation
+        if not self._verify_attestation(response.evidence):
+            logger.warning("FAILED TO VERIFY TEE ATTESTATION!")
+            # In a production system, we would raise an exception here.
+
         if response.gate_required:
             gate_bit = self.evaluator.decrypt_and_evaluate(response.encrypted_gate_signal)
             callback_request = has_pb2.ApplyTokenStepRequest(
@@ -71,6 +76,9 @@ class TenSafeClientSDK:
                 client_gate_bit=gate_bit
             )
             response = self.stub.ApplyTokenStep(callback_request)
+            
+            # Verify attestation for the callback phase as well
+            self._verify_attestation(response.evidence)
 
         if response.has_delta:
             return np.zeros((1, 4096)) # Mocked result
@@ -94,6 +102,9 @@ class TenSafeClientSDK:
         if not response.success:
             logger.error(f"Batched Step failed: {response.error_message}")
             return []
+
+        # Verify TEE Attestation
+        self._verify_attestation(response.evidence)
 
         # 2. handle Gating Phase (Phase 2)
         if response.any_gate_required:
@@ -122,6 +133,9 @@ class TenSafeClientSDK:
             )
             
             response = self.stub.ApplyBatchedTokenStep(callback_request)
+            
+            # Verify attestation for callback
+            self._verify_attestation(response.evidence)
 
         # 3. Return results
         return [
@@ -132,6 +146,20 @@ class TenSafeClientSDK:
                 "shm_offset": r.shm_offset
             } for r in response.results
         ]
+
+    def _verify_attestation(self, evidence: bytes) -> bool:
+        """
+        Verifies the TEE attestation evidence (Quote).
+        In a real system, this would verify the signature against the Intel/AMD root of trust.
+        """
+        if not evidence:
+            return False
+            
+        # Mock verification logic - detect if it contains our service's fixed header
+        if b"MOCK_TEE_QUOTE" in evidence:
+            logger.info("TEE Attestation Verified: Intel SGX Quote (Mock)")
+            return True
+        return False
 
     async def speculative_batch_eval(self, request_id: str, tokens: List[np.ndarray], 
                               layers: List[int]) -> List[Any]:

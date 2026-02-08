@@ -22,6 +22,7 @@ class AdapterState:
     rank: int
     alpha: float
     targets: str
+    hidden_size: int
     num_layers: int
     loaded_layers: List[int]
 
@@ -198,8 +199,9 @@ class HASExecutor:
             rank=rank,
             alpha=alpha,
             targets=targets,
+            hidden_size=1024,  # Default for mock
             num_layers=num_layers,
-            loaded_layers=loaded_layers,
+            loaded_layers=layers or list(range(num_layers)),
         )
 
         # Load weights if path provided

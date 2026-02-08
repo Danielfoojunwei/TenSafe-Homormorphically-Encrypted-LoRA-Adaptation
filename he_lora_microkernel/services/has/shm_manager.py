@@ -299,6 +299,8 @@ class SharedMemoryManager:
 
     def get_region(self, name: str) -> Optional[ShmRegion]:
         """Get a shared memory region by name."""
+        if name is None:
+            return None
         full_name = f"{self._prefix}_{name}" if not name.startswith(self._prefix) else name
         return self._regions.get(full_name)
 

@@ -124,6 +124,10 @@ message ApplyTokenStepResponse {
     bool gate_required = 10;
     // The encrypted rank-r gate signal (Ax) for the client to evaluate.
     bytes encrypted_gate_signal = 11;
+
+    // --- TEE Evidence ---
+    // Cryptographic evidence (Quote) of TEE execution.
+    bytes evidence = 12;
 }
 
 
@@ -156,6 +160,9 @@ message ApplyBatchedTokenStepResponse {
 
     // --- Client-Aided Bridge (Aggregate) ---
     bool any_gate_required = 10;
+
+    // --- TEE Evidence ---
+    bytes evidence = 12;
 }
 
 // ============================================================================

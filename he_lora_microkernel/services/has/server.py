@@ -187,17 +187,21 @@ class HASServicer:
                     error_message="Request not found",
                 )
 
+            # Get hidden dimension from adapter
+            adapter_state = self._executor.get_adapter(req_state.adapter_id)
+            hidden_size = adapter_state.hidden_size if adapter_state else 4096
+
             # Read hidden states from shared memory
             region = self._shm_manager.get_region(req_state.shm_region)
             if region is not None:
                 hidden_states = self._shm_manager.read_hidden_states(
                     region,
-                    shape=(req_state.batch_size, 1, 4096),  # Single token
+                    shape=(req_state.batch_size, 1, hidden_size),  # Use dynamic size
                 )
             else:
                 # Mock hidden states for testing
                 hidden_states = np.random.randn(
-                    req_state.batch_size, 1, 4096
+                    req_state.batch_size, 1, hidden_size
                 ).astype(np.float16)
 
             # Apply delta
@@ -234,6 +238,7 @@ class HASServicer:
                 decrypt_time_us=timing['decrypt_time_us'],
                 gate_required=encrypted_gate is not None,
                 encrypted_gate_signal=encrypted_gate if encrypted_gate else b"",
+                evidence=b"MOCK_TEE_QUOTE_SHA256_F9A2..." + request.request_id.encode(),
             )
 
         except Exception as e:
@@ -264,16 +269,20 @@ class HASServicer:
                 proj_type = parts[1]
                 layer_projections.append((layer_idx, proj_type))
 
+            # Get hidden dimension from adapter
+            adapter_state = self._executor.get_adapter(req_state.adapter_id)
+            hidden_size = adapter_state.hidden_size if adapter_state else 4096
+
             # Get hidden states
             region = self._shm_manager.get_region(req_state.shm_region)
             if region is not None:
                 hidden_states = self._shm_manager.read_hidden_states(
                     region,
-                    shape=(req_state.batch_size, 1, 4096),
+                    shape=(req_state.batch_size, 1, hidden_size),
                 )
             else:
                 hidden_states = np.random.randn(
-                    req_state.batch_size, 1, 4096
+                    req_state.batch_size, 1, hidden_size
                 ).astype(np.float16)
 
             # Apply all deltas
@@ -299,6 +308,7 @@ class HASServicer:
                 success=True,
                 results=delta_results,
                 total_time_us=total_time,
+                evidence=b"MOCK_TEE_QUOTE_BATCHED_SHA256_6B1D..." + request.request_id.encode(),
             )
 
         except Exception as e:

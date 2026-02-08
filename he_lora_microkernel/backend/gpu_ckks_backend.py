@@ -782,6 +782,7 @@ class SimulationBackend(GPUCKKSBackend):
         self._keys_generated = False
         self._ciphertext_counter = 0
         self._plaintexts: Dict[int, np.ndarray] = {}
+        self.enforce_zero_rotation = False  # Security contract enforcement
 
     def ct_pt_multiply(self, ct, pt_numpy):
         # Convenience method for HASExecutor (Mocked for size mismatches)
@@ -897,6 +898,13 @@ class SimulationBackend(GPUCKKSBackend):
     def rotate(self, ct: GPUCiphertext, steps: int) -> GPUCiphertext:
         self._counters.rotations += 1
         self._counters.keyswitches += 1  # Rotation requires keyswitch
+        
+        if self.enforce_zero_rotation:
+            raise RuntimeError(
+                "ZeRo-MOAI VIOLATION: Rotation detected in zero-rotation kernel! "
+                "The current packing layout MUST be optimized to remove this rotation."
+            )
+            
         ct_id = self._new_ct_id()
         self._plaintexts[ct_id] = np.roll(self._plaintexts[ct.handle], -steps)
         return GPUCiphertext(
@@ -909,6 +917,13 @@ class SimulationBackend(GPUCKKSBackend):
     def rotate_inplace(self, ct: GPUCiphertext, steps: int) -> None:
         self._counters.rotations += 1
         self._counters.keyswitches += 1
+        
+        if self.enforce_zero_rotation:
+            raise RuntimeError(
+                "ZeRo-MOAI VIOLATION: In-place rotation detected! "
+                "Hardware acceleration for this op is strictly disabled in SAFE mode."
+            )
+            
         self._plaintexts[ct.handle] = np.roll(self._plaintexts[ct.handle], -steps)
 
     def rescale(self, ct: GPUCiphertext) -> GPUCiphertext:
