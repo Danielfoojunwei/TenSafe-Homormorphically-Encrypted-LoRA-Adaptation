@@ -1051,9 +1051,13 @@ def verify_backend(use_fast_params: bool = True) -> Dict[str, Any]:
     }
 
 
+# Alias: execution_policy.py imports MOAIContext; map to the real class.
+MOAIContext = CKKSMOAIBackend
+
 # Export public API
 __all__ = [
     "CKKSMOAIBackend",
+    "MOAIContext",
     "CKKSCiphertext",
     "CKKSParams",
     "ColumnPackedMatrix",
