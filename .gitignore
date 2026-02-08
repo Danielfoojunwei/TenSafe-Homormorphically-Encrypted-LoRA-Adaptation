@@ -121,3 +121,9 @@ third_party/
 *.so
 crypto_backend/n2he_hintsight/lib/
 
+# ============================================
+# Shipped build artifacts (must never appear in repo)
+# ============================================
+*.whl
+*.dist-info/
+

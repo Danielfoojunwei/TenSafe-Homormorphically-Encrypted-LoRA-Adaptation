@@ -7,7 +7,7 @@ Privacy-first ML training API server built on FastAPI.
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +17,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from .database import check_db_health, engine
 from .tg_tinker_api import router as tinker_router
-from .playground import router as playground_router
 from .auth_routes import router as auth_router
 from .sso.routes import router as sso_router
 
@@ -26,15 +25,26 @@ from ..security.rate_limiter import RateLimitMiddleware, RateLimitConfig
 from ..security.csp import CSPMiddleware, ContentSecurityPolicy
 from ..security.sanitization import ValidationMiddleware
 
+# Unified environment resolver
+from ..config.runtime import (
+    ENVIRONMENT,
+    is_production,
+    is_local_or_dev,
+    validate_no_demo_mode,
+)
+
 logger = logging.getLogger(__name__)
 
-# Environment configuration
-TG_ENVIRONMENT = os.getenv("TG_ENVIRONMENT", "development")
+# ---------------------------------------------------------------------------
+# Environment configuration (uses unified resolver)
+# ---------------------------------------------------------------------------
+TG_ENVIRONMENT = ENVIRONMENT.value
+
 _raw_origins = os.getenv("TG_ALLOWED_ORIGINS", "")
 
 if _raw_origins:
     TG_ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
-elif TG_ENVIRONMENT == "production":
+elif is_production():
     TG_ALLOWED_ORIGINS = []
     logger.warning("SECURITY: No TG_ALLOWED_ORIGINS configured for production.")
 else:
@@ -57,7 +67,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
-        if TG_ENVIRONMENT == "production":
+        if is_production():
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
         return response
@@ -66,18 +76,26 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifecycle management."""
-    logger.info("Starting TG-Tinker Platform...")
+    logger.info("Starting TG-Tinker Platform (env=%s)...", ENVIRONMENT.value)
 
-    # Initialize database in development/demo mode
-    if TG_ENVIRONMENT != "production" or os.getenv("TG_DEMO_MODE") == "true":
+    # Block demo mode in production/staging unconditionally
+    validate_no_demo_mode()
+
+    # Auto-create tables ONLY in local/dev (never in staging/production).
+    if is_local_or_dev():
         SQLModel.metadata.create_all(engine)
-        logger.info("Database tables initialized.")
+        logger.info("Database tables auto-created (env=%s).", ENVIRONMENT.value)
+    else:
+        logger.info(
+            "Skipping auto table creation (env=%s). Use Alembic migrations.",
+            ENVIRONMENT.value,
+        )
 
     yield
     logger.info("Shutting down TG-Tinker Platform...")
 
 
-API_VERSION = "4.0.0"
+API_VERSION = "4.1.0"
 API_TITLE = "TenSafe API"
 API_DESCRIPTION = """
 # TenSafe - Privacy-Preserving ML Platform
@@ -133,56 +151,22 @@ app = FastAPI(
     description=API_DESCRIPTION,
     version=API_VERSION,
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url="/docs" if is_local_or_dev() else None,
+    redoc_url="/redoc" if is_local_or_dev() else None,
+    openapi_url="/openapi.json" if is_local_or_dev() else None,
     openapi_tags=[
-        {
-            "name": "auth",
-            "description": "User authentication - signup, login, password reset",
-        },
-        {
-            "name": "sso",
-            "description": "Enterprise SSO - OIDC and SAML authentication",
-        },
-        {
-            "name": "training",
-            "description": "Training client management and operations",
-        },
-        {
-            "name": "inference",
-            "description": "Model inference endpoints",
-        },
-        {
-            "name": "privacy",
-            "description": "Differential privacy and HE operations",
-        },
-        {
-            "name": "tgsp",
-            "description": "TenSafe Secure Package (TGSP) adapter management",
-        },
-        {
-            "name": "audit",
-            "description": "Audit logging and compliance",
-        },
-        {
-            "name": "health",
-            "description": "Health check and system status",
-        },
-        {
-            "name": "admin",
-            "description": "Administrative operations (requires admin role)",
-        },
+        {"name": "auth", "description": "User authentication - signup, login, password reset"},
+        {"name": "sso", "description": "Enterprise SSO - OIDC and SAML authentication"},
+        {"name": "training", "description": "Training client management and operations"},
+        {"name": "inference", "description": "Model inference endpoints"},
+        {"name": "privacy", "description": "Differential privacy and HE operations"},
+        {"name": "tgsp", "description": "TenSafe Secure Package (TGSP) adapter management"},
+        {"name": "audit", "description": "Audit logging and compliance"},
+        {"name": "health", "description": "Health check and system status"},
+        {"name": "admin", "description": "Administrative operations (requires admin role)"},
     ],
-    license_info={
-        "name": "Apache 2.0",
-        "url": "https://www.apache.org/licenses/LICENSE-2.0",
-    },
-    contact={
-        "name": "TenSafe Support",
-        "url": "https://tensafe.io/support",
-        "email": "support@tensafe.io",
-    },
+    license_info={"name": "Apache 2.0", "url": "https://www.apache.org/licenses/LICENSE-2.0"},
+    contact={"name": "TenSafe Support", "url": "https://tensafe.io/support", "email": "support@tensafe.io"},
     servers=[
         {"url": "https://api.tensafe.io", "description": "Production"},
         {"url": "https://api.staging.tensafe.io", "description": "Staging"},
@@ -225,12 +209,14 @@ if TG_ENABLE_INPUT_VALIDATION:
         check_sql_injection=True,
         check_command_injection=True,
         check_xss=True,
-        exclude_paths=["/health", "/ready", "/live", "/metrics", "/docs", "/redoc", "/openapi.json"],
+        exclude_paths=["/healthz", "/readyz", "/health", "/ready", "/live", "/metrics", "/docs", "/redoc", "/openapi.json"],
     )
     logger.info("Input validation middleware enabled")
 
 
-# Health check caching to avoid hammering the DB on every probe
+# ---------------------------------------------------------------------------
+# Health check caching
+# ---------------------------------------------------------------------------
 _health_cache: dict = {"result": None, "timestamp": 0.0}
 _HEALTH_CACHE_TTL = 5.0  # seconds
 
@@ -245,43 +231,61 @@ def _get_cached_db_health() -> dict:
     return _health_cache["result"]
 
 
-# Health endpoints
-@app.get("/health", tags=["health"])
+# ---------------------------------------------------------------------------
+# Health endpoints — split per K8s convention
+# ---------------------------------------------------------------------------
+
+@app.get("/healthz", tags=["health"])
+async def healthz():
+    """Minimal liveness probe — 200 if process is alive."""
+    return {"status": "ok"}
+
+
+@app.get("/readyz", tags=["health"])
+async def readyz():
+    """Readiness probe with dependency checks (DB connectivity)."""
+    db_health = _get_cached_db_health()
+    if db_health["status"] != "healthy":
+        return Response(
+            content='{"ready": false, "reason": "database unavailable"}',
+            status_code=503,
+            media_type="application/json",
+        )
+    return {"ready": True, "checks": {"database": db_health}}
+
+
+# Legacy endpoints kept for backward compatibility (hidden from OpenAPI)
+@app.get("/health", tags=["health"], include_in_schema=False)
 async def health_check():
-    """Health check endpoint."""
+    """Legacy health check — full status."""
     db_health = _get_cached_db_health()
     return {
         "status": "healthy" if db_health["status"] == "healthy" else "degraded",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "4.0.0",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": API_VERSION,
         "environment": TG_ENVIRONMENT,
         "checks": {"database": db_health},
     }
 
 
-@app.get("/ready", tags=["health"])
+@app.get("/ready", tags=["health"], include_in_schema=False)
 async def readiness_check():
-    """Kubernetes readiness probe."""
-    db_health = _get_cached_db_health()
-    if db_health["status"] != "healthy":
-        return Response(
-            content='{"ready": false, "reason": "database unavailable"}', status_code=503, media_type="application/json"
-        )
-    return {"ready": True}
+    """Legacy readiness probe."""
+    return await readyz()
 
 
-@app.get("/live", tags=["health"])
+@app.get("/live", tags=["health"], include_in_schema=False)
 async def liveness_check():
-    """Kubernetes liveness probe."""
-    return {"alive": True}
+    """Legacy liveness probe."""
+    return await healthz()
 
 
 @app.get("/version", tags=["health"])
 async def version_info():
     """Version information endpoint."""
     return {
-        "service": "TG-Tinker",
-        "version": "4.0.0",
+        "service": "TenSafe",
+        "version": API_VERSION,
         "api_version": "v1",
         "python_version": "3.9+",
         "environment": TG_ENVIRONMENT,
@@ -294,26 +298,25 @@ async def version_info():
     }
 
 
-# Authentication routes
+# ---------------------------------------------------------------------------
+# Route registration
+# ---------------------------------------------------------------------------
 app.include_router(auth_router)
 app.include_router(sso_router)
-
-# TG-Tinker API routes
 app.include_router(tinker_router, prefix="/api")
 
-# Playground routes
-app.include_router(playground_router)
+# Playground — only in local/dev
+if is_local_or_dev():
+    from .playground import router as playground_router
+    app.include_router(playground_router)
+    logger.info("Playground router mounted (env=%s)", ENVIRONMENT.value)
+else:
+    logger.info("Playground router disabled (env=%s)", ENVIRONMENT.value)
 
 
-# Root endpoint
 @app.get("/", tags=["health"])
 async def root():
-    """
-    API root - service information.
-
-    Returns basic information about the TenSafe API including version,
-    available endpoints, and links to documentation.
-    """
+    """API root - service information."""
     return {
         "service": "TenSafe",
         "version": API_VERSION,
@@ -321,19 +324,11 @@ async def root():
         "links": {
             "documentation": "/docs",
             "openapi_spec": "/openapi.json",
-            "health": "/health",
-            "status": "/status",
+            "health": "/healthz",
+            "readiness": "/readyz",
         },
-        "api_versions": {
-            "current": "v1",
-            "supported": ["v1"],
-            "deprecated": [],
-        },
-        "auth": {
-            "signup": "/auth/signup",
-            "login": "/auth/token",
-            "sso_providers": "/auth/sso/providers",
-        },
+        "api_versions": {"current": "v1", "supported": ["v1"], "deprecated": []},
+        "auth": {"signup": "/auth/signup", "login": "/auth/token", "sso_providers": "/auth/sso/providers"},
         "endpoints": {
             "training": "/api/v1/training_clients",
             "inference": "/api/v1/inference",
@@ -349,13 +344,7 @@ def run_development():
 
     port = int(os.getenv("PORT", 8000))
     log_level = os.getenv("TG_LOG_LEVEL", "info")
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=port,
-        log_level=log_level,
-        access_log=True,
-    )
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level=log_level, access_log=True)
 
 
 if __name__ == "__main__":

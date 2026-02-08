@@ -9,7 +9,7 @@ A complete privacy-preserving machine learning training system featuring:
 - Async training API with FutureHandle pattern
 """
 
-__version__ = "4.0.0"
+__version__ = "4.1.0"
 __author__ = "Daniel Foo & The TG-Tinker Team"
 
 # Lazy imports to avoid circular dependencies and optional dependencies

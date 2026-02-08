@@ -22,7 +22,7 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import jwt
 from jwt.exceptions import PyJWTError as JWTError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +116,7 @@ class AdminUserContext(BaseModel):
     name: str
     role: AdminRole
     tenant_id: Optional[str] = None  # Only set for org_admin
-    permissions: List[str] = []
+    permissions: List[str] = Field(default_factory=list)
     session_id: str
     ip_address: Optional[str] = None
 

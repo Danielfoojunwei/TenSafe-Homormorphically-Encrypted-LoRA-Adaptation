@@ -106,11 +106,11 @@ class PackageManifest(BaseModel):
 
     payload_hash: str = "pending"  # SHA-256 of encrypted payload (or compressed if v0.1)
 
-    content_index: List[Dict[str, str]] = []  # [{path, sha256}]
+    content_index: List[Dict[str, str]] = Field(default_factory=list)  # [{path, sha256}]
 
-    policy_constraints: Dict[str, Any] = {}
-    build_info: Dict[str, str] = {}
-    compat_base_model_id: List[str] = []  # For backward compatibility
+    policy_constraints: Dict[str, Any] = Field(default_factory=dict)
+    build_info: Dict[str, str] = Field(default_factory=dict)
+    compat_base_model_id: List[str] = Field(default_factory=list)  # For backward compatibility
 
     # Privacy claims for N2HE integration
     privacy: PrivacyClaims = Field(default_factory=PrivacyClaims, description="Privacy claims (N2HE)")

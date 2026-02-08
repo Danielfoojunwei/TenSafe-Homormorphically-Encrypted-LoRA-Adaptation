@@ -699,7 +699,7 @@ class CreateSSOProviderRequest(BaseModel):
     button_color: Optional[str] = None
     auto_create_users: bool = True
     default_role: str = "user"
-    allowed_domains: List[str] = []
+    allowed_domains: List[str] = Field(default_factory=list)
     session_duration_hours: int = 8
 
 

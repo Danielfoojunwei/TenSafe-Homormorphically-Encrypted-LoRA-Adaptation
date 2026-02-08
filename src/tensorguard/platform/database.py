@@ -34,9 +34,11 @@ from .models.settings_models import KMSKey, KMSRotationLog, SystemSetting  # noq
 from .models.tgflow_core_models import *  # noqa: F401
 from .models.vla_models import VLABenchmarkResult, VLADeploymentLog, VLAModel, VLASafetyCheck  # noqa: F401
 
+# Unified environment resolver
+from ..config.runtime import is_production, is_local_or_dev
+
 # Environment configuration
 DATABASE_URL = os.getenv("DATABASE_URL")
-TG_ENVIRONMENT = os.getenv("TG_ENVIRONMENT", "development")
 TG_DB_POOL_SIZE = int(os.getenv("TG_DB_POOL_SIZE", "10"))
 TG_DB_MAX_OVERFLOW = int(os.getenv("TG_DB_MAX_OVERFLOW", "20"))
 TG_DB_POOL_TIMEOUT = int(os.getenv("TG_DB_POOL_TIMEOUT", "30"))
@@ -96,10 +98,10 @@ def create_production_engine(url: str):
 
 # Initialize database URL with validation
 if not DATABASE_URL:
-    if TG_ENVIRONMENT == "production":
+    if is_production():
         raise RuntimeError(
-            "FATAL: DATABASE_URL must be set in production environment. "
-            "Set TG_ENVIRONMENT=development to use SQLite fallback."
+            "FATAL: DATABASE_URL must be set in production/staging. "
+            "Set TENSAFE_ENV=local to use SQLite fallback."
         )
     logger.warning("DATABASE_URL not set, using local SQLite (NOT FOR PRODUCTION)")
     DATABASE_URL = "sqlite:///./tg_platform.db"

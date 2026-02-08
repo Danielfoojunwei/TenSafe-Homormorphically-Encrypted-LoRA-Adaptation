@@ -43,7 +43,7 @@ Usage:
     $ tensafe inference --model ./checkpoint --prompt "Hello"
 """
 
-__version__ = "3.0.0"
+__version__ = "4.1.0"
 
 # Lazy imports to avoid requiring all dependencies at import time
 # This allows importing tensafe even if numpy isn't installed
