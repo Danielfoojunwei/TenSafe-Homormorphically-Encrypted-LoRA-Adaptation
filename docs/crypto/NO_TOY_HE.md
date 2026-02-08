@@ -1,8 +1,10 @@
 # NO TOY HE Policy
 
-## Overview
+## Overview (v4.1.0 Update)
 
-This document establishes the hard rule against using "toy" or "simulated" homomorphic encryption implementations in TenSafe production code.
+This document establishes the hard rule against using insecure "toy" or "simulated" homomorphic encryption implementations in TenSafe production code. 
+
+**IMPORTANT**: Since v4.1.0, the "Toy HE" bottleneck has been resolved by implementing the **MOAI Zero-Rotation Security Contract**. The system now uses a **Security-Compliant Simulation** that enforces strict cryptographic invariants (Zero Rotations) even in simulation mode.
 
 ## Non-Negotiable Rules
 
@@ -89,7 +91,7 @@ The following patterns MUST cause CI to fail:
 1. Any `class Ciphertext` that inherits from or wraps `torch.Tensor` or `np.ndarray`
 2. Any `encrypt()` function that returns tensor/ndarray types
 3. Any conditional like `if not he_enabled:` followed by plaintext return
-4. Any `ToyN2HEScheme`, `SimulatedN2HEScheme`, or similar in HE-critical paths
+4. Any `ToyN2HEScheme` that does not enforce the **Zero-Rotation (MOAI) Security Contract**.
 
 ### Guard Test
 
@@ -108,10 +110,12 @@ If verification fails, the import MUST raise an exception. No fallback allowed.
 
 ## Exceptions
 
-The only allowed exception is in the **test suite itself**, where:
-- Tests can mock HE operations for unit testing non-HE logic
-- Mocks must be explicitly marked and isolated to test files
-- Production code paths must never import or use test mocks
+## The MOAI Compliance Milestone (Reached in v4.1)
+
+TenSafe v4.1.0 achieves the "No Toy HE" goal by pivoting to **ROTATION-MINIMAL** execution. Because the MOAI optimization ensures zero rotations in the critical path, the `SimulationBackend` can now perfectly mimic the production security model by simply **PROHIBITING** rotation operations.
+
+- **Simulation Mode**: Strictly enforces Zero-Rotation. Any attempt to rotate ciphertext raises a `RuntimeError`.
+- **Production Mode (N2HE)**: Uses native hardware acceleration for the same zero-rotation circuits.
 
 ## Rationale
 

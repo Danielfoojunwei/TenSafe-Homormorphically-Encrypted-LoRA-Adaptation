@@ -8,7 +8,10 @@ TenSafe enables organizations to fine-tune large language models while maintaini
 
 - **Encrypted Artifacts** - All model checkpoints, gradients, and training data are encrypted at rest
 - **Differential Privacy** - Built-in DP-SGD with configurable privacy budgets
-- **Homomorphic Encryption** - N2HE integration for privacy-preserving computations
+- **Encrypted Artifacts** - All model checkpoints, gradients, and training data are encrypted at rest
+- **Differential Privacy** - Built-in DP-SGD with configurable privacy budgets
+- **Homomorphic Encryption** - N2HE integration with **Zero-Rotation (MOAI)** optimization
+- **Evidence Fabric** - TEE-backed hardware attestation for secure model inference (NEW)
 - **Immutable Audit Logs** - Hash-chained audit trail for compliance
 - **LoRA Support** - Efficient fine-tuning with Low-Rank Adaptation
 - **Pluggable Loss Functions** - Bring-your-own loss with stable contract (NEW)

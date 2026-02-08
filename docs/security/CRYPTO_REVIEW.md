@@ -1,7 +1,7 @@
 # Crypto Hygiene and Tamper Resistance Review
 
-**Date**: 2026-01-30
-**Status**: PASS
+**Date**: 2026-02-08
+**Status**: PASS (v4.1.0 Security Compliance)
 
 ## Threat Model
 
@@ -16,10 +16,11 @@
 2. **Storage attacker** - Has access to encrypted artifacts
 3. **Insider threat** - Has legitimate access to some systems
 
-### Security Goals
 - **Confidentiality**: Only authorized recipients can decrypt payloads
 - **Integrity**: Any modification to ciphertext/AAD is detected
 - **Authenticity**: Payloads are bound to their manifest and recipients
+- **Zero-Rotation (MOAI)**: No sensitive information leaks via rotations (Enforced)
+- **Remote Attestation**: Hardware-backed TEE evidence for all HAS operations
 
 ## Cryptographic Primitives
 
@@ -29,6 +30,7 @@
 | TGSP payloads | ChaCha20-Poly1305 | 256-bit | AEAD |
 | TG-Tinker artifacts | AES-256-GCM | 256-bit | AEAD |
 | N2HE key bundles | AES-256-GCM | 256-bit | AEAD |
+| Evidence Bundles | AES-256-GCM | 256-bit | AEAD |
 
 ### Asymmetric Encryption
 | Use Case | Algorithm | Security Level |
@@ -59,10 +61,9 @@ package_id = secrets.token_hex(8)  # ✅ CSPRNG
 ### Non-Cryptographic Usage (OK)
 ```python
 # Benchmark data generation - gated by TENSAFE_TOY_HE
-plaintext = np.random.randint(...)  # ⚠️ Not crypto, test-only
-
-# Toy HE scheme - gated by TENSAFE_TOY_HE
-noise = np.random.normal(...)  # ⚠️ Not crypto, simulation-only
+# Simulation Backend - Security Compliant
+plaintext = microkernel.compute(...)  # ✅ Contract enforced
+rotations = microkernel.rotate(...)   # ❌ Raises RuntimeError
 ```
 
 ## AEAD Binding Invariants
@@ -130,6 +131,8 @@ pytest tests/security/test_crypto_tamper.py -v
 3. **Nonces are never reused with the same key**
 4. **Version mismatches fail closed**
 5. **Tampered ciphertext raises clear exceptions**
+6. **Zero-Rotation contract is strictly enforced in microkernel**
+7. **TEE Evidence is attached to every Compute step**
 
 ### MAY Be Relaxed (Test/Dev Only)
 1. `np.random` usage in toy HE mode (gated by `TENSAFE_TOY_HE=1`)

@@ -13,10 +13,10 @@ TenSafe provides multiple layers of privacy protection for ML training and infer
 │  │  Differential   │  │  Homomorphic    │                 │
 │  │  Privacy (DP)   │  │  Encryption     │                 │
 │  │                 │  │  (N2HE)         │                 │
-│  │  • DP-SGD       │  │  • LWE/RLWE     │                 │
-│  │  • Noise        │  │  • CKKS         │                 │
-│  │  • Clipping     │  │  • Encrypted    │                 │
-│  │  • Accounting   │  │    LoRA         │                 │
+│  │  • DP-SGD       │  │  • Zero-Rotation │                 │
+│  │  • Noise        │  │  • MOAI Contract │                 │
+│  │  • Clipping     │  │  • TEE Evidence  │                 │
+│  │  • Accounting   │  │  • CKKS/TFHE     │                 │
 │  └─────────────────┘  └─────────────────┘                 │
 │                                                            │
 │  ┌─────────────────────────────────────────────────┐      │
@@ -145,9 +145,10 @@ except DPBudgetExceededError as e:
 
 Homomorphic Encryption allows computation on encrypted data without decryption. TenSafe integrates N2HE for:
 
-- Encrypted LoRA adapter computation
-- Private inference with encrypted prompts
-- Secure gradient aggregation
+- **Zero-Rotation (MOAI)**: Eliminates side-channel leakage from HE rotations.
+- **Evidence Fabric**: Hardware-backed proof of secure computation environments (TEE).
+- **Encrypted LoRA**: Keeps adapter deltas private during multi-tenant sharing.
+- **Secure Aggregation**: MPC protocol for federated updates.
 
 ### N2HE Architecture
 
@@ -240,10 +241,14 @@ embedding = np.random.randn(512).astype(np.float32)
 encrypted_input = inference.encrypt_input(embedding)
 
 # Process (encrypted computation happens server-side)
-encrypted_output = inference.process(encrypted_input)
+result = inference.process(encrypted_input)
+
+# Verify TEE Attestation (Evidence Fabric)
+if result.evidence:
+    inference.verify_attestation(result.evidence)
 
 # Decrypt output
-output = inference.decrypt_output(encrypted_output)
+output = inference.decrypt_output(result.encrypted_output)
 ```
 
 ### Ciphertext Serialization

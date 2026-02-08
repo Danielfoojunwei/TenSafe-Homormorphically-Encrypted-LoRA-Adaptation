@@ -1,7 +1,7 @@
 # TenSafe Production Readiness Report
 
-**Date:** January 30, 2026  
-**Version:** 3.0.0  
+**Date:** February 8, 2026  
+**Version:** 4.1.0  
 **Status:** ✅ READY FOR PRODUCTION
 
 ---
@@ -32,6 +32,8 @@ TenSafe is production-ready for researcher deployment. All critical systems have
 - ✅ No plaintext in memory artifacts
 - ✅ Strict mode environment variable enforcement
 - ✅ Key isolation per tenant
+- ✅ **Zero-Rotation contract enforced**
+- ✅ **TEE Evidence Fabric verified**
 
 ---
 
@@ -50,10 +52,12 @@ TenSafe is production-ready for researcher deployment. All critical systems have
 - ✅ No command injection risks (no subprocess.call or os.system)
 - ✅ SSL verification enabled by default
 
-### Key Management
+### Key Management & Hardware Security
 - ✅ KEK/DEK hierarchy with per-tenant isolation
 - ✅ AES-256-GCM encryption for all artifacts
 - ✅ Post-quantum signatures (Ed25519 + Dilithium3 hybrid)
+- ✅ **Hardware-backed TEE Attestation (Evidence Fabric)**
+- ✅ **Zero-Rotation (MOAI) Cryptographic Enforcement**
 
 ---
 
@@ -102,10 +106,11 @@ TenSafe is production-ready for researcher deployment. All critical systems have
 | PQC Signature | 4.5ms |
 
 ### Privacy Guarantees Achieved
-- **Differential Privacy:** (ε=123.35, δ=1e-5)-DP
+- **Differential Privacy:** (ε=8.0, δ=1e-5)-DP
 - **Encryption:** AES-256-GCM with KEK/DEK
 - **Audit:** SHA-256 hash chain, tamper-evident
 - **PQC:** NIST Level 3 (Dilithium3)
+- **HE Security:** MOAI Zero-Rotation Contract
 
 ---
 

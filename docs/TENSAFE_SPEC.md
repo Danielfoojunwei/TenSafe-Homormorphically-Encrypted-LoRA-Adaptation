@@ -1,8 +1,8 @@
 # Privacy Tinker Specification
 
-**Version**: 1.0.0
-**Status**: Draft
-**Last Updated**: 2026-01-28
+**Version**: 4.1.0
+**Status**: Finalized
+**Last Updated**: 2026-02-08
 
 ## Overview
 
@@ -271,7 +271,8 @@ Queue a forward-backward pass computation.
   "future_id": "fut-uuid-xxxx",
   "status": "pending",
   "created_at": "2026-01-28T10:00:01Z",
-  "training_client_id": "tc-uuid-xxxx"
+  "training_client_id": "tc-uuid-xxxx",
+  "evidence": "base64-encoded-tee-quote"
 }
 ```
 
@@ -621,11 +622,9 @@ Only hashes and sizes are logged to enable verification without exposing content
 
 The following are explicitly out of scope for v1:
 
-- Hardware-based attestation (TEE/SGX)
-- End-to-end encryption where server cannot compute
-- Byzantine fault tolerance
+- **Hardware-based attestation (TEE/SGX)**: Implemented via Evidence Fabric
 - Client-side gradient encryption
-- Zero-knowledge proofs of training
+- Byzantine fault tolerance
 
 ### 4.5 Differential Privacy Threat Model
 

@@ -1,7 +1,7 @@
 # TenSafe Architecture
 
-**Version**: 4.0.0
-**Last Updated**: 2026-02-02
+**Version**: 4.1.0
+**Last Updated**: 2026-02-08
 
 ## Overview
 
@@ -16,9 +16,11 @@ TenSafe is a unified privacy-first ML platform that integrates core subsystems w
 ### Production Integration Layer (v4.0)
 5. **vLLM Backend** - High-throughput inference with HE-LoRA support
 6. **Ray Train Distributed** - Scalable multi-node training with secure aggregation
-7. **Observability Stack** - OpenTelemetry-native monitoring
-8. **MLOps Integrations** - W&B, MLflow, HuggingFace Hub
-9. **Kubernetes Deployment** - Helm charts with KEDA auto-scaling
+7. **Zero-Rotation (MOAI)** - Enforced cryptographic security contract in HE-LoRA
+8. **Evidence Fabric** - TEE-backed remote attestation for encrypted computations
+9. **Observability Stack** - OpenTelemetry-native monitoring
+10. **MLOps Integrations** - W&B, MLflow, HuggingFace Hub
+11. **Kubernetes Deployment** - Helm charts with KEDA auto-scaling
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -77,8 +79,8 @@ TenSafe is a unified privacy-first ML platform that integrates core subsystems w
 │   │                          Edge Layer (tensafe.agent)                                     │    │
 │   │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │    │
 │   │  │  Identity   │  │ Attestation │  │    TSSP     │  │   Runtime   │  │  vLLM       │  │    │
-│   │  │  Manager    │  │   Verifier  │  │   Loader    │  │  (TensorRT) │  │  Inference  │  │    │
-│   │  │  (mTLS)     │  │   (TPM)     │  │             │  │             │  │  Engine     │  │    │
+│   │  │  Manager    │  │  (Evidence) │  │   Loader    │  │ (Zero-Rot)  │  │  Inference  │  │    │
+│   │  │  (mTLS)     │  │   Verifier  │  │             │  │             │  │  Engine     │  │    │
 │   │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │    │
 │   └────────────────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                                  │
@@ -181,9 +183,11 @@ High-throughput inference engine with HE-LoRA support via custom forward hooks.
     │                        │  Forward Pass            │
     │                        │─────────────────────────▶│
     │                        │                          │  HE-LoRA Transform
+    │                        │                          │  ├─ Zero-Rotation Proof
+    │                        │                          │  ├─ Encrypted Computation
     │                        │                          │  ├─ Encrypted A matrix
     │                        │                          │  ├─ Encrypted B matrix
-    │                        │                          │  └─ HE computation
+    │                        │                          │  └─ Generate TEE Evidence
     │                        │  Modified Activations    │
     │                        │◀─────────────────────────│
     │                        │                          │

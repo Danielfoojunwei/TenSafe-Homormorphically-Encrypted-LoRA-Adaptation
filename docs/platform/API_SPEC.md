@@ -1,6 +1,6 @@
-# TG-Tinker Platform API Specification
+# TenSafe Platform API Specification
 
-**Version**: 3.0.0
+**Version**: 4.1.0
 **API Version**: v1
 
 ## Overview
@@ -23,8 +23,8 @@ Health check with detailed status.
 ```json
 {
   "status": "healthy",
-  "timestamp": "2026-01-30T09:00:00.000000",
-  "version": "3.0.0",
+  "timestamp": "2026-02-08T09:00:00.000000",
+  "version": "4.1.0",
   "environment": "development",
   "checks": {
     "database": {
@@ -64,8 +64,8 @@ Service version information.
 **Response**:
 ```json
 {
-  "service": "TG-Tinker",
-  "version": "3.0.0",
+  "service": "TenSafe",
+  "version": "4.1.0",
   "api_version": "v1",
   "python_version": "3.9+",
   "environment": "development"
@@ -113,6 +113,14 @@ Save training checkpoint.
 #### POST /api/v1/training_clients/{client_id}/load_state
 
 Load training checkpoint.
+
+### Attestation & Hardware Security (NEW)
+
+#### GET /api/v1/attestation/quote
+Get a TEE hardware quote for the current server instance.
+
+#### POST /api/v1/attestation/verify
+Verify a cryptographic evidence bundle.
 
 ## Security
 
