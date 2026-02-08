@@ -33,11 +33,12 @@ COPY src/ ./src/
 # Build the wheel
 RUN python -m build --wheel --outdir /wheels
 
-# Install the wheel + runtime deps.
-# Try installing tenseal for HE support; fall back gracefully if unavailable.
+# Install the wheel + runtime deps (must succeed).
 RUN pip install --no-cache-dir /wheels/*.whl && \
-    pip install --no-cache-dir gunicorn uvicorn[standard] && \
-    pip install --no-cache-dir tenseal>=0.3.0 2>/dev/null || true
+    pip install --no-cache-dir gunicorn uvicorn[standard]
+
+# Try installing tenseal for HE support; fall back gracefully if unavailable.
+RUN pip install --no-cache-dir tenseal>=0.3.0 2>/dev/null || true
 
 # =============================================================================
 # Production stage: Runtime image
