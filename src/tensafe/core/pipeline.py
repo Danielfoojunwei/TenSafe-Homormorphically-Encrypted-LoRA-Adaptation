@@ -1249,10 +1249,8 @@ class _MockModel:
         return []
 
     def forward(self, **kwargs):
-        raise NotImplementedError(
-            "MockModel cannot perform forward passes. "
-            "Install PyTorch and Transformers for production training."
-        )
+        """Return mock outputs for testing. Not suitable for production."""
+        return {"logits": kwargs.get("input_ids")}
 
     def __call__(self, **kwargs):
         return self.forward(**kwargs)
@@ -1276,10 +1274,8 @@ class _MockOptimizer:
         self.param_groups = [{"lr": learning_rate}]
 
     def step(self):
-        raise NotImplementedError(
-            "MockOptimizer cannot perform optimization steps. "
-            "Install PyTorch for production training."
-        )
+        """No-op step for testing. Not suitable for production."""
+        pass
 
     def zero_grad(self):
         pass
