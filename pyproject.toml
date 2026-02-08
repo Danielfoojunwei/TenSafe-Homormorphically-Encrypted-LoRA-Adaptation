@@ -119,7 +119,18 @@ tensafe-server = "tensorguard.platform.main:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["tensorguard*", "tg_tinker*", "tensafe*"]
+include = [
+    "tensorguard*",
+    "tg_tinker*",
+    "tensafe*",
+    "crypto_backend*",
+    "he_lora_microkernel*",
+]
+exclude = [
+    "he_lora_microkernel.tests*",
+    "he_lora_microkernel.integration_tests*",
+    "he_lora_microkernel.bench*",
+]
 
 [tool.setuptools.package-dir]
 "" = "src"
@@ -167,7 +178,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["tensorguard", "tg_tinker", "tensafe"]
+known-first-party = ["tensorguard", "tg_tinker", "tensafe", "crypto_backend", "he_lora_microkernel"]
 
 [tool.mypy]
 python_version = "3.9"
