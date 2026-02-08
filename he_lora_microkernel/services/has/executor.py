@@ -526,6 +526,12 @@ class HASExecutor:
             delta = self._backend.decrypt(result)
             timing['decrypt_time_us'] = (time.perf_counter_ns() - t2) // 1000
 
+            # Reshape back to hidden_states shape
+            if delta is not None:
+                # In simulation, we just take the first slots
+                needed = int(np.prod(hidden_states.shape))
+                delta = delta[:needed].reshape(hidden_states.shape).astype(np.float16)
+
         else:
             # Mock computation (no HE)
             timing['encrypt_time_us'] = 100  # Mock timing
@@ -687,7 +693,7 @@ class HASExecutor:
         results = {}
 
         for layer_idx, proj_type in layer_projections:
-            delta, timing = self.apply_token_step(
+            delta, _, timing = self.apply_token_step(
                 request_id, layer_idx, proj_type, hidden_states
             )
             results[(layer_idx, proj_type)] = (delta, timing)

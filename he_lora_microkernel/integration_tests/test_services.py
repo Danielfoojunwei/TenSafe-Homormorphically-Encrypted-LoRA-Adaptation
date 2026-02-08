@@ -116,7 +116,7 @@ class TestHASService:
 
         # Compute delta
         hidden_states = np.random.randn(2, 1, 1024).astype(np.float16)
-        delta, timing = executor.apply_token_step(
+        delta, _, timing = executor.apply_token_step(
             request_id="req-001",
             layer_idx=0,
             projection_type="q",
@@ -521,7 +521,7 @@ class TestEndToEnd:
             if proj_type not in "qkv":
                 return None
 
-            delta, _ = executor.apply_token_step(
+            delta, _, _ = executor.apply_token_step(
                 request_id="req-001",
                 layer_idx=layer_idx,
                 projection_type=proj_type,
