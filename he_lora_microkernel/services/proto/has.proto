@@ -131,6 +131,10 @@ message ApplyBatchedTokenStepRequest {
     string request_id = 1;
     int32 token_idx = 2;
     repeated string layer_projections = 3;  // ["0_q", "0_k", "0_v", "1_q", ...]
+
+    // --- Client-Aided Bridge (Batched) ---
+    bool is_gate_callback = 10;
+    repeated int32 client_gate_bits = 11;
 }
 
 message DeltaResult {
@@ -138,6 +142,10 @@ message DeltaResult {
     string projection_type = 2;
     bool has_delta = 3;
     int64 shm_offset = 4;
+    
+    // --- Client-Aided Bridge (Per-Layer) ---
+    bool gate_required = 10;
+    bytes encrypted_gate_signal = 11;
 }
 
 message ApplyBatchedTokenStepResponse {
@@ -145,6 +153,9 @@ message ApplyBatchedTokenStepResponse {
     string error_message = 2;
     repeated DeltaResult results = 3;
     int64 total_time_us = 4;
+
+    // --- Client-Aided Bridge (Aggregate) ---
+    bool any_gate_required = 10;
 }
 
 // ============================================================================

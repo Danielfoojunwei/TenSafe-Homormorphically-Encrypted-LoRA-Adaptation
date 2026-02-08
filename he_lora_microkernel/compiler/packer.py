@@ -157,7 +157,7 @@ def compute_optimal_block_size(
         Optimal block size (power of 2)
     """
     # Maximum slots per block
-    max_slots_per_block = slot_count // 2  # Leave room for computation
+    max_slots_per_block = slot_count  # Use full capacity (Zero Rotation critical)
 
     # Maximum channels per block given batch size
     max_channels_per_block = max_slots_per_block // batch_size
@@ -167,8 +167,8 @@ def compute_optimal_block_size(
     while block_size * 2 <= max_channels_per_block:
         block_size *= 2
 
-    # Cap at 1024 (reasonable maximum)
-    block_size = min(block_size, 1024)
+    # Cap at 4096 (larger models support) - enable Zero Rotation for 4096 hidden
+    block_size = min(block_size, 4096)
 
     # Ensure at least 64 channels per block
     block_size = max(block_size, 64)

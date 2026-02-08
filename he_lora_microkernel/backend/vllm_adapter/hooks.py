@@ -79,6 +79,17 @@ class AttentionProjectionHook:
                 hidden_states,
             )
 
+            # Detect speculative batching for logging
+            if hidden_states.numel() > 0:
+                batch_dim = hidden_states.shape[0]
+                seq_dim = hidden_states.shape[1] if hidden_states.ndim > 1 else 1
+                if batch_dim * seq_dim > 1:
+                    # Log occasionally to avoid spam
+                    if self.call_count % 100 == 0:
+                        # In a real system use logger.debug, but checking import first
+                        pass
+
+
             if delta is not None:
                 output = output + delta
 

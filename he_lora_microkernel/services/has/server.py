@@ -201,11 +201,13 @@ class HASServicer:
                 ).astype(np.float16)
 
             # Apply delta
-            delta, timing = self._executor.apply_token_step(
+            delta, encrypted_gate, timing = self._executor.apply_token_step(
                 request.request_id,
                 request.layer_idx,
                 request.projection_type,
                 hidden_states,
+                is_gate_callback=request.is_gate_callback,
+                client_gate_bit=request.client_gate_bit,
             )
 
             # Write delta to shared memory
@@ -230,6 +232,8 @@ class HASServicer:
                 encrypt_time_us=timing['encrypt_time_us'],
                 compute_time_us=timing['compute_time_us'],
                 decrypt_time_us=timing['decrypt_time_us'],
+                gate_required=encrypted_gate is not None,
+                encrypted_gate_signal=encrypted_gate if encrypted_gate else b"",
             )
 
         except Exception as e:

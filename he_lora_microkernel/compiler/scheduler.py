@@ -219,9 +219,9 @@ def compute_level_plan(
     level_sequence.append(current_level)
 
     # Step 1: First matmul (B × x) + rescale
-    # Each block multiplication needs rescale
+    # All blocks undergo mul_plain + rescale, moving from L0 -> L1 simultaneously
+    current_level += 1
     for block_idx in range(layout.num_blocks):
-        current_level += 1  # After rescale
         level_sequence.append(current_level)
         rescale_points.append(len(level_sequence) - 1)
 
