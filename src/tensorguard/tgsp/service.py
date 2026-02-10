@@ -11,6 +11,7 @@ class TGSPService:
     def create_package(
         out_path,
         signing_key_path=None,
+        signing_pub_path=None,
         payloads=None,
         policy_path=None,
         recipients=None,
@@ -18,6 +19,10 @@ class TGSPService:
         base_models=None,
     ):
         """Legacy shim for TGSPService."""
+        # Derive signing public key path from private key path if not provided
+        if signing_pub_path is None and signing_key_path is not None:
+            signing_pub_path = signing_key_path.replace(".priv", ".pub")
+
         with tempfile.TemporaryDirectory() as tmp_in:
             if payloads:
                 for p in payloads:
@@ -45,6 +50,7 @@ class TGSPService:
                 model_version="0.0.1",
                 recipients=recipient_paths,
                 signing_key=signing_key_path,
+                signing_pub=signing_pub_path,
             )
 
             run_build(new_args)
