@@ -511,6 +511,33 @@ make k8s-apply         # Apply K8s manifests
 make docker-build      # Build container image
 ```
 
+### Test Coverage
+
+```bash
+pytest tests/ --cov=tensorguard --cov-report=html
+```
+
+---
+
+## Security Considerations
+
+### Cryptographic Components
+
+| Component | Algorithm | Security Level |
+|-----------|-----------|----------------|
+| Symmetric Encryption | AES-256-GCM | 256-bit |
+| Key Encapsulation | X25519 + Kyber768 | 128-bit PQ |
+| Digital Signatures | Ed25519 + Dilithium3 | 128-bit PQ |
+| Password Hashing | Argon2id | OWASP recommended |
+| N2HE Encryption | LWE (n=1024, q=2^32) | 128-bit (research) |
+
+### Production Hardening
+
+1. **Key Management**: Use HSM or cloud KMS (AWS KMS, Azure Key Vault, GCP Cloud KMS)
+2. **TLS Everywhere**: All API endpoints require HTTPS in production
+3. **Rate Limiting**: Built-in rate limiting on all endpoints
+4. **Audit Logging**: Comprehensive audit trail for security events
+5. **Secret Rotation**: Automated key rotation support
 ---
 
 ## Contributing
