@@ -102,6 +102,14 @@ class BatchConfig:
     dtype: str = "float16"  # Must be FP16 - no quantization
 
 
+class AttentionType(Enum):
+    """Type of attention mechanism used by the model."""
+    STANDARD = "standard"      # Standard multi-head attention (Q, K, V projections)
+    MLA = "mla"               # Multi-head Latent Attention (Kimi, DeepSeek)
+    GQA = "gqa"               # Grouped Query Attention
+    MQA = "mqa"               # Multi-Query Attention
+
+
 @dataclass
 class ModelMetadata:
     """
@@ -124,8 +132,27 @@ class ModelMetadata:
     architecture: str = "unknown"
     has_output_projection: bool = True  # Does attention have o_proj?
 
+    # Attention mechanism type
+    attention_type: AttentionType = AttentionType.STANDARD
+
+    # MoE (Mixture of Experts) specific fields
+    is_moe: bool = False
+    num_experts: Optional[int] = None           # Total number of experts
+    num_selected_experts: Optional[int] = None  # Experts selected per token
+    num_shared_experts: Optional[int] = None    # Shared experts (always active)
+
+    # MLA (Multi-head Latent Attention) specific fields
+    # Used by Kimi K2.5, DeepSeek, etc.
+    kv_lora_rank: Optional[int] = None          # Latent dimension for KV projection
+    q_lora_rank: Optional[int] = None           # Latent dimension for Q projection
+    qk_nope_head_dim: Optional[int] = None      # Non-positional embedding head dim
+    qk_rope_head_dim: Optional[int] = None      # RoPE head dimension
+
+    # Trust remote code requirement
+    requires_trust_remote_code: bool = False
+
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        result = {
             'model_id': self.model_id,
             'num_layers': self.num_layers,
             'hidden_size': self.hidden_size,
@@ -135,7 +162,40 @@ class ModelMetadata:
             'max_position_embeddings': self.max_position_embeddings,
             'architecture': self.architecture,
             'has_output_projection': self.has_output_projection,
+            'attention_type': self.attention_type.value,
         }
+
+        # Add MoE fields if applicable
+        if self.is_moe:
+            result.update({
+                'is_moe': True,
+                'num_experts': self.num_experts,
+                'num_selected_experts': self.num_selected_experts,
+                'num_shared_experts': self.num_shared_experts,
+            })
+
+        # Add MLA fields if applicable
+        if self.attention_type == AttentionType.MLA:
+            result.update({
+                'kv_lora_rank': self.kv_lora_rank,
+                'q_lora_rank': self.q_lora_rank,
+                'qk_nope_head_dim': self.qk_nope_head_dim,
+                'qk_rope_head_dim': self.qk_rope_head_dim,
+            })
+
+        return result
+
+    @property
+    def is_kimi_architecture(self) -> bool:
+        """Check if this is a Kimi-style MLA+MoE architecture."""
+        return self.attention_type == AttentionType.MLA and self.is_moe
+
+    @property
+    def effective_kv_dim(self) -> int:
+        """Get effective KV dimension (latent for MLA, hidden for standard)."""
+        if self.attention_type == AttentionType.MLA and self.kv_lora_rank:
+            return self.kv_lora_rank
+        return self.hidden_size
 
 
 # =============================================================================

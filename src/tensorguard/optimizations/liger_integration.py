@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Conditional imports
 LIGER_AVAILABLE = False
+LIGER_KIMI_AVAILABLE = False
 try:
     from liger_kernel.transformers import (
         apply_liger_kernel_to_gemma,
@@ -23,6 +24,12 @@ try:
         apply_liger_kernel_to_mistral,
         apply_liger_kernel_to_qwen2,
     )
+    # Try to import Kimi kernel support (may not be available in all versions)
+    try:
+        from liger_kernel.transformers import apply_liger_kernel_to_kimi
+        LIGER_KIMI_AVAILABLE = True
+    except ImportError:
+        LIGER_KIMI_AVAILABLE = False
     LIGER_AVAILABLE = True
 except ImportError:
     logger.info("Liger Kernel not installed. Install with: pip install liger-kernel")
@@ -124,6 +131,20 @@ def apply_liger_optimizations(
             cross_entropy=config.enable_cross_entropy,
             fused_linear_cross_entropy=config.enable_fused_linear_cross_entropy,
         )
+    elif model_type == "kimi":
+        # Kimi K2.5 uses MLA (Multi-head Latent Attention) and MoE architecture
+        # Apply Liger kernels if available, otherwise use generic optimizations
+        if LIGER_KIMI_AVAILABLE:
+            apply_liger_kernel_to_kimi(
+                rope=config.enable_rope,
+                rms_norm=config.enable_rms_norm,
+                swiglu=config.enable_swiglu,
+                cross_entropy=config.enable_cross_entropy,
+                fused_linear_cross_entropy=config.enable_fused_linear_cross_entropy,
+            )
+        else:
+            logger.info("Liger Kimi kernel not available, applying generic optimizations for Kimi")
+            _apply_generic_optimizations(model, config)
     else:
         logger.warning(f"Unknown model type: {model_type}, applying generic optimizations")
         _apply_generic_optimizations(model, config)
@@ -150,11 +171,13 @@ def _detect_model_type(model: nn.Module) -> str:
         return "gemma"
     elif "qwen" in model_class:
         return "qwen2"
+    elif "kimi" in model_class:
+        return "kimi"
 
     # Try to get from config
     if hasattr(model, 'config'):
         config_type = getattr(model.config, 'model_type', '').lower()
-        if config_type in ["llama", "mistral", "gemma", "qwen2"]:
+        if config_type in ["llama", "mistral", "gemma", "qwen2", "kimi"]:
             return config_type
 
     return "unknown"
