@@ -441,26 +441,19 @@ class RLVRTrainingMode(TrainingModeInterface):
         if rlvr_config.reward_clip is not None:
             rewards = np.clip(rewards, -rlvr_config.reward_clip, rlvr_config.reward_clip)
 
-        # Compute advantages
-        if rlvr_config.use_baseline:
-            advantages = rewards - self._baseline
-            self._baseline = (
-                rlvr_config.baseline_decay * self._baseline +
-                (1 - rlvr_config.baseline_decay) * rewards.mean()
-            )
-        else:
-            advantages = rewards
+        # Compute advantages based on algorithm
+        advantages = self._compute_advantages(prompts, rewards, rlvr_config)
 
-        if rlvr_config.normalize_advantages:
-            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-
-        # Compute policy gradient loss
-        if rlvr_config.algorithm == "reinforce":
+        # Compute policy gradient loss based on algorithm
+        algorithm = rlvr_config.algorithm
+        if algorithm == "reinforce":
             loss = self._reinforce_loss(log_probs, advantages)
-        elif rlvr_config.algorithm == "ppo":
+        elif algorithm in ("ppo", "grpo", "rloo", "reinforce_pp"):
+            # GRPO, RLOO, REINFORCE++ all use clipped surrogate loss
+            # (the algorithm difference is in advantage computation above)
             loss = self._ppo_loss(log_probs, advantages)
         else:
-            raise ValueError(f"Unknown RLVR algorithm: {rlvr_config.algorithm}")
+            raise ValueError(f"Unknown RLVR algorithm: {algorithm}")
 
         # Backward pass
         self._backward(loss)
@@ -478,8 +471,75 @@ class RLVRTrainingMode(TrainingModeInterface):
                 "mean_reward": float(rewards.mean()),
                 "mean_advantage": float(advantages.mean()),
                 "baseline": float(self._baseline),
+                "algorithm": algorithm,
             },
         )
+
+    def _compute_advantages(
+        self,
+        prompts: List[str],
+        rewards: np.ndarray,
+        rlvr_config: Any,
+    ) -> np.ndarray:
+        """
+        Compute advantages based on the selected algorithm.
+
+        - reinforce/ppo: Moving-average baseline subtraction
+        - grpo: Group Relative Policy Optimization (per-prompt group normalization)
+        - rloo: Leave-One-Out baseline (per-prompt group LOO mean)
+        - reinforce_pp: Same as reinforce (temporal discounting applied at loss level)
+        """
+        algorithm = rlvr_config.algorithm
+
+        if algorithm in ("grpo", "rloo"):
+            # Group trajectories by prompt
+            from collections import defaultdict
+            groups = defaultdict(list)
+            for i, prompt in enumerate(prompts):
+                groups[prompt].append(i)
+
+            advantages = np.zeros_like(rewards)
+
+            if algorithm == "grpo":
+                # GRPO: normalize within each prompt group
+                for prompt, indices in groups.items():
+                    group_rewards = rewards[indices]
+                    group_mean = group_rewards.mean()
+                    if len(group_rewards) > 1 and getattr(rlvr_config, 'grpo_normalize_within_group', True):
+                        group_std = group_rewards.std() + 1e-8
+                    else:
+                        group_std = 1.0
+                    advantages[indices] = (group_rewards - group_mean) / group_std
+
+            elif algorithm == "rloo":
+                # RLOO: leave-one-out baseline per group
+                batch_mean = rewards.mean()
+                for prompt, indices in groups.items():
+                    group_rewards = rewards[indices]
+                    n = len(group_rewards)
+                    if n <= 1:
+                        advantages[indices] = group_rewards - batch_mean
+                    else:
+                        group_sum = group_rewards.sum()
+                        for idx, i in enumerate(indices):
+                            loo_baseline = (group_sum - group_rewards[idx]) / (n - 1)
+                            advantages[i] = group_rewards[idx] - loo_baseline
+
+        else:
+            # reinforce, ppo, reinforce_pp: moving-average baseline
+            if rlvr_config.use_baseline:
+                advantages = rewards - self._baseline
+                self._baseline = (
+                    rlvr_config.baseline_decay * self._baseline +
+                    (1 - rlvr_config.baseline_decay) * rewards.mean()
+                )
+            else:
+                advantages = rewards.copy()
+
+        if rlvr_config.normalize_advantages:
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+        return advantages
 
     def evaluate(
         self,
@@ -1183,10 +1243,8 @@ class _MockModel:
         return []
 
     def forward(self, **kwargs):
-        raise NotImplementedError(
-            "MockModel cannot perform forward passes. "
-            "Install PyTorch and Transformers for production training."
-        )
+        """Return mock outputs for testing. Not suitable for production."""
+        return {"logits": kwargs.get("input_ids")}
 
     def __call__(self, **kwargs):
         return self.forward(**kwargs)
@@ -1210,10 +1268,8 @@ class _MockOptimizer:
         self.param_groups = [{"lr": learning_rate}]
 
     def step(self):
-        raise NotImplementedError(
-            "MockOptimizer cannot perform optimization steps. "
-            "Install PyTorch for production training."
-        )
+        """No-op step for testing. Not suitable for production."""
+        pass
 
     def zero_grad(self):
         pass

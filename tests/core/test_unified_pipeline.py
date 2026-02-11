@@ -13,8 +13,8 @@ Tests the integrated functionality of:
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import patch
+from typing import Any, Dict, Iterator, List
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
@@ -22,6 +22,31 @@ import pytest
 # Enable toy HE mode for testing
 os.environ["TENSAFE_TOY_HE"] = "1"
 os.environ["TENSAFE_ENV"] = "test"
+
+
+# ==============================================================================
+# Test Helpers
+# ==============================================================================
+
+
+def _make_sft_dataloader(num_batches: int = 10, batch_size: int = 4, seq_len: int = 32) -> Iterator[Dict[str, Any]]:
+    """Create a mock SFT dataloader yielding batches with input_ids and labels."""
+    for _ in range(num_batches):
+        yield {
+            "input_ids": np.random.randint(0, 1000, (batch_size, seq_len)),
+            "labels": np.random.randint(0, 1000, (batch_size, seq_len)),
+        }
+
+
+def _make_rlvr_dataloader(num_batches: int = 10, batch_size: int = 4) -> Iterator[Dict[str, Any]]:
+    """Create a mock RLVR dataloader yielding batches with prompts."""
+    prompts_pool = ["What is 2+2?", "Explain gravity.", "Define AI.", "What is Python?"]
+    for _ in range(num_batches):
+        yield {
+            "input_ids": np.random.randint(0, 1000, (batch_size, 16)),
+            "labels": np.random.randint(0, 1000, (batch_size, 16)),
+            "prompts": prompts_pool[:batch_size],
+        }
 
 
 # ==============================================================================
@@ -401,7 +426,7 @@ class TestUnifiedPipeline:
         pipeline = TenSafePipeline(config, validate_production=False)
         pipeline.setup()
 
-        result = pipeline.train()
+        result = pipeline.train(train_dataloader=_make_sft_dataloader(num_batches=10))
 
         assert result.success
         assert result.total_steps >= 9  # May be 9 due to 0-indexing
@@ -419,7 +444,7 @@ class TestUnifiedPipeline:
         pipeline = TenSafePipeline(config, validate_production=False)
         pipeline.setup()
 
-        result = pipeline.train()
+        result = pipeline.train(train_dataloader=_make_rlvr_dataloader(num_batches=5))
 
         assert result.success
 
@@ -440,7 +465,7 @@ class TestUnifiedPipeline:
         pipeline = TenSafePipeline(config, validate_production=False)
         pipeline.register_callback(callback)
         pipeline.setup()
-        pipeline.train()
+        pipeline.train(train_dataloader=_make_sft_dataloader(num_batches=5))
 
         assert PipelineEvent.STATE_CHANGE in events_received
         assert PipelineEvent.STEP_START in events_received
@@ -508,7 +533,8 @@ class TestUnifiedInference:
         """Test forward pass with HE LoRA."""
         from tensafe.core.inference import InferenceMode, TenSafeInference
 
-        inference = TenSafeInference(mode=InferenceMode.HE_ONLY)
+        # Disable TGSP enforcement for unit testing HE forward path
+        inference = TenSafeInference(mode=InferenceMode.HE_ONLY, enforce_tgsp=False)
 
         # Register LoRA weights
         lora_a = np.random.randn(8, 64).astype(np.float64) * 0.01
@@ -523,24 +549,96 @@ class TestUnifiedInference:
         assert result.he_metrics is not None
 
     def test_inference_generate(self):
-        """Test text generation."""
+        """Test text generation with mock tokenizer and model."""
         from tensafe.core.inference import TenSafeInference
 
-        inference = TenSafeInference()
-        result = inference.generate("Hello, world!")
+        # Create mock tokenizer
+        mock_tokenizer = Mock()
+        mock_tokenizer.pad_token_id = 0
+        mock_tokenizer.eos_token_id = 2
+        mock_tokenizer.return_value = {
+            "input_ids": Mock(shape=(1, 5), __len__=lambda s: 1),
+        }
+        mock_tokenizer.decode = Mock(return_value="Generated text response")
+
+        # Create mock model
+        mock_model = Mock()
+
+        # Mock torch module with context manager support
+        mock_torch = Mock()
+        mock_torch.no_grad.return_value.__enter__ = Mock(return_value=None)
+        mock_torch.no_grad.return_value.__exit__ = Mock(return_value=False)
+
+        # Mock generated output: a tensor-like with tolist()
+        mock_output_seq = Mock()
+        mock_output_seq.tolist.return_value = [1, 2, 3, 4, 5, 10, 20, 30]
+
+        mock_model.generate.return_value = [mock_output_seq]
+        mock_model.parameters.return_value = iter([Mock(device="cpu")])
+        mock_model.eval.return_value = None
+
+        # The tokenizer __call__ returns input_ids that need .to() and .shape
+        mock_input_ids = Mock()
+        mock_input_ids.to.return_value = mock_input_ids
+        mock_input_ids.shape = (1, 5)
+        mock_input_ids.__len__ = lambda s: 5
+        mock_input_ids.__getitem__ = lambda s, idx: [1, 2, 3, 4, 5]
+
+        mock_tokenizer.return_value = {"input_ids": mock_input_ids}
+
+        inference = TenSafeInference(
+            model=mock_model,
+            tokenizer=mock_tokenizer,
+        )
+
+        with patch.dict("sys.modules", {"torch": mock_torch}):
+            result = inference.generate("Hello, world!")
 
         assert result.text is not None
         assert result.tokens is not None
         assert len(result.tokens) > 0
 
     def test_inference_batch_generate(self):
-        """Test batch text generation."""
+        """Test batch text generation with mock tokenizer and model."""
         from tensafe.core.inference import TenSafeInference
 
-        inference = TenSafeInference()
+        # Create mock tokenizer
+        mock_tokenizer = Mock()
+        mock_tokenizer.pad_token_id = 0
+        mock_tokenizer.eos_token_id = 2
+        mock_tokenizer.decode = Mock(return_value="Batch response")
+
+        # Create mock model - parameters() must return fresh iterator each call
+        mock_param = Mock(device="cpu")
+        mock_model = Mock()
+        mock_model.eval.return_value = None
+        mock_model.parameters = Mock(side_effect=lambda: iter([mock_param]))
+
+        mock_torch = Mock()
+        mock_torch.no_grad.return_value.__enter__ = Mock(return_value=None)
+        mock_torch.no_grad.return_value.__exit__ = Mock(return_value=False)
+
+        mock_output_seq = Mock()
+        mock_output_seq.tolist.return_value = [1, 2, 3, 4, 5, 10, 20, 30]
+        mock_model.generate.return_value = [mock_output_seq]
+
+        mock_input_ids = Mock()
+        mock_input_ids.to.return_value = mock_input_ids
+        mock_input_ids.shape = (1, 5)
+        mock_input_ids.__len__ = lambda s: 5
+        mock_input_ids.__getitem__ = lambda s, idx: [1, 2, 3, 4, 5]
+
+        mock_tokenizer.return_value = {"input_ids": mock_input_ids}
+
+        inference = TenSafeInference(
+            model=mock_model,
+            tokenizer=mock_tokenizer,
+        )
+
         prompts = ["Hello!", "How are you?", "What is AI?"]
 
-        batch_result = inference.generate_batch(prompts)
+        with patch.dict("sys.modules", {"torch": mock_torch}):
+            batch_result = inference.generate_batch(prompts)
 
         assert len(batch_result.results) == 3
         assert batch_result.total_time_ms > 0
@@ -582,7 +680,7 @@ class TestIntegration:
             pipeline = TenSafePipeline(loaded_config, validate_production=False)
             pipeline.setup()
 
-            result = pipeline.train()
+            result = pipeline.train(train_dataloader=_make_sft_dataloader(num_batches=5))
 
             assert result.success
 
@@ -610,7 +708,7 @@ class TestIntegration:
         pipeline = TenSafePipeline(config, validate_production=False)
         pipeline.setup()
 
-        result = pipeline.train()
+        result = pipeline.train(train_dataloader=_make_rlvr_dataloader(num_batches=3))
 
         assert result.success
 

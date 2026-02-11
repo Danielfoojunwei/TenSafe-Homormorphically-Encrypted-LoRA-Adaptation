@@ -348,21 +348,28 @@ class HEBackend:
         self._params = params or {}
         self._backend = None
         self._is_setup = False
+        # Track original plaintext sizes for proper decrypt trimming
+        self._original_sizes: Dict[int, int] = {}
 
     def setup(self) -> None:
         """Set up the HE context and generate keys."""
         try:
+            from dataclasses import replace
+
             from .backend.gpu_ckks_backend import BackendType, get_backend
             from .compiler.ckks_params import CKKSProfile, get_profile
 
             # Use FAST profile for setup
             ckks_params = get_profile(CKKSProfile.FAST)
 
-            # Apply any custom params
+            # Apply any custom params (CKKSParams is frozen, use replace())
+            overrides = {}
             if 'poly_modulus_degree' in self._params:
-                ckks_params.poly_modulus_degree = self._params['poly_modulus_degree']
+                overrides['poly_modulus_degree'] = self._params['poly_modulus_degree']
             if 'scale_bits' in self._params:
-                ckks_params.scale_bits = self._params['scale_bits']
+                overrides['scale_bits'] = self._params['scale_bits']
+            if overrides:
+                ckks_params = replace(ckks_params, **overrides)
 
             # Get simulation backend
             self._backend = get_backend(BackendType.SIMULATION, ckks_params)
@@ -378,14 +385,25 @@ class HEBackend:
     def encrypt(self, plaintext: np.ndarray) -> Any:
         """Encrypt a plaintext vector."""
         if self._backend is not None:
-            return self._backend.encrypt(plaintext)
+            ct = self._backend.encrypt(plaintext)
+            # Track original size for auto-trimming on decrypt
+            if hasattr(ct, 'handle'):
+                self._original_sizes[ct.handle] = plaintext.flatten().shape[0]
+            return ct
         # Simulation: just return the data
         return {"data": plaintext.copy(), "is_encrypted": False}
 
     def decrypt(self, ciphertext: Any, output_size: int = 0) -> np.ndarray:
         """Decrypt a ciphertext."""
         if self._backend is not None:
-            return self._backend.decrypt(ciphertext, output_size)
+            # Resolve effective output size from tracked original or explicit arg
+            effective_size = output_size
+            if effective_size == 0 and hasattr(ciphertext, 'handle'):
+                effective_size = self._original_sizes.get(ciphertext.handle, 0)
+
+            if effective_size > 0 and hasattr(self._backend, 'decrypt_partial'):
+                return self._backend.decrypt_partial(ciphertext, effective_size)
+            return self._backend.decrypt(ciphertext)
         # Simulation: return the data
         if isinstance(ciphertext, dict):
             return ciphertext["data"][:output_size] if output_size > 0 else ciphertext["data"]
@@ -402,14 +420,21 @@ class HEBackend:
         if self._backend is not None and hasattr(self._backend, 'lora_delta'):
             return self._backend.lora_delta(ct_x, lora_a, lora_b, scaling)
 
-        # Simulation
-        if isinstance(ct_x, dict):
+        # Simulation: decrypt, compute plaintext, re-encrypt
+        if self._backend is not None:
+            # Use tracked original size to get correctly-sized plaintext
+            x = self.decrypt(ct_x)
+        elif isinstance(ct_x, dict):
             x = ct_x["data"]
         else:
             x = ct_x
 
+        x = np.asarray(x).flatten()
         intermediate = x @ lora_a.T
         result = intermediate @ lora_b.T
+
+        if self._backend is not None:
+            return self.encrypt(scaling * result)
         return {"data": scaling * result, "is_encrypted": False}
 
     def get_slot_count(self) -> int:

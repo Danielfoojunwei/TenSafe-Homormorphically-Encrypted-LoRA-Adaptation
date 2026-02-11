@@ -376,12 +376,22 @@ class InferenceConfig:
 class RLVRConfig:
     """RLVR-specific configuration."""
 
-    # Algorithm
-    algorithm: str = "reinforce"  # "reinforce", "ppo"
+    # Algorithm: "reinforce", "reinforce_pp", "ppo", "grpo", "rloo"
+    algorithm: str = "reinforce"
+
+    # Pluggable advantage estimator override (optional)
+    # "baseline", "grpo", "rloo", "reinforce_pp", "gae"
+    advantage_estimator: Optional[str] = None
+
+    # Pluggable policy loss override (optional)
+    # "ppo_clip", "gspo", "sapo", "cispo", "clip_cov", "kl_cov",
+    # "cross_entropy", "importance_sampling"
+    policy_loss: Optional[str] = None
 
     # Rollout settings
     rollout_batch_size: int = 8
     max_new_tokens: int = 128
+    num_samples_per_prompt: int = 1  # For GRPO/RLOO group statistics
 
     # Reward settings
     reward_fn: str = "keyword_contains"
@@ -389,7 +399,7 @@ class RLVRConfig:
     reward_scale: float = 1.0
     reward_clip: Optional[float] = None
 
-    # Algorithm parameters (REINFORCE)
+    # Algorithm parameters (shared)
     gamma: float = 1.0
     use_baseline: bool = True
     baseline_decay: float = 0.99
@@ -402,6 +412,33 @@ class RLVRConfig:
     ppo_epochs: int = 4
     ppo_minibatch_size: int = 4
     vf_coef: float = 0.5
+
+    # GRPO-specific
+    grpo_normalize_within_group: bool = True
+    grpo_normalize_batch: bool = False
+    grpo_min_group_size: int = 2
+
+    # RLOO-specific
+    rloo_fallback_to_batch_mean: bool = True
+
+    # REINFORCE++-specific
+    reinforce_pp_temporal_whitening: bool = True
+
+    # Off-policy correction
+    off_policy_enabled: bool = False
+    off_policy_staleness_decay: float = 0.95
+
+    # Async rollout
+    async_rollout_enabled: bool = False
+    async_max_staleness_steps: int = 5
+    async_num_workers: int = 2
+
+    # Micro-batch gradient accumulation
+    micro_batch_size: int = 0  # 0 = disabled
+
+    # Environment
+    environment: Optional[str] = None
+    environment_kwargs: Dict[str, Any] = field(default_factory=dict)
 
     # Buffer settings
     buffer_size: int = 10000
@@ -513,10 +550,11 @@ class TenSafeConfig:
             issues.append(f"warning: Learning rate {self.training.learning_rate} is very high")
 
         # Check RLVR configuration
+        _valid_rlvr_algorithms = ("reinforce", "reinforce_pp", "ppo", "grpo", "rloo")
         if self.training.mode == TrainingMode.RLVR:
             if self.rlvr is None:
                 issues.append("error: RLVR mode but no RLVR config provided")
-            elif self.rlvr.algorithm not in ("reinforce", "ppo"):
+            elif self.rlvr.algorithm not in _valid_rlvr_algorithms:
                 issues.append(f"error: Unknown RLVR algorithm: {self.rlvr.algorithm}")
 
         return issues

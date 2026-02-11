@@ -6,21 +6,27 @@ LoRA adapters. It supports:
 
 - Rollout sampling from the current policy
 - Pluggable reward functions
-- REINFORCE and PPO algorithms
+- Five RL algorithms: REINFORCE, REINFORCE++, PPO, GRPO, RLOO
+- Pluggable advantage estimators (baseline, GRPO, RLOO, REINFORCE++, GAE)
+- Pluggable policy losses (PPO clip, GSPO, SAPO, CISPO, Clip-Cov, KL-Cov, etc.)
+- Off-policy correction for async training (TIS ratios, outlier masking)
+- Async rollout buffer with staleness control for HE-LoRA latency hiding
+- Lightweight environment protocol with RewardFn auto-wrapper
+- Micro-batch gradient accumulation with DP-SGD coordination
 - Trajectory storage and replay
 
 Example usage:
     from tensafe.rlvr import RLVRTrainer, resolve_reward
-    from tensafe.rlvr.algorithms import REINFORCE
+    from tensafe.rlvr.algorithms import GRPO, GRPOConfig
 
     # Create reward function
     reward_fn = resolve_reward("my_rewards:keyword_reward")
 
-    # Create trainer
+    # Create trainer with GRPO (critic-free, ideal for HE-LoRA)
     trainer = RLVRTrainer(
         training_client=tc,
         reward_fn=reward_fn,
-        algorithm=REINFORCE(lr=1e-5),
+        algorithm=GRPO(GRPOConfig(num_samples_per_prompt=5)),
     )
 
     # Training loop
@@ -29,9 +35,77 @@ Example usage:
         print(f"Reward: {metrics['mean_reward']}")
 """
 
-from .algorithms import PPO, REINFORCE, PPOConfig, REINFORCEConfig, RLAlgorithm
-from .buffers import TrajectoryBuffer
+from .advantages import (
+    AdvantageResult,
+    apply_advantage,
+    list_advantage_estimators,
+    register_advantage,
+    resolve_advantage,
+)
+from .algorithms import (
+    GRPO,
+    PPO,
+    REINFORCE,
+    REINFORCEPP,
+    RLOO,
+    AlgorithmConfig,
+    GRPOConfig,
+    MockRLAlgorithm,
+    PPOConfig,
+    PPOWithValueFunction,
+    REINFORCEConfig,
+    REINFORCEPPConfig,
+    REINFORCEWithBaseline,
+    RLAlgorithm,
+    RLOOConfig,
+    UpdateResult,
+)
+from .async_rollout import (
+    AsyncGenerationWorker,
+    AsyncRolloutBuffer,
+    AsyncRolloutConfig,
+    AsyncRolloutOrchestrator,
+    StalenessManager,
+)
+from .buffers import PrioritizedTrajectoryBuffer, TrajectoryBuffer
 from .config import RLVRConfig
+from .env import (
+    BatchEnvRunner,
+    Environment,
+    MultiTurnEnv,
+    Observation,
+    RewardShapingWrapper,
+    SingleTurnEnv,
+    StepResult,
+    TurnLimitWrapper,
+    list_envs,
+    make_env,
+    register_env,
+    wrap_reward_fn,
+)
+from .micro_batch import (
+    DPAwareMicroBatcher,
+    GradientAccumulator,
+    MicroBatchConfig,
+    MicroBatchContext,
+)
+from .off_policy import (
+    CorrectionResult,
+    OffPolicyConfig,
+    apply_off_policy_correction,
+    compute_sequence_tis_ratios,
+    compute_staleness_weights,
+    compute_token_tis_ratios,
+    mask_outlier_sequences,
+    mask_outlier_tokens,
+)
+from .policy_losses import (
+    PolicyLossInput,
+    PolicyLossResult,
+    list_policy_losses,
+    register_policy_loss,
+    resolve_policy_loss,
+)
 from .reward import RewardFn, get_registered_rewards, register_reward, resolve_reward
 from .rollout import MockRolloutSampler, RolloutSampler, Trajectory, TrajectoryBatch
 from .trainer import RLVRTrainer
@@ -49,14 +123,71 @@ __all__ = [
     "get_registered_rewards",
     # Buffers
     "TrajectoryBuffer",
+    "PrioritizedTrajectoryBuffer",
     # Trainer
     "RLVRTrainer",
     # Config
     "RLVRConfig",
     # Algorithms
     "RLAlgorithm",
+    "AlgorithmConfig",
+    "MockRLAlgorithm",
+    "UpdateResult",
     "REINFORCE",
     "REINFORCEConfig",
+    "REINFORCEWithBaseline",
+    "REINFORCEPP",
+    "REINFORCEPPConfig",
     "PPO",
     "PPOConfig",
+    "PPOWithValueFunction",
+    "GRPO",
+    "GRPOConfig",
+    "RLOO",
+    "RLOOConfig",
+    # Advantage Estimators
+    "register_advantage",
+    "resolve_advantage",
+    "list_advantage_estimators",
+    "apply_advantage",
+    "AdvantageResult",
+    # Policy Losses
+    "register_policy_loss",
+    "resolve_policy_loss",
+    "list_policy_losses",
+    "PolicyLossInput",
+    "PolicyLossResult",
+    # Off-Policy Correction
+    "OffPolicyConfig",
+    "CorrectionResult",
+    "apply_off_policy_correction",
+    "compute_token_tis_ratios",
+    "compute_sequence_tis_ratios",
+    "mask_outlier_tokens",
+    "mask_outlier_sequences",
+    "compute_staleness_weights",
+    # Environment
+    "Environment",
+    "Observation",
+    "StepResult",
+    "SingleTurnEnv",
+    "MultiTurnEnv",
+    "BatchEnvRunner",
+    "RewardShapingWrapper",
+    "TurnLimitWrapper",
+    "register_env",
+    "make_env",
+    "list_envs",
+    "wrap_reward_fn",
+    # Async Rollout
+    "AsyncRolloutConfig",
+    "AsyncRolloutBuffer",
+    "AsyncGenerationWorker",
+    "AsyncRolloutOrchestrator",
+    "StalenessManager",
+    # Micro-Batch
+    "MicroBatchConfig",
+    "GradientAccumulator",
+    "MicroBatchContext",
+    "DPAwareMicroBatcher",
 ]
