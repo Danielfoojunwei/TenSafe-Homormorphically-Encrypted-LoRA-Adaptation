@@ -810,9 +810,7 @@ class HASExecutor:
         if adapter.hybrid_backend is not None:
             # Use hybrid backend for gated computation
             try:
-                from ...hybrid_compiler.adapters import (
-                    HEGatedLoRAAdapter, GatedLoRAAdapterConfig, AdapterWeights
-                )
+                from ...hybrid_compiler.adapters import AdapterWeights, GatedLoRAAdapterConfig, HEGatedLoRAAdapter
 
                 config = GatedLoRAAdapterConfig(
                     hidden_size=hidden_states.shape[-1],

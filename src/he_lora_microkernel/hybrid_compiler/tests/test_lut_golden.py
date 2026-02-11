@@ -8,27 +8,27 @@ Tests correctness of:
 4. Sign encoding/decoding correctness
 """
 
-import pytest
-import numpy as np
 from typing import List, Tuple
 
-from ..tfhe_lut import (
-    LUTEntry,
-    LUTLibrary,
-    step_lut,
-    sign_lut,
-    clip_lut,
-    relu_lut,
-    argmax_2_lut,
-    create_custom_lut,
-)
-from ..bridge import CKKSTFHEBridge, BridgeConfig, QuantizationParams
+import numpy as np
+import pytest
+
 from ..backend import (
     HybridHEBackend,
     HybridHEConfig,
     SimulatedBridgeService,
 )
-
+from ..bridge import BridgeConfig, CKKSTFHEBridge, QuantizationParams
+from ..tfhe_lut import (
+    LUTEntry,
+    LUTLibrary,
+    argmax_2_lut,
+    clip_lut,
+    create_custom_lut,
+    relu_lut,
+    sign_lut,
+    step_lut,
+)
 
 # =============================================================================
 # LUT Correctness Tests

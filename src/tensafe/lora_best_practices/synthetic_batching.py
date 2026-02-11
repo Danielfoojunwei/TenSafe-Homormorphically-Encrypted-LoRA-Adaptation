@@ -35,14 +35,14 @@ Research Foundation:
 
 from __future__ import annotations
 
+import logging
 import math
 import time
-import logging
 from abc import ABC, abstractmethod
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from collections import deque
 
 logger = logging.getLogger(__name__)
 
@@ -1223,23 +1223,23 @@ def print_synthetic_batching_analysis():
         acceptance_rate=0.7,
     )
 
-    print(f"\nPrefill Phase:")
+    print("\nPrefill Phase:")
     print(f"  Batches: {result['prefill']['batches']}")
     print(f"  Time: {result['prefill']['time_ms']:.1f}ms")
     print(f"  Throughput: {result['prefill']['throughput_toks']:.0f} tok/s")
 
-    print(f"\nDecode Phase (Synthetic Batching):")
+    print("\nDecode Phase (Synthetic Batching):")
     print(f"  Effective tokens/batch: {result['decode']['effective_tokens_per_batch']:.1f}")
     print(f"  Batches needed: {result['decode']['batches']}")
     print(f"  Time: {result['decode']['time_ms']:.1f}ms")
     print(f"  Throughput: {result['decode']['throughput_toks']:.0f} tok/s")
 
-    print(f"\nTotal:")
+    print("\nTotal:")
     print(f"  Tokens: {result['total']['tokens']}")
     print(f"  Time: {result['total']['time_ms']:.1f}ms")
     print(f"  Throughput: {result['total']['throughput_toks']:.0f} tok/s")
 
-    print(f"\nComparison:")
+    print("\nComparison:")
     print(f"  Naive (no batching): {result['comparison']['naive_time_ms']:.0f}ms")
     print(f"  Speedup: {result['comparison']['speedup_vs_naive']:.1f}x")
     print(f"  Ideal multi-user (128): {result['comparison']['ideal_multiuser_time_ms']:.1f}ms")

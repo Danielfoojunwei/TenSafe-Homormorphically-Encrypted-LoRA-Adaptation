@@ -15,22 +15,22 @@ production-grade injection points for all adapter types.
 Author: TenSafe Team
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 import functools
 import logging
 import time
 import weakref
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
 from .adapter_types import AdapterType, BaseAdapter
 from .placement import (
     FusedProjectionHandler,
+    LayerType,
     ProjectionTarget,
     ProjectionType,
-    LayerType,
 )
 
 if TYPE_CHECKING:

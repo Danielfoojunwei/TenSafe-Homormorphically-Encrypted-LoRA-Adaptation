@@ -497,8 +497,9 @@ def _secure_aggregate_gradients(model: nn.Module, timeout_seconds: int = 300):
         model: Model with gradients to aggregate
         timeout_seconds: Timeout for all_reduce operations (default: 5 minutes)
     """
-    import torch.distributed as dist
     from datetime import timedelta
+
+    import torch.distributed as dist
 
     if not dist.is_initialized():
         return

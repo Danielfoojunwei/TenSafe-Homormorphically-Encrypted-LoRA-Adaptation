@@ -55,12 +55,12 @@ from .scaling import (
     compute_lora_scaling,
 )
 from .synthetic_batching import (
-    SyntheticBatchExecutor,
-    SpeculativeHEBatcher,
-    LookaheadHEBatcher,
-    HybridSyntheticBatcher,
     HEBatchConfig,
+    HybridSyntheticBatcher,
+    LookaheadHEBatcher,
     SpeculationStrategy,
+    SpeculativeHEBatcher,
+    SyntheticBatchExecutor,
     analyze_synthetic_batching_performance,
 )
 

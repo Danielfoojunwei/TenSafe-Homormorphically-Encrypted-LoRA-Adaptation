@@ -21,13 +21,14 @@ References:
 Author: TenSafe Team
 """
 
+import hashlib
+import logging
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-import hashlib
-import logging
-import math
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -151,7 +152,7 @@ class AdapterConfig:
 
         if self.adapter_type == AdapterType.ADALORA:
             if self.initial_rank is not None and self.initial_rank < self.rank:
-                errors.append(f"initial_rank must be >= rank for AdaLoRA")
+                errors.append("initial_rank must be >= rank for AdaLoRA")
 
         if self.adapter_type == AdapterType.VERA:
             if self.vera_d_initial <= 0 or self.vera_b_initial <= 0:

@@ -5,15 +5,15 @@ Tests for Synthetic Batching System.
 import pytest
 
 from tensafe.lora_best_practices.synthetic_batching import (
+    HEBatchConfig,
+    HybridSyntheticBatcher,
+    LookaheadHEBatcher,
+    SpeculationBatch,
     SpeculationStrategy,
     SpeculativeToken,
-    SpeculationBatch,
-    VerificationResult,
-    SyntheticBatchMetrics,
-    HEBatchConfig,
-    LookaheadHEBatcher,
-    HybridSyntheticBatcher,
     SyntheticBatchExecutor,
+    SyntheticBatchMetrics,
+    VerificationResult,
     analyze_synthetic_batching_performance,
 )
 

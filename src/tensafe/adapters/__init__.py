@@ -38,91 +38,90 @@ Author: TenSafe Team
 
 # Adapter types
 from .adapter_types import (
-    AdapterType,
-    ScalingStrategy,
-    AdapterConfig,
-    BaseAdapter,
-    LoRAAdapter,
-    rsLoRAAdapter,
-    LoRAFAAdapter,
-    DoRAAdapter,
-    VeRAAdapter,
     AdaLoRAAdapter,
+    AdapterConfig,
+    AdapterType,
+    BaseAdapter,
+    DoRAAdapter,
     GatedLoRAAdapter,
     GLoRAAdapter,
-    create_adapter,
-    register_adapter_type,
-    list_adapter_types,
+    LoRAAdapter,
+    LoRAFAAdapter,
+    ScalingStrategy,
+    VeRAAdapter,
     convert_adapter,
-)
-
-# Placement resolution
-from .placement import (
-    LayerType,
-    ProjectionType,
-    TargetScope,
-    ProjectionTarget,
-    ArchitectureConfig,
-    PlacementConfig,
-    AdapterPlacementResolver,
-    FusedProjectionHandler,
-    ARCHITECTURE_CONFIGS,
-    get_architecture_config,
-    auto_discover_targets,
-    get_layer_importance_weights,
-)
-
-# Hot-swap and lifecycle
-from .hot_swap import (
-    CacheTier,
-    AdapterState,
-    EvictionPolicy,
-    AdapterMetadata,
-    PackedWeights,
-    TieredCacheConfig,
-    HotSwapConfig,
-    LifecycleConfig,
-    BaseEvictionPolicy,
-    LRUEvictionPolicy,
-    GDSFEvictionPolicy,
-    create_eviction_policy,
-    TieredAdapterCache,
-    HotSwapManager,
-    AdapterLifecycleManager,
-)
-
-# Hooks
-from .hooks import (
-    InjectionMode,
-    HookConfig,
-    HookStatistics,
-    StandardDeltaCallback,
-    ExtendedDeltaCallback,
-    BaseAdapterHook,
-    LinearAdapterHook,
-    DoRAHook,
-    GatedAdapterHook,
-    FusedQKVHook,
-    HookManager,
-    create_hooks_for_model,
+    create_adapter,
+    list_adapter_types,
+    register_adapter_type,
+    rsLoRAAdapter,
 )
 
 # HE Integration
 from .he_integration import (
-    HECompatibility,
     ADAPTER_HE_COMPATIBILITY,
-    get_he_compatibility,
-    is_he_compatible,
+    CKKSLoRAForward,
+    HEAdapterForward,
+    HEAwareHotSwapForward,
+    HECompatibility,
     HEForwardConfig,
     HEForwardMetrics,
-    HEAdapterForward,
-    CKKSLoRAForward,
     HybridTFHEGatedForward,
     PlaintextFallbackForward,
     create_he_forward,
-    HEAwareHotSwapForward,
+    get_he_compatibility,
+    is_he_compatible,
 )
 
+# Hooks
+from .hooks import (
+    BaseAdapterHook,
+    DoRAHook,
+    ExtendedDeltaCallback,
+    FusedQKVHook,
+    GatedAdapterHook,
+    HookConfig,
+    HookManager,
+    HookStatistics,
+    InjectionMode,
+    LinearAdapterHook,
+    StandardDeltaCallback,
+    create_hooks_for_model,
+)
+
+# Hot-swap and lifecycle
+from .hot_swap import (
+    AdapterLifecycleManager,
+    AdapterMetadata,
+    AdapterState,
+    BaseEvictionPolicy,
+    CacheTier,
+    EvictionPolicy,
+    GDSFEvictionPolicy,
+    HotSwapConfig,
+    HotSwapManager,
+    LifecycleConfig,
+    LRUEvictionPolicy,
+    PackedWeights,
+    TieredAdapterCache,
+    TieredCacheConfig,
+    create_eviction_policy,
+)
+
+# Placement resolution
+from .placement import (
+    ARCHITECTURE_CONFIGS,
+    AdapterPlacementResolver,
+    ArchitectureConfig,
+    FusedProjectionHandler,
+    LayerType,
+    PlacementConfig,
+    ProjectionTarget,
+    ProjectionType,
+    TargetScope,
+    auto_discover_targets,
+    get_architecture_config,
+    get_layer_importance_weights,
+)
 
 __all__ = [
     # === Adapter Types ===

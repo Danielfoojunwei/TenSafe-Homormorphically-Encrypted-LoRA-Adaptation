@@ -9,22 +9,27 @@ Key insight:
 - N=32768 gives 16384 slots → block_size=1024 → fewer blocks → fewer rotations
 """
 
-import sys
 import math
+import sys
 from dataclasses import dataclass
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 # Add parent path for imports
 sys.path.insert(0, str(__file__).rsplit('/', 3)[0])
 
 from he_lora_microkernel.compiler.ckks_params import (
-    CKKSProfile, get_profile, get_turbo_profile, get_production_profile,
+    CKKSProfile,
+    get_production_profile,
+    get_profile,
+    get_turbo_profile,
     select_optimal_profile,
 )
+from he_lora_microkernel.compiler.cost_model import CostEstimate, estimate_costs
 from he_lora_microkernel.compiler.packer import (
-    compute_packing_layout, PackingLayout, compute_optimal_block_size,
+    PackingLayout,
+    compute_optimal_block_size,
+    compute_packing_layout,
 )
-from he_lora_microkernel.compiler.cost_model import estimate_costs, CostEstimate
 
 
 @dataclass
@@ -129,7 +134,7 @@ def print_comparison_table(comparisons: List[ProfileComparison], config_name: st
             baseline.estimated_time_us * 100
         )
 
-        print(f"\n  Improvement with PRODUCTION profile:")
+        print("\n  Improvement with PRODUCTION profile:")
         print(f"    Rotation reduction: {rotation_reduction:.1f}%")
         print(f"    Time reduction: {time_reduction:.1f}%")
         print(f"    Blocks: {baseline.num_blocks} → {optimized.num_blocks}")

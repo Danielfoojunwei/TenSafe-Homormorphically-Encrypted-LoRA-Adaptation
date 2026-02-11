@@ -9,16 +9,16 @@ Tests cover:
 5. Step function accuracy
 """
 
-import pytest
 import numpy as np
+import pytest
 
 from he_lora_microkernel.hybrid_compiler.bridge.optimized_bridge import (
-    OptimizedCKKSTFHEBridge,
     BatchedBootstrapConfig,
-    QuantizationParams,
     BatchedLUT,
-    SIMDPackedTFHE,
     LazyGateBridge,
+    OptimizedCKKSTFHEBridge,
+    QuantizationParams,
+    SIMDPackedTFHE,
 )
 
 

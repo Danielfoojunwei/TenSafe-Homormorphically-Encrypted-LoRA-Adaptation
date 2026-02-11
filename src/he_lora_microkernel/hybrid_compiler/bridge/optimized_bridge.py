@@ -15,11 +15,12 @@ Performance improvements:
 Note: Full 8-bit precision is used to maintain output quality.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any, Callable
-import numpy as np
 import logging
 import time
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

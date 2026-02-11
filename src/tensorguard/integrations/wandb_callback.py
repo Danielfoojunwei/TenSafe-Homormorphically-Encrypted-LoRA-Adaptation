@@ -140,8 +140,8 @@ class TenSafeWandbCallback:
         last_error = None
         for attempt in range(self.config.retry_attempts):
             try:
-                import signal
                 import functools
+                import signal
 
                 def _timeout_handler(signum, frame):
                     raise TimeoutError(f"wandb.init() timed out after {self.config.init_timeout}s")

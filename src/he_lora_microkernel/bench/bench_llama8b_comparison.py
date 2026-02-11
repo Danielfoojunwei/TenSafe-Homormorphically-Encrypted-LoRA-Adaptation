@@ -20,32 +20,32 @@ Llama 8B specifications:
 - vocab_size: 128256
 """
 
-import time
 import json
 import math
+import os
+import sys
+import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 
-import sys
-import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from he_lora_microkernel.compiler import (
+    CKKSProfile,
     LoRAConfig,
     LoRATargets,
-    CKKSProfile,
-    get_profile,
     compile_schedule,
+    get_profile,
     select_optimal_profile,
 )
 from he_lora_microkernel.compiler.cost_model import (
+    CostBudget,
     CostEstimate,
     estimate_costs,
-    CostBudget,
 )
-
 
 # =============================================================================
 # Llama 8B Configuration
@@ -714,7 +714,7 @@ def print_comparison_table(results: Dict[str, Any]) -> str:
             lines.append(f"  • Improvement over Full HE: {improvement:.0f}x")
         else:
             # Full HE is impractically slow
-            lines.append(f"  • Full HE is impractical (>1M rotations/token, requires bootstrapping)")
+            lines.append("  • Full HE is impractical (>1M rotations/token, requires bootstrapping)")
             lines.append(f"  • SIMD Batching makes HE-LoRA practical with {best_simd['operations_per_token']['rotations']:.0f} rot/tok")
 
     lines.append("")

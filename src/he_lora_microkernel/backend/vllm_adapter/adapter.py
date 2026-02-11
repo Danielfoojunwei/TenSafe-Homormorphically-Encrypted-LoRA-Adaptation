@@ -18,10 +18,10 @@ if TYPE_CHECKING:
     import torch
 
 from ..base_adapter import (
+    AttentionType,
     BaseRuntimeAdapter,
     BatchConfig,
     DeltaCallback,
-    AttentionType,
     InsertionConfig,
     LayerDeltas,
     LoRATargets,

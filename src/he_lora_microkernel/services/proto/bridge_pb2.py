@@ -5,11 +5,10 @@ This module provides Python-only mock implementations for development
 and testing. In production, compile bridge.proto using grpc_tools.protoc.
 """
 
+import time
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Dict, List, Optional, Any
-import time
-
+from typing import Any, Dict, List, Optional
 
 # =============================================================================
 # Enums

@@ -10,20 +10,22 @@ Error bounds:
 - Relative error ≤ 1e-2
 """
 
-import numpy as np
-import sys
 import os
+import sys
+
+import numpy as np
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+from he_lora_microkernel.backend.gpu_ckks_backend import BackendType
 from he_lora_microkernel.compiler import (
+    CKKSProfile,
     LoRAConfig,
     LoRATargets,
-    CKKSProfile,
-    get_profile,
     compile_schedule,
+    get_profile,
 )
 from he_lora_microkernel.runtime import HELoRAExecutor
-from he_lora_microkernel.backend.gpu_ckks_backend import BackendType
 
 
 def reference_lora_forward(x, A, B, alpha, rank):
@@ -147,8 +149,8 @@ def main():
     # Summary
     print("ERROR BOUND THRESHOLDS:")
     print("-" * 40)
-    print(f"  Absolute Error Threshold: 1e-2 (0.01)")
-    print(f"  Relative Error Threshold: 1e-2 (1%)")
+    print("  Absolute Error Threshold: 1e-2 (0.01)")
+    print("  Relative Error Threshold: 1e-2 (1%)")
     print()
 
     print("WHY THESE BOUNDS ARE ACCEPTABLE:")

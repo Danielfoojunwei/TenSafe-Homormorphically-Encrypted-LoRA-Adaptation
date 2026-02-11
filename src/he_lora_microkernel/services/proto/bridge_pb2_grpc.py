@@ -5,22 +5,22 @@ This module provides Python-only mock implementations for development
 and testing. In production, compile bridge.proto using grpc_tools.protoc.
 """
 
-from typing import Any, Callable, Dict, Iterator, Optional
 import logging
 import time
+from typing import Any, Callable, Dict, Iterator, Optional
 
 from .bridge_pb2 import (
-    BridgeRequest,
-    BridgeResponse,
     BatchedBridgeRequest,
     BatchedBridgeResponse,
-    HealthRequest,
-    HealthResponse,
+    BatchMetrics,
     BridgeDirection,
     BridgeMetrics,
-    BatchMetrics,
-    ErrorInfo,
+    BridgeRequest,
+    BridgeResponse,
     ErrorCode,
+    ErrorInfo,
+    HealthRequest,
+    HealthResponse,
     ResponseStatus,
 )
 
@@ -47,7 +47,7 @@ class SchemeBridgeServiceStub:
             channel: gRPC channel (or mock servicer for testing)
         """
         self._channel = channel
-        self._servicer: Optional['SchemeBridgeServiceServicer'] = None
+        self._servicer: Optional[SchemeBridgeServiceServicer] = None
 
         # If channel is a servicer, use it directly
         if isinstance(channel, SchemeBridgeServiceServicer):

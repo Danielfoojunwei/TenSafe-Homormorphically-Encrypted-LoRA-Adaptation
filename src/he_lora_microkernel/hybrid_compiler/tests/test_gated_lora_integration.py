@@ -8,24 +8,24 @@ Validates numerical correctness between:
 Tests gate behavior, error bounds, and edge cases.
 """
 
-import pytest
-import numpy as np
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
-from ..backend import (
-    HybridHEBackend,
-    HybridHEConfig,
-    BridgeMode,
-)
+import numpy as np
+import pytest
+
 from ..adapters import (
-    HEGatedLoRAAdapter,
-    GatedLoRAAdapterConfig,
-    AdapterWeights,
     AdapterMetrics,
+    AdapterWeights,
+    GatedLoRAAdapterConfig,
+    HEGatedLoRAAdapter,
     plaintext_gated_lora,
 )
-from ..tfhe_lut import LUTLibrary, step_lut, sign_lut
-
+from ..backend import (
+    BridgeMode,
+    HybridHEBackend,
+    HybridHEConfig,
+)
+from ..tfhe_lut import LUTLibrary, sign_lut, step_lut
 
 # =============================================================================
 # Test Fixtures

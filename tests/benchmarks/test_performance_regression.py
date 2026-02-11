@@ -9,11 +9,11 @@ Run with: pytest tests/benchmarks/test_performance_regression.py -v
 
 import json
 import time
-import pytest
-import numpy as np
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
+import numpy as np
+import pytest
 
 # Load baseline thresholds
 BASELINE_PATH = Path(__file__).parent.parent.parent / "benchmarks" / "baseline.json"
@@ -275,8 +275,9 @@ class TestLWECiphertextPerformance:
         """Verify LWE ciphertext batch serialization meets threshold."""
         import warnings
         warnings.filterwarnings('ignore')
-        from tensorguard.core.crypto import LWECiphertext, N2HEParams
         import secrets
+
+        from tensorguard.core.crypto import LWECiphertext, N2HEParams
 
         threshold = self.thresholds.get("batch_100", {})
         if not threshold:
@@ -298,8 +299,9 @@ class TestLWECiphertextPerformance:
         """Verify LWE ciphertext batch deserialization meets threshold."""
         import warnings
         warnings.filterwarnings('ignore')
-        from tensorguard.core.crypto import LWECiphertext, N2HEParams
         import secrets
+
+        from tensorguard.core.crypto import LWECiphertext, N2HEParams
 
         threshold = self.thresholds.get("batch_100", {})
         if not threshold:

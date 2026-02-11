@@ -21,7 +21,6 @@ from typing import Dict, Tuple
 import numpy as np
 import pytest
 
-
 # =============================================================================
 # MOCK CKKS BACKEND FOR TESTING
 # =============================================================================
@@ -410,9 +409,9 @@ class TestHEForwardIntegration:
         from tensafe.adapters import (
             AdapterConfig,
             AdapterType,
-            create_adapter,
             CKKSLoRAForward,
             HEForwardConfig,
+            create_adapter,
         )
 
         # Create LoRA adapter
@@ -555,7 +554,7 @@ class TestBenchmarks:
 
         counters = mock_backend.get_counters()
 
-        print(f"\n=== LoRA Forward Benchmark ===")
+        print("\n=== LoRA Forward Benchmark ===")
         print(f"Iterations: {num_iterations}")
         print(f"Total time: {elapsed_ms:.2f}ms")
         print(f"Avg per forward: {avg_ms:.3f}ms")
@@ -622,7 +621,7 @@ class TestExistingInfraIntegration:
     def test_compat_module_interface(self):
         """Test compatibility with he_lora_microkernel.compat."""
         try:
-            from he_lora_microkernel.compat import HELoRAConfig, HELoRAAdapter
+            from he_lora_microkernel.compat import HELoRAAdapter, HELoRAConfig
 
             config = HELoRAConfig(
                 rank=16,

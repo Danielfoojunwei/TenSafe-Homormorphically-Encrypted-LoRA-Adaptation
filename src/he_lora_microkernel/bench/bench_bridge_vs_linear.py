@@ -13,22 +13,22 @@ so batching/SIMD optimizations are critical for hybrid HE-LoRA.
 
 import sys
 import time
-import numpy as np
 from dataclasses import dataclass
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
+import numpy as np
 
 sys.path.insert(0, str(__file__).rsplit('/', 3)[0])
 
-from he_lora_microkernel.compiler import CKKSProfile, get_profile
 from he_lora_microkernel.backend.gpu_ckks_backend import BackendType, create_backend
+from he_lora_microkernel.compiler import CKKSProfile, get_profile
 from he_lora_microkernel.hybrid_compiler.bridge.optimized_bridge import (
-    OptimizedCKKSTFHEBridge,
-    SIMDPackedTFHE,
-    LazyGateBridge,
-    QuantizationParams,
     BatchedLUT,
+    LazyGateBridge,
+    OptimizedCKKSTFHEBridge,
+    QuantizationParams,
+    SIMDPackedTFHE,
 )
-
 
 # =============================================================================
 # REALISTIC TFHE TIMING MODEL
@@ -422,7 +422,7 @@ def run_benchmark():
     print("=" * 100)
     print("CKKS-TFHE BRIDGE vs LINEAR CKKS PERFORMANCE BENCHMARK")
     print("=" * 100)
-    print(f"\nTFHE Timing Model:")
+    print("\nTFHE Timing Model:")
     print(f"  Bootstrap time: {TFHE_BOOTSTRAP_TIME_MS} ms (typical range: 10-50ms)")
     print(f"  Key switch overhead: {TFHE_KEY_SWITCH_TIME_MS} ms")
     print(f"  LUT eval overhead: {TFHE_LUT_EVAL_OVERHEAD_MS} ms per value")

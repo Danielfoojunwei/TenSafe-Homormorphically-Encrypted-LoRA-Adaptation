@@ -39,9 +39,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
-from typing import (
-    Any, Callable, Dict, Generic, List, Optional, Set, Tuple, TypeVar, Union
-)
+from typing import Any, Callable, Dict, Generic, List, Optional, Set, Tuple, TypeVar, Union
+
 import numpy as np
 
 from .adapter_types import AdapterConfig, AdapterType, BaseAdapter, create_adapter

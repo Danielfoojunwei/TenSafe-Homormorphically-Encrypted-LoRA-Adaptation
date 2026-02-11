@@ -12,24 +12,26 @@ Kimi 2.5 specifications (from Moonshot AI):
 - 1T total parameters, 32B activated per token
 """
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
+import json
+import math
+from dataclasses import dataclass
+from typing import Any, Dict, List
+
 from he_lora_microkernel.bench.bench_llama8b_comparison import (
-    HEOperationCosts,
     ApproachMetrics,
-    HEApproach,
     FullHEEstimator,
-    NormalHELoRAEstimator,
+    HEApproach,
+    HEOperationCosts,
     HybridNonLinearEstimator,
+    NormalHELoRAEstimator,
     SIMDBatchingEstimator,
     print_comparison_table,
 )
-from dataclasses import dataclass
-import math
-import json
-from typing import Dict, Any, List
 
 
 @dataclass(frozen=True)
@@ -247,7 +249,7 @@ def print_kimi_comparison_table(results: Dict[str, Any]) -> str:
             improvement = best_simd['throughput']['tok_per_s'] / full_he['throughput']['tok_per_s']
             lines.append(f"  • Improvement over Full HE: {improvement:.0f}x")
         else:
-            lines.append(f"  • Full HE is impractical for Kimi 2.5 (h=7168 requires massive rotation count)")
+            lines.append("  • Full HE is impractical for Kimi 2.5 (h=7168 requires massive rotation count)")
 
     lines.append("")
     lines.append("=" * 115)
@@ -320,4 +322,4 @@ if __name__ == "__main__":
     # Save results
     with open('benchmark_kimi25_results.json', 'w') as f:
         json.dump(results, f, indent=2)
-    print(f"\nResults saved to benchmark_kimi25_results.json")
+    print("\nResults saved to benchmark_kimi25_results.json")
