@@ -1,10 +1,10 @@
 """KMS Provider Implementations."""
 
-from .local import LocalKMSProvider
 from .aws import AWSKMSProvider
-from .vault import VaultKMSProvider
-from .gcp import GCPKMSProvider
 from .azure import AzureKMSProvider
+from .gcp import GCPKMSProvider
+from .local import LocalKMSProvider
+from .vault import VaultKMSProvider
 
 __all__ = [
     "LocalKMSProvider",

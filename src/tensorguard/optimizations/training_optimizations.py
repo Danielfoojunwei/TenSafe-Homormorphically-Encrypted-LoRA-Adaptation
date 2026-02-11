@@ -7,15 +7,15 @@ Provides general training optimizations compatible with privacy-preserving train
 - Memory optimization
 """
 
-from typing import Optional, Dict, Any, Callable, List
-from dataclasses import dataclass
 import logging
 import time
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Dataset
 from torch.cuda.amp import GradScaler, autocast
+from torch.utils.data import DataLoader, Dataset
 
 logger = logging.getLogger(__name__)
 

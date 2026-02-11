@@ -18,21 +18,20 @@ Security Features:
 """
 
 import base64
-import hashlib
 import logging
 import secrets
 import uuid
 import zlib
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urlencode, quote_plus
+from urllib.parse import quote_plus, urlencode
 from xml.etree import ElementTree as ET
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-from .models import SAMLConfig, SSOSession, SSOUser, SSOProviderType
+from .models import SAMLConfig, SSOProviderType, SSOSession, SSOUser
 
 logger = logging.getLogger(__name__)
 

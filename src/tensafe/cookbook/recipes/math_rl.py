@@ -23,13 +23,11 @@ Example usage:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 
-from ..completers import TokensWithLogprobs
 from ..hyperparam_utils import LoRAConfig
 from ..model_info import get_recommended_renderer_name
 
@@ -121,7 +119,7 @@ class MathProblem:
     answer_value: Optional[float] = None  # Numeric answer if applicable
 
     @classmethod
-    def from_gsm8k(cls, item: Dict[str, Any]) -> "MathProblem":
+    def from_gsm8k(cls, item: Dict[str, Any]) -> MathProblem:
         """Create from GSM8K format."""
         question = item["question"]
         answer = item["answer"]
@@ -317,8 +315,8 @@ class MathDatasetBuilder:
         self.seed = seed
 
         # Load tokenizer and renderer
-        from ..tokenizer_utils import get_tokenizer
         from ..renderers import get_renderer
+        from ..tokenizer_utils import get_tokenizer
 
         self.tokenizer = get_tokenizer(model_name)
         self.renderer = get_renderer(renderer_name, self.tokenizer)

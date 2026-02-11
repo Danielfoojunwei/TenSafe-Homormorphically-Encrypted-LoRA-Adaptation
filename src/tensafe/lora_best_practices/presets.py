@@ -11,12 +11,10 @@ Each preset is optimized for specific scenarios:
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Any, Optional
+from typing import Dict
 
 from .config import (
     LoRABestPracticesConfig,
-    LoRAScalingMethod,
-    LoRAVariant,
     TargetModulePreset,
 )
 

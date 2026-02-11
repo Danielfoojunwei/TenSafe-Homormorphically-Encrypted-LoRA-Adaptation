@@ -7,7 +7,7 @@ Provides high-performance training optimizations:
 - Fused operations for LoRA
 """
 
-from .liger_integration import apply_liger_optimizations, LigerOptimizationConfig
+from .liger_integration import LigerOptimizationConfig, apply_liger_optimizations
 from .training_optimizations import (
     TenSafeOptimizedTrainer,
     apply_gradient_checkpointing,

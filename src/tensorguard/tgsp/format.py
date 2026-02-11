@@ -65,7 +65,9 @@ def write_tgsp_package_v1(
     manifest_dict["author_pubkey"] = author_pubkey
 
     # Prepare AAD Inputs
-    manifest_bytes = canonical_bytes(manifest_dict)
+    # Use canonical_json (not canonical_bytes which may produce msgpack)
+    # because read_tgsp_header parses these as JSON.
+    manifest_bytes = canonical_json(manifest_dict)
     manifest_hash = hashlib.sha256(manifest_bytes).hexdigest()
 
     # We first process recipients to get recipients_hash

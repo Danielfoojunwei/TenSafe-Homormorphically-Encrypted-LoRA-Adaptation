@@ -9,11 +9,11 @@ This module provides RL algorithms for fine-tuning language models:
 - RLOO: Reinforcement Learning with Leave-One-Out baseline
 """
 
-from .base import AlgorithmConfig, RLAlgorithm, MockRLAlgorithm, UpdateResult
+from .base import AlgorithmConfig, MockRLAlgorithm, RLAlgorithm, UpdateResult
+from .grpo import GRPO, GRPOConfig
+from .ppo import PPO, PPOConfig, PPOWithValueFunction
 from .reinforce import REINFORCE, REINFORCEConfig, REINFORCEWithBaseline
 from .reinforce_pp import REINFORCEPP, REINFORCEPPConfig
-from .ppo import PPO, PPOConfig, PPOWithValueFunction
-from .grpo import GRPO, GRPOConfig
 from .rloo import RLOO, RLOOConfig
 
 __all__ = [

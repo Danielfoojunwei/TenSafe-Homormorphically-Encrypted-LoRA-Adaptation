@@ -24,18 +24,18 @@ Example usage:
     print(f"Loss: {result['loss']}, Metrics: {result['metrics']}")
 """
 
-from .base import LossFn, LossReturn, LossOutput
-from .registry import (
-    resolve_loss,
-    register_loss,
-    get_registered_losses,
-    LOSS_REGISTRY,
-)
+from .base import LossFn, LossOutput, LossReturn
 from .builtin import (
-    token_cross_entropy_loss,
-    margin_ranking_loss,
     contrastive_loss,
+    margin_ranking_loss,
     mse_loss,
+    token_cross_entropy_loss,
+)
+from .registry import (
+    LOSS_REGISTRY,
+    get_registered_losses,
+    register_loss,
+    resolve_loss,
 )
 
 __all__ = [

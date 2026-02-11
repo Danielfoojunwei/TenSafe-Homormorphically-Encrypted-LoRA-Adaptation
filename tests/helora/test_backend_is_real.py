@@ -174,8 +174,9 @@ class TestBackendAuthenticity:
     def test_encrypt_decrypt_not_identity(self):
         """Test encrypt/decrypt involves actual computation."""
         try:
-            from crypto_backend.n2he_hexl import N2HEHEXLBackend
             import time
+
+            from crypto_backend.n2he_hexl import N2HEHEXLBackend
 
             backend = N2HEHEXLBackend()
             backend.setup_context()
@@ -247,7 +248,7 @@ class TestNoBypassPaths:
     def test_tensafe_helora_uses_real_backend(self):
         """Test that tensafe.he_lora module uses real backend."""
         try:
-            from tensafe.he_lora import get_backend, HEBackendNotAvailableError
+            from tensafe.he_lora import HEBackendNotAvailableError, get_backend
 
             backend = get_backend()
 

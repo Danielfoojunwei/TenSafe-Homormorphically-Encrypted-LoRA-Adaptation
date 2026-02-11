@@ -12,11 +12,10 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from .dashboard import DashboardService, get_dashboard_service
 from .models import (
-    AdminAuditLogList,
     SystemHealth,
     SystemMetrics,
     Tenant,

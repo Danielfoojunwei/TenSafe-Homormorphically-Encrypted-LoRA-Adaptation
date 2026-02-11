@@ -16,21 +16,18 @@ Protocol:
 import hashlib
 import logging
 import os
-import time
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 from cryptography.hazmat.primitives.asymmetric import x25519
-from cryptography.hazmat.primitives import serialization
 
 from ..tgsp.hpke_v03 import (
-    hpke_seal,
-    hpke_open,
     generate_keypair,
+    hpke_open,
+    hpke_seal,
     public_key_to_bytes,
-    private_key_to_bytes,
 )
 
 logger = logging.getLogger(__name__)

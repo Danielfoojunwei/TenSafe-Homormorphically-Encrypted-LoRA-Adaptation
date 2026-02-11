@@ -4,7 +4,6 @@ TenSafe API Playground routes.
 Serves an interactive web-based playground for testing the TenSafe API.
 """
 
-import os
 from pathlib import Path
 
 from fastapi import APIRouter

@@ -14,7 +14,7 @@ import ast
 import os
 import re
 from pathlib import Path
-from typing import List, Set, Tuple
+from typing import List, Tuple
 
 import pytest
 
@@ -209,8 +209,9 @@ class TestNoToyHE:
     def test_ciphertext_is_not_tensor(self):
         """Verify Ciphertext class is not a thin wrapper around tensors."""
         try:
-            from crypto_backend.n2he_hexl import CKKSCiphertext
             import numpy as np
+
+            from crypto_backend.n2he_hexl import CKKSCiphertext
 
             # Check that ciphertext doesn't expose raw tensor data
             assert not hasattr(CKKSCiphertext, 'data'), "Ciphertext exposes raw data attribute"
@@ -222,8 +223,9 @@ class TestNoToyHE:
     def test_encrypt_returns_real_ciphertext(self):
         """Verify encrypt() returns real ciphertext, not tensor."""
         try:
-            from crypto_backend.n2he_hexl import N2HEHEXLBackend
             import numpy as np
+
+            from crypto_backend.n2he_hexl import N2HEHEXLBackend
 
             backend = N2HEHEXLBackend()
             backend.setup_context()
@@ -260,8 +262,9 @@ class TestNoPlaintextBypass:
     def test_encrypt_fails_without_keys(self):
         """Encrypt should fail without proper key setup, not fall back to plaintext."""
         try:
-            from crypto_backend.n2he_hexl import N2HEHEXLBackend
             import numpy as np
+
+            from crypto_backend.n2he_hexl import N2HEHEXLBackend
 
             backend = N2HEHEXLBackend()
             # Don't call setup_context() or generate_keys()
@@ -276,7 +279,6 @@ class TestNoPlaintextBypass:
 
     def test_no_environment_variable_bypass(self):
         """Ensure no environment variables can bypass HE."""
-        import os
 
         # Save original env
         original_env = os.environ.copy()

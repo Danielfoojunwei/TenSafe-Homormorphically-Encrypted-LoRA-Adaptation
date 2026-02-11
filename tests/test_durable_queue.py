@@ -10,11 +10,9 @@ Verifies that:
 """
 
 import sys
-import time
 from datetime import datetime, timedelta
 
 import pytest
-
 
 # Skip all tests if sqlmodel not available
 sqlmodel = pytest.importorskip("sqlmodel")

@@ -20,7 +20,6 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from tensafe.rlvr.reward import (
-    RewardFn,
     get_registered_rewards,
     register_reward,
     resolve_reward,

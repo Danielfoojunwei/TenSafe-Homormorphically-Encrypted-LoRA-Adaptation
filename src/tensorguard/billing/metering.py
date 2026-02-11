@@ -35,15 +35,12 @@ Usage:
 """
 
 import asyncio
-import json
 import logging
 import os
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Optional
-from uuid import uuid4
 
 from .billing_models import (
     OperationType,

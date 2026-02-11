@@ -10,12 +10,10 @@ Provides secure memory management for cryptographic secrets:
 
 import ctypes
 import logging
-import mmap
-import os
 import secrets
 import sys
 from contextlib import contextmanager
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 logger = logging.getLogger(__name__)
 

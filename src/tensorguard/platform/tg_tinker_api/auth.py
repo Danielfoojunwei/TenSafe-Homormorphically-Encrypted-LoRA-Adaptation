@@ -12,7 +12,6 @@ In production:
 """
 
 import hashlib
-import hmac
 import logging
 import os
 import secrets
@@ -21,9 +20,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
-from fastapi import Header, HTTPException, Request, status
+from fastapi import Header, HTTPException, status
 from sqlmodel import JSON, Column, Field, Session, SQLModel, select
 
 logger = logging.getLogger(__name__)

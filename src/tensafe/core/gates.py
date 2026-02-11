@@ -35,15 +35,13 @@ Usage:
 from __future__ import annotations
 
 import functools
-import hashlib
 import logging
 import os
 import threading
-import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +59,7 @@ class GateStatus(Enum):
 class GateDeniedError(Exception):
     """Raised when a feature gate check fails."""
 
-    def __init__(self, gate: "FeatureGate", reason: str):
+    def __init__(self, gate: FeatureGate, reason: str):
         self.gate = gate
         self.reason = reason
         super().__init__(f"Gate '{gate.name}' denied: {reason}")

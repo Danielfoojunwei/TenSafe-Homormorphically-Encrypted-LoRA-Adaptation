@@ -6,13 +6,14 @@ creates incidents on failures.
 
 import asyncio
 import logging
+import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
-import threading
+from typing import Any, Callable, Dict, Optional, Tuple
+
 import httpx
 
 from .models import (
@@ -234,7 +235,7 @@ class TCPHealthChecker(ComponentHealthChecker):
                 component_id=self.component_id,
                 result=result,
                 response_time_ms=elapsed_ms,
-                message=f"TCP connection successful",
+                message="TCP connection successful",
                 metadata={"host": self.host, "port": self.port},
             )
 

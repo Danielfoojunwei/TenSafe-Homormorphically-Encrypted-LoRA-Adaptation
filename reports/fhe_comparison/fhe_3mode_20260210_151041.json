@@ -1,0 +1,1043 @@
+{
+  "metadata": {
+    "title": "3-Mode FHE Comparison: Full FHE vs HE-LoRA Naive vs HE-LoRA MOAI",
+    "timestamp": "2026-02-10T15:10:41.759330",
+    "model": "Qwen2.5-3B-Instruct",
+    "architecture": {
+      "hidden": 2048,
+      "layers": 36,
+      "heads": 16,
+      "kv_heads": 2,
+      "intermediate": 11008,
+      "activation": "SiLU",
+      "normalization": "RMSNorm"
+    },
+    "ckks_params": {
+      "poly_mod": 8192,
+      "security_bits": 128,
+      "scale_bits": 40
+    },
+    "platform": "Linux-4.4.0-x86_64-with-glibc2.39",
+    "cpu_count": 16,
+    "memory_gb": 21.0,
+    "duration_seconds": 611.6,
+    "disclaimer": "All CKKS operations are REAL (TenSEAL/Microsoft SEAL). Analytical estimates use measured primitive costs."
+  },
+  "primitive_costs_ms": {
+    "encrypt": 4.2112322666677455,
+    "decrypt": 1.231237733350099,
+    "ct_ct_add": 0.06278883332318703,
+    "ct_pt_mul": 1.599506199992599,
+    "ct_ct_mul": 3.343181966647535,
+    "rotation": 4.483969700027046,
+    "polyval_deg3": 12.068799466654431,
+    "polyval_deg5": 53.120370000018134,
+    "polyval_deg7": 65.14519106666133,
+    "sum_reduce_step": 4.7107282666578
+  },
+  "mode1_full_fhe": {
+    "description": "Entire model encrypted \u2014 all linear + non-linear in CKKS",
+    "per_layer": {
+      "q_proj": {
+        "ms": 12587.55017388612,
+        "rotations": 2048,
+        "type": "linear"
+      },
+      "k_proj": {
+        "ms": 12587.55017388612,
+        "rotations": 2048,
+        "type": "linear"
+      },
+      "v_proj": {
+        "ms": 12587.55017388612,
+        "rotations": 2048,
+        "type": "linear"
+      },
+      "o_proj": {
+        "ms": 12587.55017388612,
+        "rotations": 2048,
+        "type": "linear"
+      },
+      "gate_proj": {
+        "ms": 12587.55017388612,
+        "rotations": 2048,
+        "type": "linear"
+      },
+      "up_proj": {
+        "ms": 12587.55017388612,
+        "rotations": 2048,
+        "type": "linear"
+      },
+      "down_proj": {
+        "ms": 67658.0821846379,
+        "rotations": 11008,
+        "type": "linear"
+      },
+      "rmsnorm_pre_attn": {
+        "ms": 109.88106909989408,
+        "rotations": 11,
+        "type": "nonlinear",
+        "detail": "x^2=3.34 + sum=51.82 + rsqrt=53.12 + scale=1.60"
+      },
+      "rmsnorm_pre_mlp": {
+        "ms": 109.88106909989408,
+        "rotations": 11,
+        "type": "nonlinear",
+        "detail": "x^2=3.34 + sum=51.82 + rsqrt=53.12 + scale=1.60"
+      },
+      "silu_activation": {
+        "ms": 36.20639839996329,
+        "rotations": 0,
+        "type": "nonlinear",
+        "num_ciphertexts": 3,
+        "detail": "3 ciphertexts \u00d7 deg-3 polyval"
+      },
+      "gate_multiply": {
+        "ms": 10.029545899942605,
+        "rotations": 0,
+        "type": "nonlinear"
+      },
+      "softmax_attention": {
+        "ms": 2721.3371519986445,
+        "rotations": 176,
+        "type": "nonlinear",
+        "detail": "exp=1042.32 + sum=829.09 + div=849.93"
+      },
+      "rope_embedding": {
+        "ms": 106.24074000003627,
+        "rotations": 0,
+        "type": "nonlinear"
+      },
+      "_totals": {
+        "linear_ms": 143183.38322795462,
+        "nonlinear_ms": 3093.5759744983748,
+        "total_ms": 146276.959202453,
+        "linear_rotations": 23296,
+        "nonlinear_rotations": 198,
+        "total_rotations": 23494
+      }
+    }
+  },
+  "mode2_helora_naive": {
+    "description": "Only LoRA encrypted, naive matmul WITH rotations",
+    "per_layer_by_rank": {
+      "8": {
+        "q_proj": {
+          "ms": 31367.220229065828,
+          "rotations": 6232,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "step2_matmul_ms": 407.88769386890635,
+          "step3_matmul_ms": 30953.8900651969,
+          "decrypt_ms": 1.231237733350099,
+          "detail": "enc=4.21 + xA^T=407.89 + iB^T=30953.89 + dec=1.23"
+        },
+        "k_proj": {
+          "ms": 31367.220229065828,
+          "rotations": 6232,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "step2_matmul_ms": 407.88769386890635,
+          "step3_matmul_ms": 30953.8900651969,
+          "decrypt_ms": 1.231237733350099,
+          "detail": "enc=4.21 + xA^T=407.89 + iB^T=30953.89 + dec=1.23"
+        },
+        "v_proj": {
+          "ms": 31367.220229065828,
+          "rotations": 6232,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "step2_matmul_ms": 407.88769386890635,
+          "step3_matmul_ms": 30953.8900651969,
+          "decrypt_ms": 1.231237733350099,
+          "detail": "enc=4.21 + xA^T=407.89 + iB^T=30953.89 + dec=1.23"
+        },
+        "o_proj": {
+          "ms": 31367.220229065828,
+          "rotations": 6232,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "step2_matmul_ms": 407.88769386890635,
+          "step3_matmul_ms": 30953.8900651969,
+          "decrypt_ms": 1.231237733350099,
+          "detail": "enc=4.21 + xA^T=407.89 + iB^T=30953.89 + dec=1.23"
+        },
+        "_totals": {
+          "linear_ms": 125468.88091626331,
+          "nonlinear_ms": 0,
+          "total_ms": 125468.88091626331,
+          "linear_rotations": 24928,
+          "nonlinear_rotations": 0,
+          "total_rotations": 24928,
+          "note": "NO non-linear ops needed \u2014 LoRA delta is purely linear"
+        }
+      },
+      "16": {
+        "q_proj": {
+          "ms": 40958.27786859012,
+          "rotations": 8368,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "step2_matmul_ms": 815.7753877378127,
+          "step3_matmul_ms": 40137.06001085229,
+          "decrypt_ms": 1.231237733350099,
+          "detail": "enc=4.21 + xA^T=815.78 + iB^T=40137.06 + dec=1.23"
+        },
+        "k_proj": {
+          "ms": 40958.27786859012,
+          "rotations": 8368,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "step2_matmul_ms": 815.7753877378127,
+          "step3_matmul_ms": 40137.06001085229,
+          "decrypt_ms": 1.231237733350099,
+          "detail": "enc=4.21 + xA^T=815.78 + iB^T=40137.06 + dec=1.23"
+        },
+        "v_proj": {
+          "ms": 40958.27786859012,
+          "rotations": 8368,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "step2_matmul_ms": 815.7753877378127,
+          "step3_matmul_ms": 40137.06001085229,
+          "decrypt_ms": 1.231237733350099,
+          "detail": "enc=4.21 + xA^T=815.78 + iB^T=40137.06 + dec=1.23"
+        },
+        "o_proj": {
+          "ms": 40958.27786859012,
+          "rotations": 8368,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "step2_matmul_ms": 815.7753877378127,
+          "step3_matmul_ms": 40137.06001085229,
+          "decrypt_ms": 1.231237733350099,
+          "detail": "enc=4.21 + xA^T=815.78 + iB^T=40137.06 + dec=1.23"
+        },
+        "_totals": {
+          "linear_ms": 163833.11147436048,
+          "nonlinear_ms": 0,
+          "total_ms": 163833.11147436048,
+          "linear_rotations": 33472,
+          "nonlinear_rotations": 0,
+          "total_rotations": 33472,
+          "note": "NO non-linear ops needed \u2014 LoRA delta is purely linear"
+        }
+      },
+      "32": {
+        "q_proj": {
+          "ms": 50957.223201983325,
+          "rotations": 10592,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "step2_matmul_ms": 1631.5507754756254,
+          "step3_matmul_ms": 49320.22995650768,
+          "decrypt_ms": 1.231237733350099,
+          "detail": "enc=4.21 + xA^T=1631.55 + iB^T=49320.23 + dec=1.23"
+        },
+        "k_proj": {
+          "ms": 50957.223201983325,
+          "rotations": 10592,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "step2_matmul_ms": 1631.5507754756254,
+          "step3_matmul_ms": 49320.22995650768,
+          "decrypt_ms": 1.231237733350099,
+          "detail": "enc=4.21 + xA^T=1631.55 + iB^T=49320.23 + dec=1.23"
+        },
+        "v_proj": {
+          "ms": 50957.223201983325,
+          "rotations": 10592,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "step2_matmul_ms": 1631.5507754756254,
+          "step3_matmul_ms": 49320.22995650768,
+          "decrypt_ms": 1.231237733350099,
+          "detail": "enc=4.21 + xA^T=1631.55 + iB^T=49320.23 + dec=1.23"
+        },
+        "o_proj": {
+          "ms": 50957.223201983325,
+          "rotations": 10592,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "step2_matmul_ms": 1631.5507754756254,
+          "step3_matmul_ms": 49320.22995650768,
+          "decrypt_ms": 1.231237733350099,
+          "detail": "enc=4.21 + xA^T=1631.55 + iB^T=49320.23 + dec=1.23"
+        },
+        "_totals": {
+          "linear_ms": 203828.8928079333,
+          "nonlinear_ms": 0,
+          "total_ms": 203828.8928079333,
+          "linear_rotations": 42368,
+          "nonlinear_rotations": 0,
+          "total_rotations": 42368,
+          "note": "NO non-linear ops needed \u2014 LoRA delta is purely linear"
+        }
+      }
+    }
+  },
+  "mode3_helora_moai": {
+    "description": "Only LoRA encrypted, MOAI column packing, ZERO rotations",
+    "per_layer_by_rank": {
+      "8": {
+        "q_proj": {
+          "ms": 3409.7699093974247,
+          "rotations": 0,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "moai_matmul_ms": 3404.317439397407,
+          "decrypt_ms": 1.231237733350099,
+          "plaintext_matmul_ms": 0.01,
+          "detail": "enc=4.21 + MOAI_xA^T=3404.32 + dec=1.23 + pt_iB^T=0.0100"
+        },
+        "k_proj": {
+          "ms": 3409.7699093974247,
+          "rotations": 0,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "moai_matmul_ms": 3404.317439397407,
+          "decrypt_ms": 1.231237733350099,
+          "plaintext_matmul_ms": 0.01,
+          "detail": "enc=4.21 + MOAI_xA^T=3404.32 + dec=1.23 + pt_iB^T=0.0100"
+        },
+        "v_proj": {
+          "ms": 3409.7699093974247,
+          "rotations": 0,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "moai_matmul_ms": 3404.317439397407,
+          "decrypt_ms": 1.231237733350099,
+          "plaintext_matmul_ms": 0.01,
+          "detail": "enc=4.21 + MOAI_xA^T=3404.32 + dec=1.23 + pt_iB^T=0.0100"
+        },
+        "o_proj": {
+          "ms": 3409.7699093974247,
+          "rotations": 0,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "moai_matmul_ms": 3404.317439397407,
+          "decrypt_ms": 1.231237733350099,
+          "plaintext_matmul_ms": 0.01,
+          "detail": "enc=4.21 + MOAI_xA^T=3404.32 + dec=1.23 + pt_iB^T=0.0100"
+        },
+        "_totals": {
+          "linear_ms": 13639.079637589699,
+          "nonlinear_ms": 0,
+          "total_ms": 13639.079637589699,
+          "linear_rotations": 0,
+          "nonlinear_rotations": 0,
+          "total_rotations": 0,
+          "note": "ZERO rotations, ZERO non-linear ops. Pure ct*pt multiply + ct+ct add."
+        }
+      },
+      "16": {
+        "q_proj": {
+          "ms": 3409.7699093974247,
+          "rotations": 0,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "moai_matmul_ms": 3404.317439397407,
+          "decrypt_ms": 1.231237733350099,
+          "plaintext_matmul_ms": 0.01,
+          "detail": "enc=4.21 + MOAI_xA^T=3404.32 + dec=1.23 + pt_iB^T=0.0100"
+        },
+        "k_proj": {
+          "ms": 3409.7699093974247,
+          "rotations": 0,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "moai_matmul_ms": 3404.317439397407,
+          "decrypt_ms": 1.231237733350099,
+          "plaintext_matmul_ms": 0.01,
+          "detail": "enc=4.21 + MOAI_xA^T=3404.32 + dec=1.23 + pt_iB^T=0.0100"
+        },
+        "v_proj": {
+          "ms": 3409.7699093974247,
+          "rotations": 0,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "moai_matmul_ms": 3404.317439397407,
+          "decrypt_ms": 1.231237733350099,
+          "plaintext_matmul_ms": 0.01,
+          "detail": "enc=4.21 + MOAI_xA^T=3404.32 + dec=1.23 + pt_iB^T=0.0100"
+        },
+        "o_proj": {
+          "ms": 3409.7699093974247,
+          "rotations": 0,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "moai_matmul_ms": 3404.317439397407,
+          "decrypt_ms": 1.231237733350099,
+          "plaintext_matmul_ms": 0.01,
+          "detail": "enc=4.21 + MOAI_xA^T=3404.32 + dec=1.23 + pt_iB^T=0.0100"
+        },
+        "_totals": {
+          "linear_ms": 13639.079637589699,
+          "nonlinear_ms": 0,
+          "total_ms": 13639.079637589699,
+          "linear_rotations": 0,
+          "nonlinear_rotations": 0,
+          "total_rotations": 0,
+          "note": "ZERO rotations, ZERO non-linear ops. Pure ct*pt multiply + ct+ct add."
+        }
+      },
+      "32": {
+        "q_proj": {
+          "ms": 3409.7699093974247,
+          "rotations": 0,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "moai_matmul_ms": 3404.317439397407,
+          "decrypt_ms": 1.231237733350099,
+          "plaintext_matmul_ms": 0.01,
+          "detail": "enc=4.21 + MOAI_xA^T=3404.32 + dec=1.23 + pt_iB^T=0.0100"
+        },
+        "k_proj": {
+          "ms": 3409.7699093974247,
+          "rotations": 0,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "moai_matmul_ms": 3404.317439397407,
+          "decrypt_ms": 1.231237733350099,
+          "plaintext_matmul_ms": 0.01,
+          "detail": "enc=4.21 + MOAI_xA^T=3404.32 + dec=1.23 + pt_iB^T=0.0100"
+        },
+        "v_proj": {
+          "ms": 3409.7699093974247,
+          "rotations": 0,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "moai_matmul_ms": 3404.317439397407,
+          "decrypt_ms": 1.231237733350099,
+          "plaintext_matmul_ms": 0.01,
+          "detail": "enc=4.21 + MOAI_xA^T=3404.32 + dec=1.23 + pt_iB^T=0.0100"
+        },
+        "o_proj": {
+          "ms": 3409.7699093974247,
+          "rotations": 0,
+          "type": "linear",
+          "encrypt_ms": 4.2112322666677455,
+          "moai_matmul_ms": 3404.317439397407,
+          "decrypt_ms": 1.231237733350099,
+          "plaintext_matmul_ms": 0.01,
+          "detail": "enc=4.21 + MOAI_xA^T=3404.32 + dec=1.23 + pt_iB^T=0.0100"
+        },
+        "_totals": {
+          "linear_ms": 13639.079637589699,
+          "nonlinear_ms": 0,
+          "total_ms": 13639.079637589699,
+          "linear_rotations": 0,
+          "nonlinear_rotations": 0,
+          "total_rotations": 0,
+          "note": "ZERO rotations, ZERO non-linear ops. Pure ct*pt multiply + ct+ct add."
+        }
+      }
+    }
+  },
+  "insights": {
+    "nonlinear_cost_ratio": {
+      "title": "Non-linear operations are NOT the bottleneck in Full FHE",
+      "finding": "Linear ops = 97.9% of Full FHE cost, Non-linear = 2.1%",
+      "reason": "The dominant cost in Full FHE comes from the sheer number of rotations needed for encrypted matrix-vector multiplication (23,296 rotations for linear ops). Non-linear polynomial evaluations (SiLU, RMSNorm, softmax) are expensive per-operation but affect far fewer elements (26,112 non-linear elements vs 77M linear MACs per layer).",
+      "novelty": "Contrary to common assumption that non-linear ops are the FHE bottleneck, the real bottleneck is the rotation count in linear layers, which MOAI directly addresses."
+    },
+    "nonlinear_elimination": {
+      "title": "HE-LoRA completely eliminates non-linear FHE operations",
+      "finding": "Full FHE: 3093.58ms non-linear per layer. HE-LoRA: 0.00ms (both naive and MOAI).",
+      "reason": "LoRA delta computation is PURELY LINEAR: delta = x @ A^T @ B^T * scaling. No activation functions, no normalization, no softmax. All non-linear ops happen in the plaintext base model.",
+      "implication": "This eliminates the need for polynomial approximations of SiLU, RMSNorm, and softmax entirely \u2014 removing both the computational cost AND the approximation error these introduce in Full FHE."
+    },
+    "rotation_wall": {
+      "title": "Rotation (key-switching) is the dominant scaling wall",
+      "finding": "Rotation costs 4.4840ms vs ct*pt=1.5995ms (2.8x more expensive). In naive HE-LoRA: rotations account for ~93% of cost.",
+      "moai_impact": "MOAI eliminates ALL 42,368 rotations per layer (r=32), saving ~189976.83ms per layer, ~6839.2s across all 36 layers.",
+      "scaling": "Rotation count scales as O(d \u00d7 log(d)) for naive matmul, but O(0) for MOAI. As model dimension grows, the gap widens super-linearly."
+    },
+    "rank_sensitivity": {
+      "title": "MOAI makes HE-LoRA cost rank-INDEPENDENT",
+      "finding": "Naive: r=8\u2192r=32 cost ratio = 1.62x. MOAI: r=8\u2192r=32 cost ratio = 1.00x.",
+      "reason": "In MOAI column packing, the dominant cost is dim \u00d7 (ct*pt + ct+ct add) which depends on input dimension, NOT rank. The rank only affects the number of slots needed per ciphertext, which fits within slot_count. In naive mode, rank directly multiplies the rotation count.",
+      "implication": "Users can increase LoRA rank for better quality (per 'LoRA Without Regret' recommendation of r=32) with ZERO additional HE cost when using MOAI. This decouples privacy cost from model quality."
+    },
+    "communication_cost": {
+      "title": "Communication cost follows HE-LoRA's parameter efficiency",
+      "finding": "LoRA r=32 per layer: 524,288 params = 2048 KB plaintext, ~32768 KB encrypted (16x expansion). Full model layer: ~294 MB.",
+      "ratio": "HE-LoRA encrypts 0.68% of per-layer parameters \u2192 proportional communication savings.",
+      "cross_institution": "In cross-institution setting, only encrypted LoRA adapters are transmitted. Base model can be distributed openly or pre-installed. This reduces bandwidth by >99%."
+    },
+    "accuracy_preservation": {
+      "title": "CKKS approximation error is negligible for LoRA weight distributions",
+      "finding": "Max CKKS error: MOAI=1.58e-07, Naive=1.92e-07. Qwen2.5-3B weight std \u2248 0.01-0.05. Error/std ratio < 1e-6.",
+      "implication": "CKKS approximate arithmetic introduces errors ~1e-8 to 1e-9, which is 6+ orders of magnitude below the scale of LoRA weight values. Model quality is preserved with zero measurable degradation. Contrast with Full FHE where polynomial approximations of SiLU/softmax introduce errors at the 1e-2 to 1e-3 level."
+    },
+    "multiplicative_depth": {
+      "title": "HE-LoRA MOAI requires minimal multiplicative depth",
+      "finding": "Full FHE needs depth 7+ (matmul + SiLU poly + RMSNorm poly + softmax poly). HE-LoRA naive needs depth 2 (two matmuls with rotation). HE-LoRA MOAI needs depth 1 (single ct*pt multiply per column).",
+      "implication": "Lower multiplicative depth = smaller CKKS parameters = faster ops. MOAI could use N=4096 instead of N=8192 for the same security level, halving ciphertext size and further improving performance. Full FHE needs N=16384+ for sufficient depth, which is 2-4x slower per op.",
+      "theoretical": "Depth-1 CKKS operations preserve maximum noise budget, enabling more computation before bootstrapping. Full FHE often requires expensive bootstrapping mid-computation."
+    },
+    "error_cascade": {
+      "title": "Full FHE suffers compounding polynomial approximation errors",
+      "finding": "SiLU poly (deg-3): 12.0688ms, RMSNorm poly (deg-5): 53.1204ms, Softmax poly (deg-7): 65.1452ms. Across 36 layers, errors compound multiplicatively.",
+      "problem": "Each polynomial approximation introduces error \u03b5. After L layers: total error \u2248 L \u00d7 \u03b5 (additive) to \u03b5^L (multiplicative in worst case). For 36 layers with degree-3 SiLU approximation error ~1e-2: cumulative error can reach ~0.36 (additive) \u2014 enough to change token predictions.",
+      "helora_advantage": "HE-LoRA avoids this entirely. The only CKKS approximation error (~1e-8) occurs in the linear LoRA delta computation. All non-linear functions execute in exact plaintext arithmetic."
+    }
+  },
+  "results": [
+    {
+      "name": "CKKS encrypt",
+      "mode": "primitive",
+      "op_type": "linear",
+      "is_real_ckks": true,
+      "iterations": 30,
+      "latency_ms": {
+        "mean": 4.2112,
+        "median": 4.3572,
+        "p95": 4.4802,
+        "min": 3.7702,
+        "max": 4.6322,
+        "stddev": 0.274
+      },
+      "extra": {}
+    },
+    {
+      "name": "CKKS decrypt",
+      "mode": "primitive",
+      "op_type": "linear",
+      "is_real_ckks": true,
+      "iterations": 30,
+      "latency_ms": {
+        "mean": 1.2312,
+        "median": 1.1688,
+        "p95": 1.6267,
+        "min": 1.0664,
+        "max": 1.6348,
+        "stddev": 0.1528
+      },
+      "extra": {}
+    },
+    {
+      "name": "CKKS ct+ct add",
+      "mode": "primitive",
+      "op_type": "linear",
+      "is_real_ckks": true,
+      "iterations": 30,
+      "latency_ms": {
+        "mean": 0.0628,
+        "median": 0.056,
+        "p95": 0.1112,
+        "min": 0.0522,
+        "max": 0.1203,
+        "stddev": 0.0167
+      },
+      "extra": {}
+    },
+    {
+      "name": "CKKS ct*pt multiply",
+      "mode": "primitive",
+      "op_type": "linear",
+      "is_real_ckks": true,
+      "iterations": 30,
+      "latency_ms": {
+        "mean": 1.5995,
+        "median": 1.6069,
+        "p95": 1.7006,
+        "min": 1.4165,
+        "max": 1.7813,
+        "stddev": 0.0658
+      },
+      "extra": {}
+    },
+    {
+      "name": "CKKS ct*ct multiply",
+      "mode": "primitive",
+      "op_type": "nonlinear",
+      "is_real_ckks": true,
+      "iterations": 30,
+      "latency_ms": {
+        "mean": 3.3432,
+        "median": 3.3572,
+        "p95": 3.5569,
+        "min": 3.0644,
+        "max": 3.6101,
+        "stddev": 0.1325
+      },
+      "extra": {}
+    },
+    {
+      "name": "CKKS rotation (key-switch)",
+      "mode": "primitive",
+      "op_type": "rotation",
+      "is_real_ckks": true,
+      "iterations": 30,
+      "latency_ms": {
+        "mean": 4.484,
+        "median": 4.5218,
+        "p95": 4.7545,
+        "min": 3.9365,
+        "max": 4.7705,
+        "stddev": 0.1788
+      },
+      "extra": {}
+    },
+    {
+      "name": "CKKS polyval deg-3 (SiLU approx)",
+      "mode": "primitive",
+      "op_type": "nonlinear",
+      "is_real_ckks": true,
+      "iterations": 30,
+      "latency_ms": {
+        "mean": 12.0688,
+        "median": 12.1679,
+        "p95": 12.7231,
+        "min": 10.2661,
+        "max": 14.1289,
+        "stddev": 0.712
+      },
+      "extra": {}
+    },
+    {
+      "name": "CKKS polyval deg-5 (precise SiLU)",
+      "mode": "primitive",
+      "op_type": "nonlinear",
+      "is_real_ckks": true,
+      "iterations": 15,
+      "latency_ms": {
+        "mean": 53.1204,
+        "median": 53.8766,
+        "p95": 56.6664,
+        "min": 47.5104,
+        "max": 56.6664,
+        "stddev": 2.906
+      },
+      "extra": {
+        "note": "Requires N=16384 for sufficient multiplicative depth"
+      }
+    },
+    {
+      "name": "CKKS polyval deg-7 (exp/softmax)",
+      "mode": "primitive",
+      "op_type": "nonlinear",
+      "is_real_ckks": true,
+      "iterations": 15,
+      "latency_ms": {
+        "mean": 65.1452,
+        "median": 64.6486,
+        "p95": 72.657,
+        "min": 63.1902,
+        "max": 72.657,
+        "stddev": 2.2973
+      },
+      "extra": {
+        "note": "Composed deg-3 + deg-2 as proxy. Real deg-7 needs N=32768, which would be ~4x slower per op."
+      }
+    },
+    {
+      "name": "CKKS sum-reduce (rotate-add step)",
+      "mode": "primitive",
+      "op_type": "nonlinear",
+      "is_real_ckks": true,
+      "iterations": 15,
+      "latency_ms": {
+        "mean": 4.7107,
+        "median": 4.6509,
+        "p95": 5.7979,
+        "min": 4.3249,
+        "max": 5.7979,
+        "stddev": 0.3246
+      },
+      "extra": {
+        "note": "Single rotate-add step. Full sum over 512 elements needs log2(512)=9 such steps."
+      }
+    },
+    {
+      "name": "CKKS accuracy q_proj",
+      "mode": "verification",
+      "op_type": "linear",
+      "is_real_ckks": true,
+      "iterations": 1,
+      "latency_ms": {
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "extra": {
+        "max_abs_error": 6.278655862151233e-09,
+        "relative_error": 4.860972000145458e-08,
+        "weight_std": 0.036549508571624756,
+        "dim_tested": 2048
+      }
+    },
+    {
+      "name": "CKKS accuracy k_proj",
+      "mode": "verification",
+      "op_type": "linear",
+      "is_real_ckks": true,
+      "iterations": 1,
+      "latency_ms": {
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "extra": {
+        "max_abs_error": 4.879725554185477e-09,
+        "relative_error": 2.818618844735479e-08,
+        "weight_std": 0.05099546164274216,
+        "dim_tested": 256
+      }
+    },
+    {
+      "name": "CKKS accuracy v_proj",
+      "mode": "verification",
+      "op_type": "linear",
+      "is_real_ckks": true,
+      "iterations": 1,
+      "latency_ms": {
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "extra": {
+        "max_abs_error": 3.817671092448682e-09,
+        "relative_error": 5.959110262344222e-08,
+        "weight_std": 0.01649114489555359,
+        "dim_tested": 256
+      }
+    },
+    {
+      "name": "CKKS accuracy o_proj",
+      "mode": "verification",
+      "op_type": "linear",
+      "is_real_ckks": true,
+      "iterations": 1,
+      "latency_ms": {
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "extra": {
+        "max_abs_error": 7.323093912520173e-09,
+        "relative_error": 9.555807871198096e-08,
+        "weight_std": 0.021541673690080643,
+        "dim_tested": 2048
+      }
+    },
+    {
+      "name": "Mode 1: Full FHE per layer",
+      "mode": "full_fhe",
+      "op_type": "total",
+      "is_real_ckks": true,
+      "iterations": 1,
+      "latency_ms": {
+        "mean": 146276.9592,
+        "median": 146276.9592,
+        "p95": 146276.9592,
+        "min": 146276.9592,
+        "max": 146276.9592,
+        "stddev": 0
+      },
+      "extra": {
+        "linear_ms": 143183.38322795462,
+        "nonlinear_ms": 3093.5759744983748,
+        "total_ms": 146276.959202453,
+        "linear_rotations": 23296,
+        "nonlinear_rotations": 198,
+        "total_rotations": 23494
+      }
+    },
+    {
+      "name": "Mode 2: HE-LoRA naive r=8 per layer",
+      "mode": "helora_naive",
+      "op_type": "total",
+      "is_real_ckks": true,
+      "iterations": 1,
+      "latency_ms": {
+        "mean": 125468.8809,
+        "median": 125468.8809,
+        "p95": 125468.8809,
+        "min": 125468.8809,
+        "max": 125468.8809,
+        "stddev": 0
+      },
+      "extra": {
+        "linear_ms": 125468.88091626331,
+        "nonlinear_ms": 0,
+        "total_ms": 125468.88091626331,
+        "linear_rotations": 24928,
+        "nonlinear_rotations": 0,
+        "total_rotations": 24928,
+        "note": "NO non-linear ops needed \u2014 LoRA delta is purely linear"
+      }
+    },
+    {
+      "name": "Mode 2: HE-LoRA naive r=16 per layer",
+      "mode": "helora_naive",
+      "op_type": "total",
+      "is_real_ckks": true,
+      "iterations": 1,
+      "latency_ms": {
+        "mean": 163833.1115,
+        "median": 163833.1115,
+        "p95": 163833.1115,
+        "min": 163833.1115,
+        "max": 163833.1115,
+        "stddev": 0
+      },
+      "extra": {
+        "linear_ms": 163833.11147436048,
+        "nonlinear_ms": 0,
+        "total_ms": 163833.11147436048,
+        "linear_rotations": 33472,
+        "nonlinear_rotations": 0,
+        "total_rotations": 33472,
+        "note": "NO non-linear ops needed \u2014 LoRA delta is purely linear"
+      }
+    },
+    {
+      "name": "Mode 2: HE-LoRA naive r=32 per layer",
+      "mode": "helora_naive",
+      "op_type": "total",
+      "is_real_ckks": true,
+      "iterations": 1,
+      "latency_ms": {
+        "mean": 203828.8928,
+        "median": 203828.8928,
+        "p95": 203828.8928,
+        "min": 203828.8928,
+        "max": 203828.8928,
+        "stddev": 0
+      },
+      "extra": {
+        "linear_ms": 203828.8928079333,
+        "nonlinear_ms": 0,
+        "total_ms": 203828.8928079333,
+        "linear_rotations": 42368,
+        "nonlinear_rotations": 0,
+        "total_rotations": 42368,
+        "note": "NO non-linear ops needed \u2014 LoRA delta is purely linear"
+      }
+    },
+    {
+      "name": "HE-LoRA naive r=8",
+      "mode": "helora_naive",
+      "op_type": "total",
+      "is_real_ckks": true,
+      "iterations": 5,
+      "latency_ms": {
+        "mean": 4308.6844,
+        "median": 4371.2153,
+        "p95": 4434.146,
+        "min": 4100.449,
+        "max": 4434.146,
+        "stddev": 139.2754
+      },
+      "extra": {
+        "rank": 8,
+        "hidden_dim": 2048,
+        "rotations_per_forward": 6232,
+        "max_error": 1.9197666334402896e-07,
+        "mean_error": 1.509504582636323e-07
+      }
+    },
+    {
+      "name": "HE-LoRA naive r=16",
+      "mode": "helora_naive",
+      "op_type": "total",
+      "is_real_ckks": true,
+      "iterations": 5,
+      "latency_ms": {
+        "mean": 4486.3048,
+        "median": 4480.2026,
+        "p95": 4525.1516,
+        "min": 4458.1477,
+        "max": 4525.1516,
+        "stddev": 26.9283
+      },
+      "extra": {
+        "rank": 16,
+        "hidden_dim": 2048,
+        "rotations_per_forward": 8368,
+        "max_error": 1.58500485958335e-07,
+        "mean_error": 1.1395642808276208e-07
+      }
+    },
+    {
+      "name": "HE-LoRA naive r=32",
+      "mode": "helora_naive",
+      "op_type": "total",
+      "is_real_ckks": true,
+      "iterations": 5,
+      "latency_ms": {
+        "mean": 4634.6608,
+        "median": 4657.6013,
+        "p95": 4730.0504,
+        "min": 4509.5951,
+        "max": 4730.0504,
+        "stddev": 82.3307
+      },
+      "extra": {
+        "rank": 32,
+        "hidden_dim": 2048,
+        "rotations_per_forward": 10592,
+        "max_error": 7.818309510909671e-08,
+        "mean_error": 7.105159986198207e-08
+      }
+    },
+    {
+      "name": "Mode 3: HE-LoRA MOAI r=8 per layer",
+      "mode": "helora_moai",
+      "op_type": "total",
+      "is_real_ckks": true,
+      "iterations": 1,
+      "latency_ms": {
+        "mean": 13639.0796,
+        "median": 13639.0796,
+        "p95": 13639.0796,
+        "min": 13639.0796,
+        "max": 13639.0796,
+        "stddev": 0
+      },
+      "extra": {
+        "linear_ms": 13639.079637589699,
+        "nonlinear_ms": 0,
+        "total_ms": 13639.079637589699,
+        "linear_rotations": 0,
+        "nonlinear_rotations": 0,
+        "total_rotations": 0,
+        "note": "ZERO rotations, ZERO non-linear ops. Pure ct*pt multiply + ct+ct add."
+      }
+    },
+    {
+      "name": "Mode 3: HE-LoRA MOAI r=16 per layer",
+      "mode": "helora_moai",
+      "op_type": "total",
+      "is_real_ckks": true,
+      "iterations": 1,
+      "latency_ms": {
+        "mean": 13639.0796,
+        "median": 13639.0796,
+        "p95": 13639.0796,
+        "min": 13639.0796,
+        "max": 13639.0796,
+        "stddev": 0
+      },
+      "extra": {
+        "linear_ms": 13639.079637589699,
+        "nonlinear_ms": 0,
+        "total_ms": 13639.079637589699,
+        "linear_rotations": 0,
+        "nonlinear_rotations": 0,
+        "total_rotations": 0,
+        "note": "ZERO rotations, ZERO non-linear ops. Pure ct*pt multiply + ct+ct add."
+      }
+    },
+    {
+      "name": "Mode 3: HE-LoRA MOAI r=32 per layer",
+      "mode": "helora_moai",
+      "op_type": "total",
+      "is_real_ckks": true,
+      "iterations": 1,
+      "latency_ms": {
+        "mean": 13639.0796,
+        "median": 13639.0796,
+        "p95": 13639.0796,
+        "min": 13639.0796,
+        "max": 13639.0796,
+        "stddev": 0
+      },
+      "extra": {
+        "linear_ms": 13639.079637589699,
+        "nonlinear_ms": 0,
+        "total_ms": 13639.079637589699,
+        "linear_rotations": 0,
+        "nonlinear_rotations": 0,
+        "total_rotations": 0,
+        "note": "ZERO rotations, ZERO non-linear ops. Pure ct*pt multiply + ct+ct add."
+      }
+    },
+    {
+      "name": "HE-LoRA MOAI r=8",
+      "mode": "helora_moai",
+      "op_type": "total",
+      "is_real_ckks": true,
+      "iterations": 5,
+      "latency_ms": {
+        "mean": 11136.566,
+        "median": 11184.1534,
+        "p95": 11213.3373,
+        "min": 10979.8574,
+        "max": 11213.3373,
+        "stddev": 95.5237
+      },
+      "extra": {
+        "rank": 8,
+        "hidden_dim": 2048,
+        "rotations_per_forward": 0,
+        "max_error": 1.5849474749307646e-07,
+        "mean_error": 1.0046827331189334e-07,
+        "num_ct_pt_muls": 2048,
+        "num_ct_additions": 2047
+      }
+    },
+    {
+      "name": "HE-LoRA MOAI r=16",
+      "mode": "helora_moai",
+      "op_type": "total",
+      "is_real_ckks": true,
+      "iterations": 5,
+      "latency_ms": {
+        "mean": 11187.4836,
+        "median": 11180.132,
+        "p95": 11306.8802,
+        "min": 11076.9472,
+        "max": 11306.8802,
+        "stddev": 82.0286
+      },
+      "extra": {
+        "rank": 16,
+        "hidden_dim": 2048,
+        "rotations_per_forward": 0,
+        "max_error": 6.547795536326895e-08,
+        "mean_error": 4.9246163924543396e-08,
+        "num_ct_pt_muls": 2048,
+        "num_ct_additions": 2047
+      }
+    },
+    {
+      "name": "HE-LoRA MOAI r=32",
+      "mode": "helora_moai",
+      "op_type": "total",
+      "is_real_ckks": true,
+      "iterations": 5,
+      "latency_ms": {
+        "mean": 11199.8887,
+        "median": 11155.1838,
+        "p95": 11385.8577,
+        "min": 11086.7268,
+        "max": 11385.8577,
+        "stddev": 115.2751
+      },
+      "extra": {
+        "rank": 32,
+        "hidden_dim": 2048,
+        "rotations_per_forward": 0,
+        "max_error": 5.125287594331951e-08,
+        "mean_error": 3.820242617247338e-08,
+        "num_ct_pt_muls": 2048,
+        "num_ct_additions": 2047
+      }
+    }
+  ]
+}

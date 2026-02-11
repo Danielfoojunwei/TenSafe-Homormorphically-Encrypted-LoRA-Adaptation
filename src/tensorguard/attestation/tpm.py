@@ -4,23 +4,21 @@ TPM 2.0 Attestation Provider.
 Provides hardware-based attestation using TPM 2.0.
 """
 
-import base64
 import hashlib
 import logging
 import os
 import secrets
 import struct
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 from .provider import (
-    AttestationProvider,
     AttestationError,
-    AttestationVerificationError,
-    AttestationType,
+    AttestationProvider,
     AttestationQuote,
     AttestationResult,
+    AttestationType,
     QuoteType,
     VerificationPolicy,
 )

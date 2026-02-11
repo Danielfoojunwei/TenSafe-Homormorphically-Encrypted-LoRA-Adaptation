@@ -340,7 +340,7 @@ class KeyManager:
         Uses the KMS plugin system if configured, otherwise falls back to local.
         """
         try:
-            from tensorguard.kms import create_kms_provider, KMSConfig
+            from tensorguard.kms import KMSConfig, create_kms_provider
 
             config = KMSConfig.from_env()
             if config.provider != "local":
@@ -392,7 +392,7 @@ class KeyManager:
 
     def _get_dek_from_kms(self, tenant_id: str) -> Tuple[bytes, str]:
         """Get or create DEK using KMS provider."""
-        from tensorguard.kms import KeyType, KeyAlgorithm, KMSKeyNotFoundError
+        from tensorguard.kms import KeyAlgorithm, KeyType, KMSKeyNotFoundError
 
         dek_key_id = f"tenant-dek-{tenant_id}"
 

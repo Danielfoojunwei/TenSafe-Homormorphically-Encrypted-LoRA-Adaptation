@@ -5,17 +5,17 @@ Provides user behavior tracking, business metrics, and operational analytics
 for founders and operators.
 """
 
-from .events import EventTracker, EventType, track_event
-from .metrics import BusinessMetrics, UserMetrics, OperationalMetrics
 from .dashboards import FounderDashboard
+from .events import EventTracker, EventType, track_event
 from .health_checker import (
-    ProductHealthChecker,
+    CheckCategory,
     HealthCheck,
     HealthReport,
     HealthStatus,
-    CheckCategory,
+    ProductHealthChecker,
     run_health_check,
 )
+from .metrics import BusinessMetrics, OperationalMetrics, UserMetrics
 
 __all__ = [
     "EventTracker",

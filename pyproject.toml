@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tensafe"
-version = "4.0.0"
+version = "4.1.0"
 description = "TenSafe: Privacy-First ML Training API with Differential Privacy, Encrypted Storage, and Post-Quantum Security"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -83,6 +83,11 @@ bench = [
     "scikit-learn>=1.3.0,<2.0.0",
 ]
 
+# Homomorphic Encryption backends
+he = [
+    "tenseal>=0.3.0,<1.0.0",
+]
+
 # Federated Learning (optional heavy dependencies)
 fl = [
     "flwr>=1.5.0,<2.0.0",
@@ -96,11 +101,12 @@ dev = [
     "pytest-cov>=4.1.0",
     "ruff>=0.1.0",
     "mypy>=1.7.0",
+    "pip-audit>=2.6.0",
 ]
 
 # All dependencies
 all = [
-    "tensafe[pqc,server,bench,fl,dev]",
+    "tensafe[pqc,server,bench,he,fl,dev]",
 ]
 
 [project.urls]
@@ -113,7 +119,18 @@ tensafe-server = "tensorguard.platform.main:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["tensorguard*", "tg_tinker*", "tensafe*"]
+include = [
+    "tensorguard*",
+    "tg_tinker*",
+    "tensafe*",
+    "crypto_backend*",
+    "he_lora_microkernel*",
+]
+exclude = [
+    "he_lora_microkernel.tests*",
+    "he_lora_microkernel.integration_tests*",
+    "he_lora_microkernel.bench*",
+]
 
 [tool.setuptools.package-dir]
 "" = "src"
@@ -148,23 +165,38 @@ select = [
 ignore = [
     "E501",  # line too long
     "E701",  # Multiple statements on one line - guard clauses
-    "B008",  # function calls in argument defaults
+    "E712",  # Comparison to True/False - pre-existing patterns
+    "E721",  # Type comparison instead of isinstance - pre-existing
+    "E731",  # Lambda assignment - pre-existing patterns
+    "E741",  # Ambiguous variable name - pre-existing
+    "B006",  # Mutable default in function arg - pre-existing
     "B007",  # Loop control variable not used - enumerate patterns
-    "UP006", # Use `X` instead of `typing.X` - allow for Python 3.9 compat
-    "UP035", # `typing.X` is deprecated - allow for Python 3.9 compat
-    "E402",  # Module level import not at top - needed for conditional imports
+    "B008",  # function calls in argument defaults
+    "B017",  # assertRaises(Exception) too broad - pre-existing tests
+    "B028",  # No stacklevel in warnings.warn - pre-existing
     "B904",  # Within an `except` clause, raise with `from` - pre-existing
+    "C401",  # Unnecessary generator - pre-existing
+    "F401",  # Imported but unused - many intentional re-exports and availability checks
+    "F403",  # Star imports - needed for SQLModel registration
+    "F821",  # Undefined name - pre-existing (type annotations, conditional imports)
+    "F841",  # Local variable assigned but never used - pre-existing code
+    "UP006", # Use `X` instead of `typing.X` - allow for Python 3.9 compat
+    "UP007", # Use `X | Y` instead of `Union[X, Y]` - allow for Python 3.9 compat
+    "UP035", # `typing.X` is deprecated - allow for Python 3.9 compat
+    "UP045", # Use `X | None` instead of `Optional[X]` - allow for Python 3.9 compat
+    "E402",  # Module level import not at top - needed for conditional imports
     "W291",  # Trailing whitespace - auto-fixable
     "W293",  # Blank line contains whitespace - auto-fixable
-    "F403",  # Star imports - needed for SQLModel registration
-    "F841",  # Local variable assigned but never used - pre-existing code
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["tensorguard", "tg_tinker", "tensafe"]
+known-first-party = ["tensorguard", "tg_tinker", "tensafe", "crypto_backend", "he_lora_microkernel"]
 
 [tool.mypy]
 python_version = "3.9"
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true

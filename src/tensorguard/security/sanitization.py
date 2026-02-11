@@ -15,9 +15,8 @@ import logging
 import os
 import re
 import unicodedata
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Pattern, Set, Union
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, Pattern, Set
 from urllib.parse import urlparse
 
 from fastapi import HTTPException, Request, Response, status

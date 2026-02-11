@@ -39,11 +39,9 @@ Usage:
 from __future__ import annotations
 
 import logging
-import os
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
@@ -51,20 +49,16 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 import numpy as np
 
 from tensafe.core.config import (
+    HEMode,
     TenSafeConfig,
     TrainingMode,
-    HEMode,
     load_config,
     save_config,
 )
 from tensafe.core.gates import (
-    ProductionGates,
     production_check,
-    GateDeniedError,
 )
 from tensafe.core.registry import (
-    get_loss_registry,
-    get_reward_registry,
     resolve_function,
 )
 
@@ -815,7 +809,7 @@ class TenSafePipeline:
         cls,
         config_path: Union[str, Path],
         **overrides: Any,
-    ) -> "TenSafePipeline":
+    ) -> TenSafePipeline:
         """
         Create pipeline from configuration file.
 
@@ -870,7 +864,7 @@ class TenSafePipeline:
                 logger.error(f"Production error: {error}")
             raise ValueError(f"Production validation failed: {result.errors}")
 
-    def setup(self) -> "TenSafePipeline":
+    def setup(self) -> TenSafePipeline:
         """
         Set up the pipeline components.
 
@@ -926,7 +920,7 @@ class TenSafePipeline:
 
             # Apply LoRA if enabled
             if lora_config.enabled:
-                from peft import LoraConfig, get_peft_model, TaskType
+                from peft import LoraConfig, TaskType, get_peft_model
 
                 peft_config = LoraConfig(
                     r=lora_config.rank,
@@ -1022,7 +1016,7 @@ class TenSafePipeline:
         All HE modes now route through the single UnifiedHEBackend which
         uses the HE-LoRA Microkernel with MOAI optimizations.
         """
-        from tensafe.core.he_interface import get_backend, HEParams, HEBackendType
+        from tensafe.core.he_interface import HEBackendType, HEParams, get_backend
 
         he_config = self.config.he
 

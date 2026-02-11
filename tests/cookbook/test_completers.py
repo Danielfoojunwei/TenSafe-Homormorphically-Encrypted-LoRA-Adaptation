@@ -1,9 +1,9 @@
 """Tests for cookbook completers."""
 
+from typing import Any, List
+from unittest.mock import MagicMock
+
 import pytest
-import asyncio
-from unittest.mock import MagicMock, AsyncMock
-from typing import List, Any
 
 
 class MockSamplingClient:
@@ -171,7 +171,6 @@ class TestMockMessageCompleter:
     async def test_complete_with_custom_responses(self):
         """Test mock completer with custom responses."""
         from tensafe.cookbook.completers import MockMessageCompleter
-        from tensafe.cookbook.renderers.base import Message
 
         custom_responses = ["Response 1", "Response 2"]
         completer = MockMessageCompleter(responses=custom_responses)

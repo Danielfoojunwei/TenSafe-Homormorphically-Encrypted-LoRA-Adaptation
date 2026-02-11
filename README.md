@@ -19,6 +19,10 @@ TenSafe is a complete privacy-preserving machine learning platform that protects
 
 > **N2HE Security Note**: The system now strictly enforces the Zero-Rotation security contract. Simulation mode is security-compliant and matches the performance profile of native N2HE acceleration.
 
+> **Extraction on Linux/macOS**: If the ZIP was built on Windows it may contain backslash paths. Use `python scripts/unzip_normalized.py --zip TenSafe_v4.1.0_Final.zip --out ./tensafe_src` to extract with POSIX-normalized paths.
+
+> **Production Env Vars**: See [`OPERATIONS.md`](OPERATIONS.md) for required environment variables, safe defaults, and deployment instructions.
+
 ---
 
 ## Why TenSafe?
@@ -38,7 +42,7 @@ Training ML models on sensitive data creates significant security and compliance
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           TenSafe Platform v4.0                                  │
+│                          TenSafe Platform v4.1.0                                  │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                  │
 │  ┌───────────────────────────────────────────────────────────────────────────┐  │

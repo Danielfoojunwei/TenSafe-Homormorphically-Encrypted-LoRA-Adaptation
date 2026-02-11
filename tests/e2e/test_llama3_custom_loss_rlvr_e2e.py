@@ -121,7 +121,7 @@ class TestPluggableLossE2E:
     @pytest.mark.e2e
     def test_builtin_loss_registry(self):
         """Test that all built-in losses are registered and resolvable."""
-        from tensafe.training.losses import resolve_loss, get_registered_losses
+        from tensafe.training.losses import get_registered_losses, resolve_loss
 
         builtin_losses = ["token_ce", "margin_ranking", "contrastive", "mse"]
 
@@ -166,7 +166,6 @@ class TestPluggableLossE2E:
     @pytest.mark.e2e
     def test_loss_computation_performance(self):
         """Benchmark loss computation overhead."""
-        from tensafe.training.losses import resolve_loss
         from tensafe.training.losses.builtin import MockLossFunctions
 
         metrics = CustomLossMetrics()
@@ -263,7 +262,7 @@ class TestRLVRE2E:
     @pytest.mark.e2e
     def test_reward_registry(self):
         """Test reward function registration and resolution."""
-        from tensafe.rlvr import resolve_reward, register_reward, get_registered_rewards
+        from tensafe.rlvr import register_reward, resolve_reward
 
         # Test built-in rewards
         builtin_rewards = ["keyword_contains", "length_penalty", "format_compliance"]
@@ -286,8 +285,8 @@ class TestRLVRE2E:
     def test_reinforce_algorithm(self):
         """Test REINFORCE algorithm training loop."""
         from tensafe.rlvr import (
-            MockRolloutSampler,
             REINFORCE,
+            MockRolloutSampler,
             REINFORCEConfig,
             resolve_reward,
         )
@@ -375,8 +374,8 @@ class TestRLVRE2E:
     def test_ppo_algorithm(self):
         """Test PPO algorithm training loop."""
         from tensafe.rlvr import (
-            MockRolloutSampler,
             PPO,
+            MockRolloutSampler,
             PPOConfig,
             resolve_reward,
         )
@@ -465,8 +464,8 @@ class TestRLVRE2E:
     def test_custom_reward_function(self):
         """Test training with custom verifiable reward."""
         from tensafe.rlvr import (
-            MockRolloutSampler,
             REINFORCE,
+            MockRolloutSampler,
             REINFORCEConfig,
             register_reward,
             resolve_reward,
@@ -552,16 +551,16 @@ class TestCombinedE2E:
         3. PPO training
         4. Performance comparison
         """
-        from tensafe.training.losses import register_loss, resolve_loss
-        from tensafe.training.losses.builtin import MockLossFunctions
         from tensafe.rlvr import (
-            MockRolloutSampler,
-            REINFORCE,
-            REINFORCEConfig,
             PPO,
+            REINFORCE,
+            MockRolloutSampler,
             PPOConfig,
+            REINFORCEConfig,
             resolve_reward,
         )
+        from tensafe.training.losses import register_loss, resolve_loss
+        from tensafe.training.losses.builtin import MockLossFunctions
 
         results = {
             "timestamp": datetime.utcnow().isoformat(),

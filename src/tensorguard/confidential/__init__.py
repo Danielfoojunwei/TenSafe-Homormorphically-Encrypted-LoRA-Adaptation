@@ -8,9 +8,9 @@ Provides TEE-based confidential inference with:
 - Privacy receipts with cryptographic proof chain
 """
 
-from .session import ConfidentialSessionManager, ConfidentialSession
 from .middleware import ConfidentialInferenceMiddleware
 from .receipt import PrivacyReceipt, PrivacyReceiptGenerator
+from .session import ConfidentialSession, ConfidentialSessionManager
 
 __all__ = [
     "ConfidentialSessionManager",

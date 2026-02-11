@@ -2,15 +2,16 @@
 Tests for LoRA scaling methods.
 """
 
-import pytest
 import math
 
+import pytest
+
 from tensafe.lora_best_practices.scaling import (
-    StandardLoRAScaling,
     RSLoRAScaling,
+    StandardLoRAScaling,
     UnitScaling,
-    compute_lora_scaling,
     analyze_scaling_stability,
+    compute_lora_scaling,
     get_optimal_alpha,
     recommend_scaling_method,
 )

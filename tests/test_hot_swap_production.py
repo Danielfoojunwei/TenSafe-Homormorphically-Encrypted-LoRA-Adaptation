@@ -14,12 +14,8 @@ import json
 import os
 import struct
 import tempfile
-import time
-from datetime import datetime
-from typing import List, Optional
-from unittest.mock import MagicMock, patch
+from typing import List
 
-import numpy as np
 import pytest
 
 
@@ -459,8 +455,8 @@ class TestN2HEAdapterConfigMoE:
     def test_nonlinear_adapter_requires_tfhe(self):
         """Test that non-linear adapters require TFHE bootstrapping."""
         from he_lora_microkernel.n2he.adapter_config import (
-            N2HEAdapterConfig,
             AdapterType,
+            N2HEAdapterConfig,
             NonLinearActivation,
         )
 
@@ -477,8 +473,8 @@ class TestN2HEAdapterConfigMoE:
     def test_linear_adapter_rejects_tfhe(self):
         """Test that linear adapters reject TFHE (not needed)."""
         from he_lora_microkernel.n2he.adapter_config import (
-            N2HEAdapterConfig,
             AdapterType,
+            N2HEAdapterConfig,
         )
 
         with pytest.raises(ValueError) as exc_info:
@@ -495,11 +491,11 @@ class TestHotSwapIntegration:
 
     def test_full_hot_swap_flow_with_callbacks(self):
         """Test complete hot-swap flow with callback-based hook reconfiguration."""
-        from tensafe.tgsp_adapter_registry import TGSPAdapterRegistry
         from he_lora_microkernel.backend.base_adapter import (
             BatchConfig,
             get_adapter,
         )
+        from tensafe.tgsp_adapter_registry import TGSPAdapterRegistry
 
         # Setup registry
         registry = TGSPAdapterRegistry(enforce_tgsp=True)

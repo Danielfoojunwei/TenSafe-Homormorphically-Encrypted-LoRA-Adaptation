@@ -20,11 +20,11 @@ For language models:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..rollout import TrajectoryBatch
 from .base import AlgorithmConfig, RLAlgorithm, TrainingClient, UpdateResult
-from ..rollout import Trajectory, TrajectoryBatch
 
 logger = logging.getLogger(__name__)
 

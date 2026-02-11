@@ -6,14 +6,13 @@ Privacy-aware: respects user preferences and anonymizes where appropriate.
 """
 
 import hashlib
-import json
 import logging
 import threading
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
-from dataclasses import dataclass, field
-from enum import Enum
 from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

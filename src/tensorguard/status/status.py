@@ -4,8 +4,6 @@ Core service for component status tracking, incident management,
 maintenance scheduling, and uptime calculation.
 """
 
-import asyncio
-import json
 import logging
 import secrets
 import threading
@@ -730,7 +728,7 @@ class StatusService:
         if status == ComponentState.MAJOR_OUTAGE:
             return "Major system outage - Service disruption in progress"
         if status == ComponentState.MAINTENANCE:
-            return f"Scheduled maintenance in progress"
+            return "Scheduled maintenance in progress"
         return "System status unknown"
 
     # ==========================================================================

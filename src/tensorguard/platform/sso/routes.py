@@ -14,31 +14,29 @@ import json
 import logging
 import os
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Cookie, Depends, Form, HTTPException, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
-from ..auth import create_access_token, create_refresh_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from ...admin.permissions import AdminUserContext, require_super_admin
+from ..auth import ACCESS_TOKEN_EXPIRE_MINUTES, create_access_token, create_refresh_token
 from .models import (
     OIDCConfig,
     SAMLConfig,
-    SSOCallbackRequest,
     SSOCallbackResponse,
-    SSOLoginInitRequest,
     SSOLoginInitResponse,
     SSOProvider,
     SSOProviderInfo,
-    SSOProviderType,
     SSOProvidersListResponse,
+    SSOProviderType,
     SSOSession,
     SSOUser,
 )
 from .oidc import OIDCClient, OIDCError
-from .providers import ProviderRegistry, get_provider_registry
+from .providers import get_provider_registry
 from .saml import SAMLError, SAMLServiceProvider
 
 logger = logging.getLogger(__name__)
@@ -699,7 +697,7 @@ class CreateSSOProviderRequest(BaseModel):
     button_color: Optional[str] = None
     auto_create_users: bool = True
     default_role: str = "user"
-    allowed_domains: List[str] = []
+    allowed_domains: List[str] = Field(default_factory=list)
     session_duration_hours: int = 8
 
 

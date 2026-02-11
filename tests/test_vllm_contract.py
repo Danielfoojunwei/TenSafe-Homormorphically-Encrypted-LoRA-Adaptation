@@ -11,10 +11,9 @@ Verifies that:
 import os
 import sys
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import pytest
-
 
 # Try to import torch, but don't fail if not available
 try:

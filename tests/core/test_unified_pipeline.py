@@ -11,7 +11,6 @@ Tests the integrated functionality of:
 """
 
 import os
-import json
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, Iterator, List
@@ -72,10 +71,10 @@ class TestUnifiedConfiguration:
     def test_config_with_custom_values(self):
         """Test configuration with custom values."""
         from tensafe.core.config import (
-            TenSafeConfig,
-            ModelConfig,
-            TrainingConfig,
             LoRAConfig,
+            ModelConfig,
+            TenSafeConfig,
+            TrainingConfig,
             TrainingMode,
         )
 
@@ -105,7 +104,7 @@ class TestUnifiedConfiguration:
 
     def test_config_validation(self):
         """Test configuration validation."""
-        from tensafe.core.config import TenSafeConfig, LoRAConfig, DPConfig
+        from tensafe.core.config import DPConfig, LoRAConfig, TenSafeConfig
 
         config = TenSafeConfig(
             lora=LoRAConfig(rank=256),  # Very high rank
@@ -137,8 +136,8 @@ class TestUnifiedConfiguration:
             TenSafeConfig,
             TrainingConfig,
             TrainingMode,
-            save_config,
             load_config,
+            save_config,
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -155,7 +154,7 @@ class TestUnifiedConfiguration:
 
     def test_create_default_config(self):
         """Test the create_default_config helper."""
-        from tensafe.core.config import create_default_config, TrainingMode, HEMode
+        from tensafe.core.config import HEMode, TrainingMode, create_default_config
 
         config = create_default_config(
             mode=TrainingMode.RLVR,
@@ -215,7 +214,7 @@ class TestProductionGates:
 
     def test_production_gates_toy_he(self):
         """Test the TOY_HE production gate."""
-        from tensafe.core.gates import ProductionGates, GateStatus
+        from tensafe.core.gates import GateStatus, ProductionGates
 
         # Should be allowed in test env with TENSAFE_TOY_HE=1
         status = ProductionGates.TOY_HE.check()
@@ -223,7 +222,7 @@ class TestProductionGates:
 
     def test_require_gate_decorator(self):
         """Test the require_gate decorator."""
-        from tensafe.core.gates import FeatureGate, require_gate, GateDeniedError
+        from tensafe.core.gates import FeatureGate, GateDeniedError, require_gate
 
         gate = FeatureGate(
             name="required_gate",
@@ -239,8 +238,8 @@ class TestProductionGates:
 
     def test_production_check(self):
         """Test comprehensive production check."""
+        from tensafe.core.config import HEConfig, HEMode, TenSafeConfig
         from tensafe.core.gates import production_check
-        from tensafe.core.config import TenSafeConfig, HEConfig, HEMode
 
         # Valid config
         config = TenSafeConfig()
@@ -279,7 +278,7 @@ class TestFunctionRegistry:
 
     def test_loss_resolution_by_name(self):
         """Test resolving loss function by name."""
-        from tensafe.core.registry import get_loss_registry, resolve_function
+        from tensafe.core.registry import resolve_function
 
         loss_fn = resolve_function("token_ce", registry="loss")
         assert callable(loss_fn)
@@ -328,7 +327,7 @@ class TestHEBackendInterface:
 
     def test_toy_backend_creation(self):
         """Test creating toy HE backend."""
-        from tensafe.core.he_interface import ToyHEBackend, HEParams
+        from tensafe.core.he_interface import HEParams, ToyHEBackend
 
         backend = ToyHEBackend(HEParams())
         backend.setup()
@@ -338,7 +337,7 @@ class TestHEBackendInterface:
 
     def test_toy_backend_encrypt_decrypt(self):
         """Test encrypt/decrypt with toy backend."""
-        from tensafe.core.he_interface import ToyHEBackend, HEParams
+        from tensafe.core.he_interface import HEParams, ToyHEBackend
 
         backend = ToyHEBackend(HEParams())
         backend.setup()
@@ -351,7 +350,7 @@ class TestHEBackendInterface:
 
     def test_toy_backend_lora_delta(self):
         """Test LoRA delta computation with toy backend."""
-        from tensafe.core.he_interface import ToyHEBackend, HEParams
+        from tensafe.core.he_interface import HEParams, ToyHEBackend
 
         backend = ToyHEBackend(HEParams())
         backend.setup()
@@ -371,7 +370,7 @@ class TestHEBackendInterface:
 
     def test_get_backend_auto(self):
         """Test auto-selecting backend."""
-        from tensafe.core.he_interface import get_backend, HEBackendType
+        from tensafe.core.he_interface import HEBackendType, get_backend
 
         backend = get_backend(HEBackendType.AUTO)
         assert backend.is_setup
@@ -397,7 +396,7 @@ class TestUnifiedPipeline:
     def test_pipeline_creation(self):
         """Test creating a pipeline."""
         from tensafe.core.config import TenSafeConfig
-        from tensafe.core.pipeline import TenSafePipeline, PipelineState
+        from tensafe.core.pipeline import PipelineState, TenSafePipeline
 
         config = TenSafeConfig()
         pipeline = TenSafePipeline(config, validate_production=False)
@@ -407,7 +406,7 @@ class TestUnifiedPipeline:
     def test_pipeline_setup(self):
         """Test pipeline setup."""
         from tensafe.core.config import TenSafeConfig
-        from tensafe.core.pipeline import TenSafePipeline, PipelineState
+        from tensafe.core.pipeline import TenSafePipeline
 
         config = TenSafeConfig()
         pipeline = TenSafePipeline(config, validate_production=False)
@@ -418,7 +417,7 @@ class TestUnifiedPipeline:
     def test_pipeline_sft_training(self):
         """Test SFT training with pipeline."""
         from tensafe.core.config import TenSafeConfig, TrainingConfig
-        from tensafe.core.pipeline import TenSafePipeline, PipelineState
+        from tensafe.core.pipeline import PipelineState, TenSafePipeline
 
         config = TenSafeConfig(
             training=TrainingConfig(total_steps=10, log_interval=5),
@@ -452,7 +451,7 @@ class TestUnifiedPipeline:
     def test_pipeline_callbacks(self):
         """Test pipeline event callbacks."""
         from tensafe.core.config import TenSafeConfig, TrainingConfig
-        from tensafe.core.pipeline import TenSafePipeline, PipelineEvent
+        from tensafe.core.pipeline import PipelineEvent, TenSafePipeline
 
         events_received = []
 
@@ -497,14 +496,14 @@ class TestUnifiedInference:
 
     def test_inference_creation(self):
         """Test creating inference engine."""
-        from tensafe.core.inference import TenSafeInference, InferenceMode
+        from tensafe.core.inference import InferenceMode, TenSafeInference
 
         inference = TenSafeInference(mode=InferenceMode.PLAINTEXT)
         assert inference._mode == InferenceMode.PLAINTEXT
 
     def test_inference_forward_no_lora(self):
         """Test forward pass without LoRA."""
-        from tensafe.core.inference import TenSafeInference, InferenceMode
+        from tensafe.core.inference import InferenceMode, TenSafeInference
 
         inference = TenSafeInference(mode=InferenceMode.NONE)
 
@@ -515,7 +514,7 @@ class TestUnifiedInference:
 
     def test_inference_forward_plaintext_lora(self):
         """Test forward pass with plaintext LoRA."""
-        from tensafe.core.inference import TenSafeInference, InferenceMode
+        from tensafe.core.inference import InferenceMode, TenSafeInference
 
         inference = TenSafeInference(mode=InferenceMode.PLAINTEXT)
 
@@ -532,7 +531,7 @@ class TestUnifiedInference:
 
     def test_inference_forward_he_lora(self):
         """Test forward pass with HE LoRA."""
-        from tensafe.core.inference import TenSafeInference, InferenceMode
+        from tensafe.core.inference import InferenceMode, TenSafeInference
 
         # Disable TGSP enforcement for unit testing HE forward path
         inference = TenSafeInference(mode=InferenceMode.HE_ONLY, enforce_tgsp=False)
@@ -658,11 +657,10 @@ class TestIntegration:
         from tensafe.core.config import (
             TenSafeConfig,
             TrainingConfig,
-            save_config,
             load_config,
+            save_config,
         )
         from tensafe.core.pipeline import TenSafePipeline
-        from tensafe.core.inference import TenSafeInference
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create and save config
@@ -689,9 +687,9 @@ class TestIntegration:
     def test_full_rlvr_workflow(self):
         """Test complete RLVR workflow."""
         from tensafe.core.config import (
+            RLVRConfig,
             TenSafeConfig,
             TrainingConfig,
-            RLVRConfig,
             TrainingMode,
         )
         from tensafe.core.pipeline import TenSafePipeline
@@ -716,8 +714,8 @@ class TestIntegration:
 
     def test_he_integration(self):
         """Test HE integration in pipeline."""
-        from tensafe.core.config import TenSafeConfig, HEConfig, HEMode
-        from tensafe.core.he_interface import get_backend, HEBackendType
+        from tensafe.core.config import HEConfig, HEMode, TenSafeConfig
+        from tensafe.core.he_interface import HEBackendType, get_backend
 
         config = TenSafeConfig(
             he=HEConfig(mode=HEMode.TOY),

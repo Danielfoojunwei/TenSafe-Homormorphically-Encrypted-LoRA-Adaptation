@@ -7,8 +7,8 @@ Provides comprehensive observability through OpenTelemetry:
 - Privacy-aware: Redacts sensitive data, tracks privacy budget
 """
 
-from .setup import setup_observability, TenSafeMetrics
 from .middleware import TenSafeTracingMiddleware
+from .setup import TenSafeMetrics, setup_observability
 
 __all__ = [
     "setup_observability",

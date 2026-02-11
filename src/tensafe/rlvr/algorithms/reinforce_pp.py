@@ -20,8 +20,8 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from .base import AlgorithmConfig, RLAlgorithm, TrainingClient, UpdateResult
 from ..rollout import Trajectory, TrajectoryBatch
+from .base import AlgorithmConfig, RLAlgorithm, TrainingClient, UpdateResult
 
 logger = logging.getLogger(__name__)
 

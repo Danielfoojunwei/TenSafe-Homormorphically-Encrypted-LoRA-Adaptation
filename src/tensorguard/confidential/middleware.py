@@ -25,7 +25,6 @@ Envelope format (response):
 
 import json
 import logging
-import time
 from typing import Any, Dict, Optional
 
 from cryptography.hazmat.primitives.asymmetric import x25519

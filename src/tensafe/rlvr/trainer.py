@@ -13,19 +13,19 @@ from __future__ import annotations
 import logging
 import random
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol
 
-from .config import RLVRConfig
-from .rollout import MockRolloutSampler, RolloutSampler, Trajectory, TrajectoryBatch
-from .reward import RewardFn, resolve_reward
-from .buffers import RolloutCollector, TrajectoryBuffer
-from .algorithms.base import AlgorithmConfig, RLAlgorithm, UpdateResult
+from .algorithms.base import RLAlgorithm
+from .algorithms.grpo import GRPO, GRPOConfig
+from .algorithms.ppo import PPO, PPOConfig
 from .algorithms.reinforce import REINFORCE, REINFORCEConfig
 from .algorithms.reinforce_pp import REINFORCEPP, REINFORCEPPConfig
-from .algorithms.ppo import PPO, PPOConfig
-from .algorithms.grpo import GRPO, GRPOConfig
 from .algorithms.rloo import RLOO, RLOOConfig
+from .buffers import RolloutCollector, TrajectoryBuffer
+from .config import RLVRConfig
+from .reward import RewardFn, resolve_reward
+from .rollout import MockRolloutSampler, RolloutSampler, TrajectoryBatch
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +202,7 @@ class RLVRTrainer:
         # Initialize micro-batch accumulator (if enabled)
         self._micro_batcher = None
         if self.config.micro_batch_size > 0:
-            from .micro_batch import MicroBatchConfig, GradientAccumulator, DPAwareMicroBatcher
+            from .micro_batch import DPAwareMicroBatcher, GradientAccumulator, MicroBatchConfig
 
             mb_config = MicroBatchConfig(
                 micro_batch_size=self.config.micro_batch_size,

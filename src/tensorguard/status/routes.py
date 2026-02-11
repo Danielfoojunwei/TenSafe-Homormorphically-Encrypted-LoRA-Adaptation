@@ -7,9 +7,8 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from .models import (
     ComponentState,
@@ -22,9 +21,8 @@ from .models import (
     MaintenanceWindow,
     StatusSummaryResponse,
     SubscribeRequest,
-    SystemStatus,
-    UptimeMetrics,
     UpdateIncidentRequest,
+    UptimeMetrics,
 )
 from .status import StatusService, get_status_service
 

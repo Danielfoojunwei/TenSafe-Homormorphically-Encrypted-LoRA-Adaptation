@@ -36,10 +36,10 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, Literal
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
 
@@ -82,7 +82,7 @@ class HEMode(str, Enum):
     N2HE_HEXL = "n2he_hexl"  # DEPRECATED: Maps to PRODUCTION
 
     @classmethod
-    def resolve(cls, mode: "HEMode") -> "HEMode":
+    def resolve(cls, mode: HEMode) -> HEMode:
         """
         Resolve legacy modes to their modern equivalents.
 
@@ -584,7 +584,7 @@ class TenSafeConfig:
         return convert(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TenSafeConfig":
+    def from_dict(cls, data: Dict[str, Any]) -> TenSafeConfig:
         """Create from dictionary."""
         # Parse nested configs
         model = ModelConfig(**data.get("model", {})) if "model" in data else ModelConfig()

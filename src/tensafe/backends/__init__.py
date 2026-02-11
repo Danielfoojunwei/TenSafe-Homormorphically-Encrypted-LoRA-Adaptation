@@ -10,15 +10,14 @@ All production code paths use these interfaces.
 """
 
 from tensafe.backends.ml_backend import (
-    MLBackendInterface,
-    MLBackendConfig,
     ForwardBackwardResult,
+    MLBackendConfig,
+    MLBackendInterface,
     OptimStepResult,
     SampleResult,
     get_ml_backend,
     list_available_ml_backends,
 )
-
 from tensafe.backends.registry import (
     BackendRegistry,
     register_ml_backend,

@@ -12,10 +12,10 @@ Key research findings implemented:
 6. LoRA+ for asymmetric learning rates
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import List, Optional, Dict, Any, Union
 import math
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class LoRAScalingMethod(Enum):
@@ -264,9 +264,9 @@ class LoRABestPracticesConfig:
         if not 0 <= self.dropout < 1:
             raise ValueError(f"dropout must be in [0, 1), got {self.dropout}")
         if self.learning_rate <= 0:
-            raise ValueError(f"learning_rate must be positive")
+            raise ValueError("learning_rate must be positive")
         if self.lora_plus_ratio <= 0:
-            raise ValueError(f"lora_plus_ratio must be positive")
+            raise ValueError("lora_plus_ratio must be positive")
         if not self.target_modules:
             raise ValueError("target_modules cannot be empty")
 

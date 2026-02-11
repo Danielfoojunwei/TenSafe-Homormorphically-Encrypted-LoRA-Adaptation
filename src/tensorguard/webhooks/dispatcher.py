@@ -19,12 +19,11 @@ import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from queue import Empty, PriorityQueue
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
-from .models import DeliveryStatus, Webhook, WebhookDelivery, WebhookEventType
 from .webhooks import WebhookPayload, WebhookService, get_webhook_service
 
 logger = logging.getLogger(__name__)

@@ -7,11 +7,11 @@ Provides experiment tracking with privacy-aware logging:
 - Supports artifact logging (metadata only for privacy)
 """
 
-from typing import Optional, Dict, Any, List
-from dataclasses import dataclass
 import logging
-import time
 import os
+import time
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
