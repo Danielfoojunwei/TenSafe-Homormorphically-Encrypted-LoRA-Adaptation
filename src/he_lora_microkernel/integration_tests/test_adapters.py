@@ -12,6 +12,7 @@ from he_lora_microkernel.backend.base_adapter import (
     InsertionPoint,
     LoRATargets,
     get_adapter,
+    list_available_adapters,
 )
 
 
@@ -22,7 +23,6 @@ def batch_config():
     return BatchConfig(
         max_batch_size=4,
         max_context_length=2048,
-        max_generation_length=512,
     )
 
 
@@ -41,13 +41,13 @@ class TestVLLMAdapter:
 
     def test_adapter_registration(self):
         """Test vLLM adapter is registered."""
-        adapter_cls = get_adapter("vllm")
-        assert adapter_cls is not None
+        available = list_available_adapters()
+        assert "vllm" in available
 
     def test_mock_initialization(self, batch_config):
         """Test adapter initializes in mock mode."""
-        adapter_cls = get_adapter("vllm")
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            "vllm",
             model_id="meta-llama/Llama-2-7b-hf",
             batch_config=batch_config,
         )
@@ -61,10 +61,11 @@ class TestVLLMAdapter:
 
     def test_prefill(self, batch_config):
         """Test prefill phase."""
+        pytest.importorskip("torch")
         import torch
 
-        adapter_cls = get_adapter("vllm")
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            "vllm",
             model_id="meta-llama/Llama-2-7b-hf",
             batch_config=batch_config,
         )
@@ -77,10 +78,11 @@ class TestVLLMAdapter:
 
     def test_decode_step(self, batch_config):
         """Test decode step."""
+        pytest.importorskip("torch")
         import torch
 
-        adapter_cls = get_adapter("vllm")
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            "vllm",
             model_id="meta-llama/Llama-2-7b-hf",
             batch_config=batch_config,
         )
@@ -98,8 +100,8 @@ class TestVLLMAdapter:
 
     def test_insertion_config(self, batch_config, insertion_config):
         """Test insertion point configuration."""
-        adapter_cls = get_adapter("vllm")
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            "vllm",
             model_id="meta-llama/Llama-2-7b-hf",
             batch_config=batch_config,
         )
@@ -111,10 +113,11 @@ class TestVLLMAdapter:
 
     def test_delta_callback(self, batch_config, insertion_config):
         """Test delta callback mechanism."""
+        pytest.importorskip("torch")
         import torch
 
-        adapter_cls = get_adapter("vllm")
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            "vllm",
             model_id="meta-llama/Llama-2-7b-hf",
             batch_config=batch_config,
         )
@@ -141,8 +144,8 @@ class TestVLLMAdapter:
 
     def test_shutdown(self, batch_config):
         """Test adapter shutdown."""
-        adapter_cls = get_adapter("vllm")
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            "vllm",
             model_id="meta-llama/Llama-2-7b-hf",
             batch_config=batch_config,
         )
@@ -157,13 +160,13 @@ class TestTensorRTLLMAdapter:
 
     def test_adapter_registration(self):
         """Test TensorRT-LLM adapter is registered."""
-        adapter_cls = get_adapter("tensorrt_llm")
-        assert adapter_cls is not None
+        available = list_available_adapters()
+        assert "tensorrt_llm" in available
 
     def test_mock_initialization(self, batch_config):
         """Test adapter initializes in mock mode."""
-        adapter_cls = get_adapter("tensorrt_llm")
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            "tensorrt_llm",
             model_id="meta-llama/Llama-2-7b-hf",
             batch_config=batch_config,
         )
@@ -176,8 +179,8 @@ class TestTensorRTLLMAdapter:
 
     def test_plugin_creation(self, batch_config, insertion_config):
         """Test plugin creation for projections."""
-        adapter_cls = get_adapter("tensorrt_llm")
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            "tensorrt_llm",
             model_id="meta-llama/Llama-2-7b-hf",
             batch_config=batch_config,
         )
@@ -191,13 +194,13 @@ class TestTensorRTLLMAdapter:
 
     def test_hybrid_mode(self, batch_config):
         """Test hybrid mode execution."""
+        pytest.importorskip("torch")
         import torch
 
-        adapter_cls = get_adapter("tensorrt_llm")
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            "tensorrt_llm",
             model_id="meta-llama/Llama-2-7b-hf",
             batch_config=batch_config,
-            use_hybrid_mode=True,
         )
         adapter.init()
 
@@ -214,13 +217,13 @@ class TestSGLangAdapter:
 
     def test_adapter_registration(self):
         """Test SGLang adapter is registered."""
-        adapter_cls = get_adapter("sglang")
-        assert adapter_cls is not None
+        available = list_available_adapters()
+        assert "sglang" in available
 
     def test_mock_initialization(self, batch_config):
         """Test adapter initializes in mock mode."""
-        adapter_cls = get_adapter("sglang")
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            "sglang",
             model_id="meta-llama/Llama-2-7b-hf",
             batch_config=batch_config,
         )
@@ -233,8 +236,8 @@ class TestSGLangAdapter:
 
     def test_hook_registry(self, batch_config, insertion_config):
         """Test hook registry management."""
-        adapter_cls = get_adapter("sglang")
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            "sglang",
             model_id="meta-llama/Llama-2-7b-hf",
             batch_config=batch_config,
         )
@@ -248,8 +251,8 @@ class TestSGLangAdapter:
 
     def test_request_management(self, batch_config):
         """Test request lifecycle management."""
-        adapter_cls = get_adapter("sglang")
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            "sglang",
             model_id="meta-llama/Llama-2-7b-hf",
             batch_config=batch_config,
         )
@@ -270,10 +273,11 @@ class TestAdapterInteroperability:
     @pytest.mark.parametrize("adapter_name", ["vllm", "tensorrt_llm", "sglang"])
     def test_common_interface(self, adapter_name, batch_config, insertion_config):
         """Test all adapters implement common interface."""
+        pytest.importorskip("torch")
         import torch
 
-        adapter_cls = get_adapter(adapter_name)
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            adapter_name,
             model_id="test-model",
             batch_config=batch_config,
         )
@@ -306,8 +310,8 @@ class TestAdapterInteroperability:
     @pytest.mark.parametrize("adapter_name", ["vllm", "tensorrt_llm", "sglang"])
     def test_layer_selection(self, adapter_name, batch_config):
         """Test layer selection works across adapters."""
-        adapter_cls = get_adapter(adapter_name)
-        adapter = adapter_cls(
+        adapter = get_adapter(
+            adapter_name,
             model_id="test-model",
             batch_config=batch_config,
         )

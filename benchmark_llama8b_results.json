@@ -1,0 +1,831 @@
+{
+  "model": "Llama-8B",
+  "config": {
+    "hidden_size": 4096,
+    "num_layers": 32,
+    "intermediate_size": 14336
+  },
+  "lora_without_regret_params": {
+    "ranks": [
+      16,
+      32,
+      64
+    ],
+    "alpha": "2 * rank",
+    "targets": "all"
+  },
+  "approaches": [
+    {
+      "approach": "full_he",
+      "rank": 0,
+      "batch_size": 1,
+      "throughput": {
+        "tok_per_s": 0.0,
+        "aggregate_tok_per_s": 0.0,
+        "ms_per_token": 1677744.4
+      },
+      "latency_ms": {
+        "total": 1677744.4,
+        "encrypt": 0.2,
+        "compute": 1677744.0,
+        "decrypt": 0.2
+      },
+      "operations_per_token": {
+        "rotations": 1572864,
+        "keyswitches": 1572864,
+        "rescales": 448,
+        "ct_ct_muls": 131072,
+        "ct_pt_muls": 0
+      },
+      "memory_mb": 3801088.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 96
+    },
+    {
+      "approach": "normal_helora",
+      "rank": 16,
+      "batch_size": 1,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 0.18,
+        "ms_per_token": 5443.6
+      },
+      "latency_ms": {
+        "total": 5443.6,
+        "encrypt": 0.2,
+        "compute": 5443.2,
+        "decrypt": 0.2
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 14336.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "normal_helora",
+      "rank": 16,
+      "batch_size": 4,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 0.73,
+        "ms_per_token": 5444.0
+      },
+      "latency_ms": {
+        "total": 5444.0,
+        "encrypt": 0.4,
+        "compute": 5443.2,
+        "decrypt": 0.4
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 14336.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "normal_helora",
+      "rank": 16,
+      "batch_size": 8,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 1.47,
+        "ms_per_token": 5444.8
+      },
+      "latency_ms": {
+        "total": 5444.8,
+        "encrypt": 0.8,
+        "compute": 5443.2,
+        "decrypt": 0.8
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 14336.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "normal_helora",
+      "rank": 32,
+      "batch_size": 1,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 0.18,
+        "ms_per_token": 5443.6
+      },
+      "latency_ms": {
+        "total": 5443.6,
+        "encrypt": 0.2,
+        "compute": 5443.2,
+        "decrypt": 0.2
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 28672.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "normal_helora",
+      "rank": 32,
+      "batch_size": 4,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 0.73,
+        "ms_per_token": 5444.0
+      },
+      "latency_ms": {
+        "total": 5444.0,
+        "encrypt": 0.4,
+        "compute": 5443.2,
+        "decrypt": 0.4
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 28672.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "normal_helora",
+      "rank": 32,
+      "batch_size": 8,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 1.47,
+        "ms_per_token": 5444.8
+      },
+      "latency_ms": {
+        "total": 5444.8,
+        "encrypt": 0.8,
+        "compute": 5443.2,
+        "decrypt": 0.8
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 28672.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "normal_helora",
+      "rank": 64,
+      "batch_size": 1,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 0.18,
+        "ms_per_token": 5443.6
+      },
+      "latency_ms": {
+        "total": 5443.6,
+        "encrypt": 0.2,
+        "compute": 5443.2,
+        "decrypt": 0.2
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 57344.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "normal_helora",
+      "rank": 64,
+      "batch_size": 4,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 0.73,
+        "ms_per_token": 5444.0
+      },
+      "latency_ms": {
+        "total": 5444.0,
+        "encrypt": 0.4,
+        "compute": 5443.2,
+        "decrypt": 0.4
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 57344.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "normal_helora",
+      "rank": 64,
+      "batch_size": 8,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 1.47,
+        "ms_per_token": 5444.8
+      },
+      "latency_ms": {
+        "total": 5444.8,
+        "encrypt": 0.8,
+        "compute": 5443.2,
+        "decrypt": 0.8
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 57344.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "hybrid_nonlinear",
+      "rank": 16,
+      "batch_size": 1,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 0.18,
+        "ms_per_token": 5469.2
+      },
+      "latency_ms": {
+        "total": 5469.2,
+        "encrypt": 13.0,
+        "compute": 5443.2,
+        "decrypt": 13.0
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 14336.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "hybrid_nonlinear",
+      "rank": 16,
+      "batch_size": 4,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 0.73,
+        "ms_per_token": 5495.2
+      },
+      "latency_ms": {
+        "total": 5495.2,
+        "encrypt": 26.0,
+        "compute": 5443.2,
+        "decrypt": 26.0
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 14336.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "hybrid_nonlinear",
+      "rank": 16,
+      "batch_size": 8,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 1.44,
+        "ms_per_token": 5547.2
+      },
+      "latency_ms": {
+        "total": 5547.2,
+        "encrypt": 52.0,
+        "compute": 5443.2,
+        "decrypt": 52.0
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 14336.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "hybrid_nonlinear",
+      "rank": 32,
+      "batch_size": 1,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 0.18,
+        "ms_per_token": 5469.2
+      },
+      "latency_ms": {
+        "total": 5469.2,
+        "encrypt": 13.0,
+        "compute": 5443.2,
+        "decrypt": 13.0
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 28672.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "hybrid_nonlinear",
+      "rank": 32,
+      "batch_size": 4,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 0.73,
+        "ms_per_token": 5495.2
+      },
+      "latency_ms": {
+        "total": 5495.2,
+        "encrypt": 26.0,
+        "compute": 5443.2,
+        "decrypt": 26.0
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 28672.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "hybrid_nonlinear",
+      "rank": 32,
+      "batch_size": 8,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 1.44,
+        "ms_per_token": 5547.2
+      },
+      "latency_ms": {
+        "total": 5547.2,
+        "encrypt": 52.0,
+        "compute": 5443.2,
+        "decrypt": 52.0
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 28672.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "hybrid_nonlinear",
+      "rank": 64,
+      "batch_size": 1,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 0.18,
+        "ms_per_token": 5469.2
+      },
+      "latency_ms": {
+        "total": 5469.2,
+        "encrypt": 13.0,
+        "compute": 5443.2,
+        "decrypt": 13.0
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 57344.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "hybrid_nonlinear",
+      "rank": 64,
+      "batch_size": 4,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 0.73,
+        "ms_per_token": 5495.2
+      },
+      "latency_ms": {
+        "total": 5495.2,
+        "encrypt": 26.0,
+        "compute": 5443.2,
+        "decrypt": 26.0
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 57344.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "hybrid_nonlinear",
+      "rank": 64,
+      "batch_size": 8,
+      "throughput": {
+        "tok_per_s": 0.18,
+        "aggregate_tok_per_s": 1.44,
+        "ms_per_token": 5547.2
+      },
+      "latency_ms": {
+        "total": 5547.2,
+        "encrypt": 52.0,
+        "compute": 5443.2,
+        "decrypt": 52.0
+      },
+      "operations_per_token": {
+        "rotations": 5376,
+        "keyswitches": 5376,
+        "rescales": 448,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448
+      },
+      "memory_mb": 57344.0,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "simd_batching",
+      "rank": 16,
+      "batch_size": 1,
+      "throughput": {
+        "tok_per_s": 0.58,
+        "aggregate_tok_per_s": 0.58,
+        "ms_per_token": 1725.2
+      },
+      "latency_ms": {
+        "total": 1725.2,
+        "encrypt": 0.2,
+        "compute": 1724.8,
+        "decrypt": 0.2
+      },
+      "operations_per_token": {
+        "rotations": 1344.0,
+        "keyswitches": 1344.0,
+        "rescales": 448.0,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 3584.0
+      },
+      "memory_mb": 14067.2,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "simd_batching",
+      "rank": 16,
+      "batch_size": 4,
+      "throughput": {
+        "tok_per_s": 2.32,
+        "aggregate_tok_per_s": 9.27,
+        "ms_per_token": 431.4
+      },
+      "latency_ms": {
+        "total": 431.4,
+        "encrypt": 0.1,
+        "compute": 431.2,
+        "decrypt": 0.1
+      },
+      "operations_per_token": {
+        "rotations": 336.0,
+        "keyswitches": 336.0,
+        "rescales": 112.0,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 896.0
+      },
+      "memory_mb": 13260.8,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "simd_batching",
+      "rank": 16,
+      "batch_size": 8,
+      "throughput": {
+        "tok_per_s": 4.63,
+        "aggregate_tok_per_s": 37.07,
+        "ms_per_token": 215.8
+      },
+      "latency_ms": {
+        "total": 215.8,
+        "encrypt": 0.1,
+        "compute": 215.6,
+        "decrypt": 0.1
+      },
+      "operations_per_token": {
+        "rotations": 168.0,
+        "keyswitches": 168.0,
+        "rescales": 56.0,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448.0
+      },
+      "memory_mb": 12185.6,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "simd_batching",
+      "rank": 32,
+      "batch_size": 1,
+      "throughput": {
+        "tok_per_s": 0.58,
+        "aggregate_tok_per_s": 0.58,
+        "ms_per_token": 1725.2
+      },
+      "latency_ms": {
+        "total": 1725.2,
+        "encrypt": 0.2,
+        "compute": 1724.8,
+        "decrypt": 0.2
+      },
+      "operations_per_token": {
+        "rotations": 1344.0,
+        "keyswitches": 1344.0,
+        "rescales": 448.0,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 3584.0
+      },
+      "memory_mb": 28134.4,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "simd_batching",
+      "rank": 32,
+      "batch_size": 4,
+      "throughput": {
+        "tok_per_s": 2.32,
+        "aggregate_tok_per_s": 9.27,
+        "ms_per_token": 431.4
+      },
+      "latency_ms": {
+        "total": 431.4,
+        "encrypt": 0.1,
+        "compute": 431.2,
+        "decrypt": 0.1
+      },
+      "operations_per_token": {
+        "rotations": 336.0,
+        "keyswitches": 336.0,
+        "rescales": 112.0,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 896.0
+      },
+      "memory_mb": 26521.6,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "simd_batching",
+      "rank": 32,
+      "batch_size": 8,
+      "throughput": {
+        "tok_per_s": 4.63,
+        "aggregate_tok_per_s": 37.07,
+        "ms_per_token": 215.8
+      },
+      "latency_ms": {
+        "total": 215.8,
+        "encrypt": 0.1,
+        "compute": 215.6,
+        "decrypt": 0.1
+      },
+      "operations_per_token": {
+        "rotations": 168.0,
+        "keyswitches": 168.0,
+        "rescales": 56.0,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448.0
+      },
+      "memory_mb": 24371.2,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "simd_batching",
+      "rank": 64,
+      "batch_size": 1,
+      "throughput": {
+        "tok_per_s": 0.58,
+        "aggregate_tok_per_s": 0.58,
+        "ms_per_token": 1725.2
+      },
+      "latency_ms": {
+        "total": 1725.2,
+        "encrypt": 0.2,
+        "compute": 1724.8,
+        "decrypt": 0.2
+      },
+      "operations_per_token": {
+        "rotations": 1344.0,
+        "keyswitches": 1344.0,
+        "rescales": 448.0,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 3584.0
+      },
+      "memory_mb": 56268.8,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "simd_batching",
+      "rank": 64,
+      "batch_size": 4,
+      "throughput": {
+        "tok_per_s": 2.32,
+        "aggregate_tok_per_s": 9.27,
+        "ms_per_token": 431.4
+      },
+      "latency_ms": {
+        "total": 431.4,
+        "encrypt": 0.1,
+        "compute": 431.2,
+        "decrypt": 0.1
+      },
+      "operations_per_token": {
+        "rotations": 336.0,
+        "keyswitches": 336.0,
+        "rescales": 112.0,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 896.0
+      },
+      "memory_mb": 53043.2,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    },
+    {
+      "approach": "simd_batching",
+      "rank": 64,
+      "batch_size": 8,
+      "throughput": {
+        "tok_per_s": 4.63,
+        "aggregate_tok_per_s": 37.07,
+        "ms_per_token": 215.8
+      },
+      "latency_ms": {
+        "total": 215.8,
+        "encrypt": 0.1,
+        "compute": 215.6,
+        "decrypt": 0.1
+      },
+      "operations_per_token": {
+        "rotations": 168.0,
+        "keyswitches": 168.0,
+        "rescales": 56.0,
+        "ct_ct_muls": 0,
+        "ct_pt_muls": 448.0
+      },
+      "memory_mb": 48742.4,
+      "coverage": {
+        "layers": 32,
+        "projections_per_layer": 7
+      },
+      "depth": 2
+    }
+  ]
+}

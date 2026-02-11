@@ -331,7 +331,8 @@ class ServiceTelemetryCollector:
         """
         with self._lock:
             now = time.time()
-            if not force_refresh and (now - self._last_aggregation) < self._aggregation_interval:
+            # Force refresh if aggregated is empty or if explicitly requested
+            if not force_refresh and self._aggregated and (now - self._last_aggregation) < self._aggregation_interval:
                 return self._aggregated
 
             # Compute aggregates
