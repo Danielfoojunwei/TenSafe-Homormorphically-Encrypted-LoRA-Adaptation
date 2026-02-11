@@ -404,8 +404,26 @@ class ToyN2HEScheme(N2HEScheme):
         return sk, pk, ek
 
     def encrypt(self, pk: bytes, plaintext: np.ndarray) -> LWECiphertext:
-        """Encrypt plaintext (simulated - stores plaintext with noise)."""
+        """Encrypt plaintext (simulated - stores plaintext with noise).
+
+        Args:
+            pk: Public key bytes
+            plaintext: Plaintext as numpy array (must have at least 1 element)
+
+        Returns:
+            LWECiphertext object
+
+        Raises:
+            ValueError: If plaintext array is empty
+        """
         n = self.params.n
+
+        # Validate plaintext is non-empty to prevent IndexError
+        if plaintext.size == 0:
+            raise ValueError(
+                "Cannot encrypt empty plaintext array. "
+                "Plaintext must have at least one element."
+            )
 
         # Generate random 'a' vector
         a = np.random.randint(0, self.params.q, size=n, dtype=np.int64)
@@ -417,7 +435,7 @@ class ToyN2HEScheme(N2HEScheme):
         if plaintext.size == 1:
             m = int(plaintext.item()) % self.params.t
         else:
-            m = int(plaintext[0]) % self.params.t
+            m = int(plaintext.flat[0]) % self.params.t  # Use .flat for safe indexing
 
         noise = int(np.random.normal(0, self.params.std_dev))
         b = (delta * m + noise) % self.params.q
@@ -446,9 +464,26 @@ class ToyN2HEScheme(N2HEScheme):
         )
 
     def multiply(self, ct: LWECiphertext, plaintext: np.ndarray) -> LWECiphertext:
-        """Multiply ciphertext by plaintext scalar."""
+        """Multiply ciphertext by plaintext scalar.
+
+        Args:
+            ct: LWE ciphertext to multiply
+            plaintext: Scalar value as numpy array (must have at least 1 element)
+
+        Returns:
+            Scaled LWECiphertext
+
+        Raises:
+            ValueError: If plaintext array is empty
+        """
+        if plaintext.size == 0:
+            raise ValueError(
+                "Cannot multiply by empty plaintext array. "
+                "Plaintext must have at least one element."
+            )
+
         q = self.params.q
-        scalar = int(plaintext.item()) if plaintext.size == 1 else int(plaintext[0])
+        scalar = int(plaintext.item()) if plaintext.size == 1 else int(plaintext.flat[0])
 
         return LWECiphertext(
             a=(ct.a.astype(np.int64) * scalar) % q,
@@ -505,10 +540,41 @@ class N2HEContext:
 
         Args:
             params: Scheme parameters (default: LoRA-optimized)
-            scheme: HE scheme implementation (default: simulated)
+            scheme: HE scheme implementation. If None, attempts to load native
+                    N2HE library first, then falls back to ToyN2HEScheme only
+                    if TENSAFE_TOY_HE=1 is set.
+
+        Raises:
+            ImportError: If no scheme provided and native N2HE unavailable
+                        without toy mode enabled.
+            ToyModeNotEnabledError: If attempting to use toy scheme without
+                                   TENSAFE_TOY_HE=1 environment variable.
         """
         self.params = params or HESchemeParams.default_lora_params()
-        self.scheme = scheme or ToyN2HEScheme(self.params)
+
+        if scheme is not None:
+            self.scheme = scheme
+        else:
+            # Try native N2HE first, then fall back to toy mode with explicit opt-in
+            try:
+                from tensorguard.n2he._native import NativeN2HEScheme
+                self.scheme = NativeN2HEScheme(self.params)
+                logger.info("N2HEContext initialized with native N2HE scheme")
+            except ImportError:
+                if _TOY_HE_ENABLED:
+                    logger.warning(
+                        "Native N2HE library not available - using ToyN2HEScheme. "
+                        "WARNING: ToyN2HEScheme is NOT cryptographically secure! "
+                        "For production, install the N2HE C++ library."
+                    )
+                    self.scheme = ToyN2HEScheme(self.params)
+                else:
+                    raise ImportError(
+                        "N2HEContext requires an HE scheme implementation. Either:\n"
+                        "1. Install the N2HE C++ library for production use, or\n"
+                        "2. Set TENSAFE_TOY_HE=1 environment variable for development/testing\n"
+                        "   (WARNING: ToyN2HEScheme is NOT cryptographically secure!)"
+                    )
 
         # Key material (set by load_keys or generate_keys)
         self._sk: Optional[bytes] = None

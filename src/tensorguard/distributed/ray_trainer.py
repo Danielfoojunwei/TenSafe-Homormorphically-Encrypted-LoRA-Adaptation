@@ -189,9 +189,21 @@ class TenSafeRayTrainer:
         self._total_epsilon = 0.0
         self._total_delta = 0.0
 
-        # Initialize Ray if needed
+        # Initialize Ray if needed with proper error handling
         if RAY_AVAILABLE and not ray.is_initialized():
-            ray.init(ignore_reinit_error=True)
+            try:
+                ray.init(
+                    ignore_reinit_error=False,  # Don't silently swallow reinit errors
+                    logging_level=logging.WARNING,
+                )
+                logger.info("Ray initialized successfully")
+            except Exception as e:
+                # Log the actual error instead of swallowing it
+                logger.error(f"Ray initialization failed: {e}", exc_info=True)
+                raise RuntimeError(
+                    f"Failed to initialize Ray for distributed training: {e}. "
+                    "Check Ray cluster status or set RAY_AVAILABLE=False to use single-process training."
+                ) from e
 
     def _create_train_func(self):
         """Create training function for Ray workers.
@@ -478,17 +490,41 @@ def _clip_gradients(model: nn.Module, max_norm: float):
     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
 
 
-def _secure_aggregate_gradients(model: nn.Module):
-    """Securely aggregate gradients across workers."""
+def _secure_aggregate_gradients(model: nn.Module, timeout_seconds: int = 300):
+    """Securely aggregate gradients across workers with timeout.
+
+    Args:
+        model: Model with gradients to aggregate
+        timeout_seconds: Timeout for all_reduce operations (default: 5 minutes)
+    """
     import torch.distributed as dist
+    from datetime import timedelta
 
     if not dist.is_initialized():
         return
 
-    for param in model.parameters():
-        if param.grad is not None:
-            dist.all_reduce(param.grad, op=dist.ReduceOp.SUM)
-            param.grad.div_(dist.get_world_size())
+    # Configure timeout for collective operations
+    timeout = timedelta(seconds=timeout_seconds)
+
+    try:
+        for param in model.parameters():
+            if param.grad is not None:
+                # Use async_op=False for synchronous execution with implicit timeout
+                # from dist.init_process_group, but also add explicit monitoring
+                work = dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, async_op=True)
+                # Wait with timeout to prevent indefinite blocking
+                if not work.wait(timeout=timeout):
+                    raise TimeoutError(
+                        f"Gradient all_reduce timed out after {timeout_seconds}s. "
+                        "This may indicate a dead worker or network issue."
+                    )
+                param.grad.div_(dist.get_world_size())
+
+    except TimeoutError:
+        raise
+    except Exception as e:
+        logger.error(f"Gradient aggregation failed: {e}")
+        raise RuntimeError(f"Secure gradient aggregation failed: {e}") from e
 
 
 def _add_dp_noise(model: nn.Module, noise_multiplier: float, max_grad_norm: float, batch_size: int):

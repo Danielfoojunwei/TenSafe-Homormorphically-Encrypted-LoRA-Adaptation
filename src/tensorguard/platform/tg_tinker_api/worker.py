@@ -34,6 +34,11 @@ class ProductionMLBackend:
         self._orchestrators: Dict[str, Any] = {}
         self._configs: Dict[str, Dict[str, Any]] = {}
         self._use_mock = os.environ.get("TENSAFE_USE_MOCK", "0") == "1"
+        # Track degraded mode for health checks
+        self._degraded_mode = False
+        self._degraded_reason: Optional[str] = None
+        # Whether to fail hard on init errors instead of falling back to mock
+        self._fail_on_init_error = os.environ.get("TENSAFE_FAIL_ON_INIT_ERROR", "0") == "1"
 
         if self._use_mock:
             logger.warning(
@@ -91,9 +96,25 @@ class ProductionMLBackend:
             logger.info(f"Initialized model for {training_client_id}: {model_ref}")
 
         except Exception as e:
-            logger.error(f"Failed to initialize model: {e}")
-            # Fallback to mock if production init fails
-            logger.warning("Falling back to mock orchestrator")
+            error_msg = f"Failed to initialize production model: {e}"
+            logger.error(error_msg, exc_info=True)
+
+            # In production mode with TENSAFE_FAIL_ON_INIT_ERROR=1, raise the error
+            if self._fail_on_init_error:
+                raise RuntimeError(
+                    f"Production model initialization failed for {training_client_id}. "
+                    f"Error: {e}. Set TENSAFE_USE_MOCK=1 to use mock backend, or fix the underlying issue."
+                ) from e
+
+            # Mark system as degraded
+            self._degraded_mode = True
+            self._degraded_reason = error_msg
+
+            # Fallback to mock with LOUD warning
+            logger.critical(
+                f"DEGRADED MODE: Falling back to mock orchestrator for {training_client_id}. "
+                f"This is NOT suitable for production! Error: {e}"
+            )
             self._orchestrators[training_client_id] = _MockOrchestrator(
                 model_ref, config
             )
@@ -215,6 +236,25 @@ class ProductionMLBackend:
         if orch is None:
             raise ValueError(f"Model not found: {training_client_id}")
         return orch
+
+    def is_degraded(self) -> bool:
+        """Check if backend is running in degraded mode (using mock due to errors)."""
+        return self._degraded_mode
+
+    def get_health_status(self) -> Dict[str, Any]:
+        """Get backend health status for monitoring."""
+        mock_count = sum(1 for o in self._orchestrators.values() if isinstance(o, _MockOrchestrator))
+        prod_count = len(self._orchestrators) - mock_count
+
+        return {
+            "healthy": not self._degraded_mode and mock_count == 0,
+            "degraded": self._degraded_mode,
+            "degraded_reason": self._degraded_reason,
+            "use_mock_explicit": self._use_mock,
+            "total_models": len(self._orchestrators),
+            "production_models": prod_count,
+            "mock_models": mock_count,
+        }
 
 
 # ==============================================================================
