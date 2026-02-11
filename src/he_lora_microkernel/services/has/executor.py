@@ -16,6 +16,15 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class GateConfig:
+    """Gate configuration for gated LoRA adapters."""
+    gate_type: str = "step"  # "step" or "sign"
+    gate_lut_id: Optional[str] = None
+    input_bits: int = 8
+    clip_range: Tuple[float, float] = (-10.0, 10.0)
+
+
+@dataclass
 class AdapterState:
     """State for a loaded adapter."""
     adapter_id: str
@@ -27,11 +36,23 @@ class AdapterState:
     num_layers: int
     loaded_layers: List[int]
 
+    # Adapter type (v2: gated_lora support)
+    adapter_type: str = "linear_lora"  # "linear_lora" | "gated_lora"
+
+    # Gate configuration (for gated_lora)
+    gate_config: Optional[GateConfig] = None
+
     # Compiled schedule
     schedule: Optional[Any] = None
 
-    # Weights per layer
+    # Weights per layer (LoRA A/B)
     weights: Dict[int, Dict[str, Any]] = field(default_factory=dict)
+
+    # Gate weights per layer (for gated_lora)
+    gate_weights: Dict[int, Dict[str, Any]] = field(default_factory=dict)
+
+    # Hybrid backend (for gated_lora)
+    hybrid_backend: Optional[Any] = None
 
     # Memory usage
     memory_mb: float = 0.0
@@ -702,6 +723,174 @@ class HASExecutor:
             results[(layer_idx, proj_type)] = (delta, timing)
 
         return results
+
+    def apply_gated_token_step(
+        self,
+        request_id: str,
+        layer_idx: int,
+        projection_type: str,
+        hidden_states: np.ndarray,
+        base_output: np.ndarray,
+    ) -> Tuple[Optional[np.ndarray], Dict[str, Any]]:
+        """
+        Apply gated HE-LoRA delta for a single layer/projection.
+
+        Uses hybrid CKKS-TFHE: CKKS for linear LoRA, TFHE for gate.
+
+        Args:
+            request_id: Request ID
+            layer_idx: Layer index
+            projection_type: "q", "k", "v", or "o"
+            hidden_states: Input hidden states (batch, seq, hidden)
+            base_output: Base model output Wx
+
+        Returns:
+            Tuple of (output array with gated delta applied, timing stats)
+        """
+        timing = {
+            'ckks_lora_time_us': 0,
+            'ckks_gate_pre_time_us': 0,
+            'bridge_time_us': 0,
+            'tfhe_lut_time_us': 0,
+            'total_time_us': 0,
+            'gate_value': 0.0,
+            'quantization_error': 0.0,
+        }
+
+        request = self._requests.get(request_id)
+        if request is None:
+            return None, timing
+
+        adapter = self._adapters.get(request.adapter_id)
+        if adapter is None:
+            return None, timing
+
+        # Check adapter type
+        if adapter.adapter_type != "gated_lora":
+            # Fall back to linear for non-gated adapters
+            delta, linear_timing = self.apply_token_step(
+                request_id, layer_idx, projection_type, hidden_states
+            )
+            if delta is not None:
+                return base_output + delta, {**timing, **linear_timing}
+            return base_output, timing
+
+        # Check if this layer/projection is targeted
+        if layer_idx not in adapter.loaded_layers:
+            return base_output, timing
+
+        if projection_type not in adapter.targets:
+            return base_output, timing
+
+        # Get LoRA weights
+        layer_weights = adapter.weights.get(layer_idx, {})
+        A = layer_weights.get(f'{projection_type}_A')
+        B = layer_weights.get(f'{projection_type}_B')
+
+        if A is None or B is None:
+            return base_output, timing
+
+        # Get gate weights
+        gate_weights = adapter.gate_weights.get(layer_idx, {})
+        w_gate = gate_weights.get(f'{projection_type}_w_gate')
+        b_gate = gate_weights.get(f'{projection_type}_b_gate')
+
+        if w_gate is None:
+            # No gate weights, fall back to linear
+            delta, linear_timing = self.apply_token_step(
+                request_id, layer_idx, projection_type, hidden_states
+            )
+            if delta is not None:
+                return base_output + delta, {**timing, **linear_timing}
+            return base_output, timing
+
+        t_start = time.perf_counter_ns()
+
+        # Check if we have a hybrid backend initialized
+        if adapter.hybrid_backend is not None:
+            # Use hybrid backend for gated computation
+            try:
+                from ...hybrid_compiler.adapters import (
+                    HEGatedLoRAAdapter, GatedLoRAAdapterConfig, AdapterWeights
+                )
+
+                config = GatedLoRAAdapterConfig(
+                    hidden_size=hidden_states.shape[-1],
+                    lora_rank=adapter.rank,
+                    lora_alpha=adapter.alpha,
+                    gate_type=adapter.gate_config.gate_type if adapter.gate_config else "step",
+                )
+
+                weights = AdapterWeights(
+                    lora_A=A.astype(np.float64),
+                    lora_B=B.astype(np.float64),
+                    w_gate=w_gate.astype(np.float64),
+                    b_gate=b_gate.astype(np.float64) if b_gate is not None else None,
+                )
+
+                gated_adapter = HEGatedLoRAAdapter(config, adapter.hybrid_backend)
+                output, metrics = gated_adapter.forward(
+                    hidden_states.flatten(),
+                    base_output.flatten(),
+                    weights,
+                )
+
+                timing['ckks_lora_time_us'] = int(metrics.ckks_lora_time_ms * 1000)
+                timing['ckks_gate_pre_time_us'] = int(metrics.ckks_gate_pre_time_ms * 1000)
+                timing['bridge_time_us'] = int((metrics.bridge_to_tfhe_time_ms + metrics.bridge_to_ckks_time_ms) * 1000)
+                timing['tfhe_lut_time_us'] = int(metrics.tfhe_lut_time_ms * 1000)
+                timing['gate_value'] = metrics.gate_value
+                timing['quantization_error'] = metrics.quantization_error
+                timing['total_time_us'] = (time.perf_counter_ns() - t_start) // 1000
+
+                return output.reshape(base_output.shape), timing
+
+            except ImportError:
+                logger.warning("Hybrid compiler not available, using simulation")
+
+        # Simulation path (no actual HE)
+        # Phase 1: LoRA delta
+        t0 = time.perf_counter_ns()
+        x_flat = hidden_states.flatten()
+        u = A @ x_flat
+        delta = B @ u
+        timing['ckks_lora_time_us'] = (time.perf_counter_ns() - t0) // 1000
+
+        # Phase 2: Gate pre-activation
+        t0 = time.perf_counter_ns()
+        z = w_gate @ x_flat
+        if b_gate is not None:
+            z = z + b_gate.flat[0]
+        timing['ckks_gate_pre_time_us'] = (time.perf_counter_ns() - t0) // 1000
+
+        # Phase 3-5: Gate via LUT (simulated)
+        t0 = time.perf_counter_ns()
+        gate_type = adapter.gate_config.gate_type if adapter.gate_config else "step"
+        if gate_type == "step":
+            g = 1.0 if float(z) >= 0 else 0.0
+        else:  # sign
+            if float(z) > 0:
+                g = 1.0
+            elif float(z) < 0:
+                g = -1.0
+            else:
+                g = 0.0
+        timing['tfhe_lut_time_us'] = (time.perf_counter_ns() - t0) // 1000
+        timing['gate_value'] = g
+
+        # Phase 6-7: Apply gate and final add
+        scale = adapter.alpha / adapter.rank
+        gated_delta = g * scale * delta
+        output = base_output.flatten() + gated_delta
+
+        timing['total_time_us'] = (time.perf_counter_ns() - t_start) // 1000
+
+        # Update statistics
+        request.tokens_processed += 1
+        self._total_tokens += 1
+        self._total_operations += 1
+
+        return output.reshape(base_output.shape), timing
 
     # -------------------------------------------------------------------------
     # STATISTICS
